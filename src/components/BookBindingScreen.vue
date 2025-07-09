@@ -12,9 +12,22 @@
 
     <!-- METADATA BREADCRUMB -->
     <div class="breadcrumb">
-      {{ title }}<span v-if="location">, {{ location }}</span
-      ><span v-if="shelfmark">, {{ shelfmark }}</span
-      ><span v-if="manuscriptDate">, {{ manuscriptDate }}</span>
+      {{ title }}
+      <span v-if="location">, {{ location }}</span>
+      <span v-if="shelfmark">, {{ shelfmark }}</span>
+      <span v-if="manuscriptDate">, {{ manuscriptDate }}</span>
+    </div>
+
+    <!-- PEN TOOLBAR -->
+    <div class="pen-toolbar">
+      <button
+        v-for="pen in pens"
+        :key="pen.id"
+        :class="['pen-btn', { active: activePenId === pen.id }]"
+        @click="selectPen(pen.id)"
+      >
+        Pen {{ pen.id }}
+      </button>
     </div>
 
     <!-- RULER + TABLE -->
@@ -51,14 +64,14 @@
       <table class="binding-table">
         <thead>
           <tr>
-            <th class="black-text">Quire</th>
-            <th class="black-text">Leaves</th>
-            <th class="canvas-col head-tail">Head</th>
-            <th class="canvas-col">Sewing</th>
-            <th class="canvas-col">Change</th>
-            <th class="canvas-col">Holes</th>
-            <th class="canvas-col head-tail">Tail</th>
-            <th class="notes-header">Notes</th>
+            <th class="header-dark">Quire</th>
+            <th class="header-dark">Leaves</th>
+            <th class="header-light head-tail">Head</th>
+            <th class="header-light">Sewing</th>
+            <th class="header-light">Change</th>
+            <th class="header-light">Holes</th>
+            <th class="header-light head-tail">Tail</th>
+            <th class="header-dark">Notes</th>
           </tr>
         </thead>
         <tbody>
@@ -67,63 +80,102 @@
             :key="i"
             :class="i % 2 === 0 ? 'even' : 'odd'"
           >
-            <td class="black-text">{{ row.roman }}</td>
-            <td class="black-text">{{ row.range }}</td>
-            <td class="canvas-cell">
-              <div v-if="headbands" class="headband-bar" />
-            </td>
+            <td class="cell-text">{{ row.roman }}</td>
+            <td class="cell-text">{{ row.range }}</td>
+
+            <!-- Headbands (left) -->
             <td class="canvas-cell">
               <div
-                v-for="(pos, j) in supportPositions"
-                :key="j"
+                v-for="(pos, idx) in headbandPositions"
+                :key="'hb-left-' + idx"
+                class="headband-bar"
+                v-draggable="(newPos) => (headbandPositions[idx] = newPos)"
+                :style="{ left: pos + '%' }"
+              />
+            </td>
+
+            <!-- Sewing supports -->
+            <td class="canvas-cell">
+              <div
+                v-for="(sp, idx) in supportEntries"
+                :key="sp.id"
                 class="support-bar"
-                :style="{ left: pos + '%' }"
+                v-draggable="
+                  (newPos) => (supportEntries[idx].position = newPos)
+                "
+                :style="{ left: sp.position + '%', width: sp.width + 'px' }"
               />
             </td>
+
+            <!-- Change‐over stations -->
             <td class="canvas-cell">
               <div
-                v-for="(pos, j) in changePositions"
-                :key="j"
+                v-for="(pos, idx) in changePositions"
+                :key="'co-' + idx"
                 class="change-bar"
+                v-draggable="(newPos) => (changePositions[idx] = newPos)"
                 :style="{ left: pos + '%' }"
               />
             </td>
+
+            <!-- Sewing holes -->
             <td class="canvas-cell">
               <div
-                v-for="(pos, j) in holePositions"
-                :key="j"
+                v-for="(pos, idx) in holePositions"
+                :key="'hole-' + idx"
                 class="hole-dot"
+                v-draggable="(newPos) => (holePositions[idx] = newPos)"
                 :style="{ left: pos + '%' }"
               />
             </td>
+
+            <!-- Headbands (right) -->
             <td class="canvas-cell">
-              <div v-if="headbands" class="headband-bar" />
+              <div
+                v-for="(pos, idx) in headbandPositions"
+                :key="'hb-right-' + idx"
+                class="headband-bar"
+                v-draggable="
+                  (newPos) => (headbandPositions[idx] = 100 - newPos)
+                "
+                :style="{ left: 100 - pos + '%' }"
+              />
             </td>
+
             <td>
-              <input type="text" class="notes-input" v-model="notes[i]" />
+              <input
+                type="text"
+                class="notes-input"
+                v-model="notes[i]"
+                placeholder="Enter notes"
+              />
             </td>
           </tr>
           <tr class="add-row">
-            <td class="add-cell" colspan="8">+ Add</td>
+            <td class="add-cell" colspan="8">+ Add Row</td>
           </tr>
         </tbody>
       </table>
     </div>
 
-    <!-- FOOTER LEGEND + CONTINUE -->
+    <!-- FOOTER LEGEND + CONTROLS -->
     <div class="footer">
       <div class="legend">
         <div>
-          <span class="swatch headband" /> Headbands <button>+ Add</button>
+          <span class="swatch headband" /> Headbands
+          <button @click="addHeadband()">+ Add</button>
         </div>
         <div>
-          <span class="swatch support" /> Sewing support <button>+ Add</button>
+          <span class="swatch support" /> Sewing support
+          <button @click="addSupport()">+ Add</button>
         </div>
         <div>
-          <span class="swatch change" /> Change-over <button>+ Add</button>
+          <span class="swatch change" /> Change-over
+          <button @click="addChange()">+ Add</button>
         </div>
         <div>
-          <span class="swatch hole" /> Sewing holes <button>+ Add</button>
+          <span class="swatch hole" /> Sewing holes
+          <button @click="addHole()">+ Add</button>
         </div>
       </div>
       <button class="continue-btn" @click="$router.push('/')">Continue</button>
@@ -132,43 +184,70 @@
 </template>
 
 <script>
-import { ref, computed, reactive } from "vue";
+/* eslint-disable */
+import { ref, computed, reactive, onMounted } from "vue";
 
 export default {
   name: "BookBindingScreen",
+  directives: {
+    draggable: {
+      mounted(el, binding) {
+        el.style.position = "absolute";
+        const onMouseMove = (e) => {
+          const parent = el.parentElement;
+          const rect = parent.getBoundingClientRect();
+          let x = e.clientX - rect.left;
+          x = Math.max(0, Math.min(x, rect.width));
+          const pct = (x / rect.width) * 100;
+          el.style.left = pct + "%";
+          binding.value(pct);
+        };
+        const onMouseUp = () => {
+          document.removeEventListener("mousemove", onMouseMove);
+          document.removeEventListener("mouseup", onMouseUp);
+        };
+        const onMouseDown = (e) => {
+          e.preventDefault();
+          document.addEventListener("mousemove", onMouseMove);
+          document.addEventListener("mouseup", onMouseUp);
+        };
+        el.addEventListener("mousedown", onMouseDown);
+        el._cleanup = () => {
+          el.removeEventListener("mousedown", onMouseDown);
+        };
+      },
+      unmounted(el) {
+        el._cleanup && el._cleanup();
+      },
+    },
+  },
+  // eslint-disable-next-line vue/no-dupe-keys
   props: {
     title: { type: String, required: true },
     manuscriptDate: { type: String, default: "" },
     location: { type: String, required: true },
     shelfmark: { type: String, default: "" },
-    quires: { type: Number, required: true },
-    leavesPerQuire: { type: Number, required: true },
+    quires: { type: [Number, String], required: true },
+    leavesPerQuire: { type: [Number, String], required: true },
     collationStyle: { type: String, default: "foliate" },
-    frontEndleaves: { type: Number, default: 0 },
-    backEndleaves: { type: Number, default: 0 },
-    sewingSupports: { type: Number, required: true },
+    frontEndleaves: { type: [Number, String], default: 0 },
+    backEndleaves: { type: [Number, String], default: 0 },
+    sewingSupports: { type: [Number, String], required: true },
     headbands: { type: Boolean, default: false },
     changeOver: { type: Boolean, default: false },
-    spineLength: { type: Number, required: true },
+    spineLength: { type: [Number, String], required: true },
   },
   setup(props) {
-    // 1) Build rows (front endleaves → quires → back endleaves)
-    const romanArr = [
-      "I",
-      "II",
-      "III",
-      "IV",
-      "V",
-      "VI",
-      "VII",
-      "VIII",
-      "IX",
-      "X",
-    ];
+    const qNum = computed(() => parseInt(props.quires) || 0);
+    const leavesN = computed(() => parseInt(props.leavesPerQuire) || 0);
+    const feN = computed(() => parseInt(props.frontEndleaves) || 0);
+    const beN = computed(() => parseInt(props.backEndleaves) || 0);
+    const slN = computed(() => parseInt(props.spineLength) || 0);
+
+    const roman = ["I", "II", "III", "IV", "V", "VI", "VII", "VIII", "IX", "X"];
     const rows = computed(() => {
       const out = [];
-      // front endleaves
-      for (let i = 0; i < props.frontEndleaves; i++) {
+      for (let i = 0; i < feN.value; i++) {
         const n = i + 1;
         out.push({
           roman: "",
@@ -178,21 +257,19 @@ export default {
               : `p ${2 * n - 1}–${2 * n}`,
         });
       }
-      // main quires
-      for (let i = 0; i < props.quires; i++) {
-        const start = i * props.leavesPerQuire + 1;
-        const end = start + props.leavesPerQuire - 1;
+      for (let i = 0; i < qNum.value; i++) {
+        const start = i * leavesN.value + 1,
+          end = start + leavesN.value - 1;
         out.push({
-          roman: romanArr[i] || `${i + 1}`,
+          roman: roman[i] || `${i + 1}`,
           range:
             props.collationStyle === "foliate"
               ? `${start}r–${end}v`
               : `p ${2 * start - 1}–${2 * end}`,
         });
       }
-      // back endleaves
-      const offset = props.quires * props.leavesPerQuire;
-      for (let i = 0; i < props.backEndleaves; i++) {
+      const offset = qNum.value * leavesN.value;
+      for (let i = 0; i < beN.value; i++) {
         const n = offset + (i + 1);
         out.push({
           roman: "",
@@ -205,16 +282,13 @@ export default {
       return out;
     });
 
-    // notes array
     const notes = reactive(Array(rows.value.length).fill(""));
 
-    // 2) Ruler logic
-    const ruler = ref(null),
-      tooltipVisible = ref(false),
-      tooltipX = ref(0),
-      tooltipCm = ref(0);
-
-    const totalCm = computed(() => props.spineLength);
+    const ruler = ref(null);
+    const tooltipVisible = ref(false);
+    const tooltipX = ref(0);
+    const tooltipCm = ref(0);
+    const totalCm = computed(() => slN.value);
     const majorTicks = computed(() =>
       Array.from({ length: totalCm.value + 1 }, (_, i) => i)
     );
@@ -223,7 +297,6 @@ export default {
         i % 10 === 0 ? null : (i / (totalCm.value * 10)) * 100
       ).filter((x) => x != null)
     );
-
     function onRulerMove(e) {
       const rect = ruler.value.getBoundingClientRect();
       const x = e.clientX - rect.left;
@@ -232,22 +305,59 @@ export default {
       tooltipVisible.value = true;
     }
 
-    // 3) Support / change / hole positions
-    const supportPositions = computed(() =>
-      Array.from(
-        { length: props.sewingSupports },
-        (_, i) => ((i + 1) / (props.sewingSupports + 1)) * 100
-      )
-    );
-    const changePositions = computed(() => (props.changeOver ? [25, 75] : []));
-    const holePositions = computed(() =>
-      Array.from(
-        { length: Math.max(1, Math.floor(props.leavesPerQuire / 2)) },
-        (_, i) => ((i + 1) / (Math.floor(props.leavesPerQuire / 2) + 1)) * 100
-      )
-    );
+    const headbandPositions = reactive(props.headbands ? [5, 95] : []);
+    function addHeadband() {
+      headbandPositions.push(50);
+    }
+
+    const supportEntries = reactive([]);
+    const changePositions = reactive(props.changeOver ? [25, 75] : []);
+    const holePositions = reactive([]);
+
+    onMounted(() => {
+      for (let i = 0; i < props.sewingSupports; i++) {
+        supportEntries.push({
+          id: i + 1,
+          position: ((i + 1) / (props.sewingSupports + 1)) * 100,
+          width: 6,
+        });
+      }
+      const count = Math.max(1, Math.floor(leavesN.value / 2));
+      for (let i = 0; i < count; i++) {
+        holePositions.push(((i + 1) / (count + 1)) * 100);
+      }
+    });
+
+    function addSupport() {
+      const type = window.prompt("single or double?", "single");
+      const id = supportEntries.length + 1;
+      supportEntries.push({
+        id,
+        position: 50,
+        width: type === "double" ? 12 : 6,
+      });
+    }
+
+    function addChange() {
+      changePositions.push(50);
+    }
+
+    function addHole() {
+      holePositions.push(50);
+    }
+
+    const pens = ref([{ id: 1 }, { id: 2 }]);
+    const activePenId = ref(1);
+    function selectPen(id) {
+      activePenId.value = id;
+    }
 
     return {
+      title: props.title,
+      manuscriptDate: props.manuscriptDate,
+      location: props.location,
+      shelfmark: props.shelfmark,
+
       rows,
       notes,
       ruler,
@@ -258,13 +368,25 @@ export default {
       majorTicks,
       minorTicks,
       onRulerMove,
-      supportPositions,
+
+      headbandPositions,
+      addHeadband,
+      supportEntries,
+      addSupport,
       changePositions,
+      addChange,
       holePositions,
+      addHole,
+
+      pens,
+      activePenId,
+      selectPen,
     };
   },
 };
 </script>
+
+
 
 <style scoped>
 .bookbinding-screen {
@@ -276,8 +398,6 @@ export default {
   overflow: hidden;
   font-family: Arial, sans-serif;
 }
-
-/* Header */
 .header-bar {
   display: flex;
   justify-content: space-between;
@@ -295,7 +415,6 @@ export default {
   font-size: 16px;
 }
 
-/* Title */
 .title-bar {
   background: #0f2340;
   text-align: center;
@@ -304,13 +423,31 @@ export default {
   color: #a0a0a0;
   font-weight: 400;
 }
-
-/* Breadcrumb */
 .breadcrumb {
   background: #1f2a3a;
   padding: 8px 24px;
   font-size: 14px;
   color: white;
+}
+
+/* Pen toolbar */
+.pen-toolbar {
+  display: flex;
+  gap: 12px;
+  padding: 8px 24px;
+  background: #0f2340;
+}
+.pen-btn {
+  padding: 6px 12px;
+  background: #1f2a3a;
+  border: 1px solid #555;
+  color: white;
+  cursor: pointer;
+  border-radius: 4px;
+}
+.pen-btn.active {
+  background: #4ea5de;
+  border-color: #4ea5de;
 }
 
 /* Ruler */
@@ -345,7 +482,7 @@ export default {
   color: white;
 }
 
-/* Data table */
+/* Table */
 .binding-table {
   width: 80%;
   margin: 0 auto 16px;
@@ -358,14 +495,22 @@ export default {
   padding: 6px 8px;
   font-size: 14px;
 }
-.binding-table th {
+.header-dark {
   background: #0f2340;
   color: white;
   font-weight: 600;
-  font-size: 16px;
 }
-.black-text {
-  color: black !important;
+.header-light {
+  background: #fff;
+  color: black;
+  font-weight: 600;
+}
+.head-tail {
+  writing-mode: vertical-rl;
+  text-orientation: upright;
+}
+.cell-text {
+  color: black;
 }
 .canvas-col {
   background: white !important;
@@ -374,21 +519,12 @@ export default {
   position: relative;
   background: rgba(15, 35, 64, 0.1);
 }
-/* Head/Tail vertical */
-.head-tail {
-  writing-mode: vertical-rl;
-  text-orientation: upright;
-  font-size: 14px;
-  font-weight: 600;
-}
-/* Striping */
 tbody tr.even {
   background: #e1e1e1;
 }
 tbody tr.odd {
   background: #c8c8c8;
 }
-/* + Add row */
 .add-row .add-cell {
   text-align: left;
   color: #555;
@@ -401,7 +537,6 @@ tbody tr.odd {
   position: absolute;
   top: 0;
   bottom: 0;
-  left: 0;
   width: 16px;
   background: #4ea5de;
 }
@@ -431,15 +566,13 @@ tbody tr.odd {
   transform: translate(-50%, -50%);
 }
 
-/* Notes input */
+/* Notes & footer */
 .notes-input {
   width: 100%;
   padding: 4px;
   font-size: 14px;
   border: 1px solid #999;
 }
-
-/* Footer */
 .footer {
   background: #1f2a3a;
   padding: 16px 24px;

@@ -202,8 +202,8 @@
               <input type="checkbox" v-model="headbands" /> Headbands
             </label>
             <label class="checkbox">
-              <input type="checkbox" v-model="changeOver" />
-              Change‐Over Stations
+              <input type="checkbox" v-model="changeOver" /> Change‐Over
+              Stations
             </label>
           </div>
         </div>
@@ -304,7 +304,7 @@ function onContinue() {
 .form-container {
   margin: 0 auto;
   width: 800px;
-  padding: 64px 0 48px; /* ↑ more top/bottom breathing room */
+  padding: 64px 0 48px;
 }
 
 .metadata {
@@ -353,7 +353,7 @@ function onContinue() {
 }
 
 .field {
-  margin-bottom: 32px; /* increased spacing */
+  margin-bottom: 32px;
 }
 
 .field-header {
@@ -377,7 +377,7 @@ function onContinue() {
   display: flex;
   align-items: center;
   gap: 16px;
-  margin-top: 12px; /* increased */
+  margin-top: 12px;
 }
 
 .number-input {
@@ -426,7 +426,7 @@ function onContinue() {
 .button-container {
   display: flex;
   justify-content: center;
-  margin-top: 24px; /* less distance from form */
+  margin-top: 24px;
 }
 
 .continue-btn {
