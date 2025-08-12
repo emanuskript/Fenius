@@ -9,20 +9,33 @@ const routes = [
     { path: '/', name: 'landing', component: LandingPage },
     { path: '/input-screen', name: 'input', component: InputScreen },
     {
-        path: '/book-binding', name: 'bookBinding',
+        path: '/book-binding',
+        name: 'bookBinding',
         component: BookBindingScreen,
-        // tell Vue Router to take all query params and pass them as props
         props: route => ({
             title: route.query.title,
             manuscriptDate: route.query.date,
             location: route.query.location,
             shelfmark: route.query.shelfmark,
-            quires: Number(route.query.quires),
+
+            // ✅ Important: pass foliosPerQuire (what InputScreen sends)
+            foliosPerQuire: Number(route.query.foliosPerQuire),
+            // keep this for older links (optional)
             leavesPerQuire: Number(route.query.leavesPerQuire),
+
+            quires: Number(route.query.quires),
+            collationStyle: route.query.collationStyle,
+            frontEndleaves: Number(route.query.frontEndleaves),
+            backEndleaves: Number(route.query.backEndleaves),
+
             sewingSupports: Number(route.query.sewingSupports),
             headbands: route.query.headbands === 'true',
             changeOver: route.query.changeOver === 'true',
-            spineLength: Number(route.query.spineLength)
+            spineLength: Number(route.query.spineLength),
+
+            // passthroughs if present
+            quiresStyle: route.query.quiresStyle,
+            sewingType: route.query.sewingType,
         })
     },
 ]
