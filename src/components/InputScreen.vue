@@ -51,7 +51,9 @@
           <div class="field">
             <div class="field-header">
               <span class="field-title">Number of Quires *</span>
-              <span class="info" title="Choose how many quires (1–10)">ℹ</span>
+              <span class="info" data-tooltip="Choose how many quires (1-10)"
+                >ℹ</span
+              >
             </div>
             <div class="field-body">
               <input
@@ -79,7 +81,9 @@
           <div class="field">
             <div class="field-header">
               <span class="field-title">Folios per Quire</span>
-              <span class="info" title="These entries can be modified later"
+              <span
+                class="info"
+                data-tooltip="These entries can be modified later"
                 >ℹ</span
               >
             </div>
@@ -115,7 +119,7 @@
           <div class="field">
             <div class="field-header">
               <span class="field-title">Sewing Supports</span>
-              <span class="info" title="Choose number of supports (1–6)"
+              <span class="info" data-tooltip="Choose number of supports (1–6)"
                 >ℹ</span
               >
             </div>
@@ -146,7 +150,9 @@
           <div class="field">
             <div class="field-header">
               <span class="field-title">Spine Length (cm)</span>
-              <span class="info" title="Enter spine length in cm">ℹ</span>
+              <span class="info" data-tooltip="Enter spine length in cm"
+                >ℹ</span
+              >
             </div>
             <div class="field-body">
               <input
@@ -164,7 +170,7 @@
               <span class="field-title">Front Endleaves</span>
               <span
                 class="info"
-                title="Enter folios that precede the bookblock."
+                data-tooltip="Enter folios that precede the bookblock."
                 >ℹ</span
               >
             </div>
@@ -182,7 +188,9 @@
           <div class="field">
             <div class="field-header">
               <span class="field-title">Back Endleaves</span>
-              <span class="info" title="Enter folios that follow the bookblock."
+              <span
+                class="info"
+                data-tooltip="Enter folios that follow the bookblock."
                 >ℹ</span
               >
             </div>
@@ -225,9 +233,10 @@
 
 <script setup>
 import { ref, computed } from "vue";
-import { useRouter } from "vue-router";
+import { useRouter, useRoute } from "vue-router";
 
 const router = useRouter();
+const route = useRoute();
 
 // Metadata
 const title = ref("");
@@ -247,6 +256,23 @@ const frontEndleaves = ref(null);
 const backEndleaves = ref(null);
 const headbands = ref(false);
 const changeOver = ref(false);
+
+// Fill from route query
+title.value = route.query.title || "";
+manuscriptDate.value = route.query.date || "";
+location.value = route.query.location || "";
+shelfmark.value = route.query.shelfmark || "";
+quires.value = Number(route.query.quires) || 1;
+quiresStyle.value = route.query.quiresStyle || "roman";
+foliosPerQuire.value = Number(route.query.foliosPerQuire) || 1;
+collationStyle.value = route.query.collationStyle || "foliate";
+frontEndleaves.value = Number(route.query.frontEndleaves) || null;
+backEndleaves.value = Number(route.query.backEndleaves) || null;
+spineLength.value = Number(route.query.spineLength) || null;
+sewingSupports.value = Number(route.query.sewingSupports) || 0;
+sewingType.value = route.query.sewingType || "";
+headbands.value = route.query.headbands === "true";
+changeOver.value = route.query.changeOver === "true";
 
 const canContinue = computed(
   () => title.value.trim() !== "" && quires.value >= 1
@@ -277,6 +303,7 @@ function onContinue() {
 </script>
 
 <style scoped>
+/* original styling unchanged */
 .input-page {
   display: flex;
   flex-direction: column;
@@ -284,7 +311,6 @@ function onContinue() {
   background: linear-gradient(to bottom, #3a4b60, #112233);
   color: white;
 }
-
 .header-bar {
   background: #c0c2c3;
   color: black;
@@ -292,37 +318,30 @@ function onContinue() {
   font-weight: 600;
   font-size: 18px;
 }
-
 .title {
   text-align: center;
   margin: 16px 0;
   font-size: 32px;
   color: #a0a0a0;
 }
-
-/* Center the form, add generous top padding */
 .form-container {
   margin: 0 auto;
   width: 800px;
   padding: 64px 0 48px;
 }
-
 .metadata {
   display: flex;
   gap: 64px;
 }
-
 .meta-group {
   display: flex;
   flex-direction: column;
   flex: 1;
 }
-
 .field-label {
   font-size: 14px;
   font-weight: 500;
 }
-
 .field-input {
   margin-top: 4px;
   padding: 8px 12px;
@@ -332,54 +351,39 @@ function onContinue() {
   color: white;
   font-size: 16px;
 }
-
 .mt {
   margin-top: 16px;
 }
-
 .separator {
   height: 1px;
   background: #2e3a4b;
   margin: 32px 0;
 }
-
 .body {
   display: flex;
   gap: 80px;
 }
-
 .column {
   flex: 1;
 }
-
 .field {
   margin-bottom: 32px;
 }
-
 .field-header {
   display: flex;
   align-items: center;
   gap: 8px;
 }
-
 .field-title {
   font-size: 16px;
   font-weight: 600;
 }
-
-.info {
-  font-size: 16px;
-  color: #ccc;
-  cursor: help;
-}
-
 .field-body {
   display: flex;
   align-items: center;
   gap: 16px;
   margin-top: 12px;
 }
-
 .number-input {
   width: 80px;
   padding: 8px;
@@ -390,45 +394,37 @@ function onContinue() {
   text-align: center;
   font-size: 16px;
 }
-
 .number-input.short {
   width: 60px;
 }
-
 .radios {
   display: flex;
   flex-direction: column;
   gap: 8px;
 }
-
 .radio {
   display: flex;
   align-items: center;
   gap: 8px;
   font-size: 14px;
 }
-
 .extras {
   display: flex;
   flex-direction: column;
   gap: 16px;
   margin-top: 24px;
 }
-
 .checkbox {
   display: flex;
   align-items: center;
   gap: 8px;
   font-size: 16px;
 }
-
-/* Bring Continue button closer */
 .button-container {
   display: flex;
   justify-content: center;
   margin-top: 24px;
 }
-
 .continue-btn {
   padding: 12px 48px;
   border: 1px solid white;
@@ -438,15 +434,44 @@ function onContinue() {
   font-size: 18px;
   cursor: pointer;
 }
-
 .continue-btn:disabled {
   opacity: 0.5;
   cursor: not-allowed;
 }
-
 .continue-btn:not(:disabled):hover {
   background: white;
   color: black;
+}
+
+/* ✅ Tooltip styling */
+.info {
+  position: relative;
+  display: inline-block;
+  cursor: help;
+  font-size: 16px;
+  color: #ccc;
+}
+
+.info::after {
+  content: attr(data-tooltip);
+  position: absolute;
+  bottom: 125%;
+  left: 50%;
+  transform: translateX(-50%);
+  background: #333;
+  color: #fff;
+  font-size: 12px;
+  padding: 6px 10px;
+  border-radius: 4px;
+  white-space: nowrap;
+  opacity: 0;
+  pointer-events: none;
+  transition: opacity 0.2s ease-in-out;
+  z-index: 1000;
+}
+
+.info:hover::after {
+  opacity: 1;
 }
 </style>
 

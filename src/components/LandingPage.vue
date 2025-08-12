@@ -34,10 +34,40 @@ function goToInputScreen() {
 
 function handleFileUpload(event) {
   const file = event.target.files[0];
-  if (file) {
-    console.log("File selected:", file);
-    // Placeholder for JSON parsing or backend upload
-  }
+  if (!file) return;
+
+  const reader = new FileReader();
+  reader.onload = (e) => {
+    try {
+      const json = JSON.parse(e.target.result);
+      const project = json?.project || {};
+      const metadata = project.metadata || {};
+      const preferences = project.preferences || {};
+
+      const fields = {
+        title: project.title || "",
+        shelfmark: project.shelfmark || "",
+        date: metadata.date || "",
+        // These fields assume you're using them in InputScreen
+        foliosPerQuire: Number(preferences.leavesPerQuire || 0),
+        frontEndleaves: Number(preferences.startLeaves || 0),
+        backEndleaves: Number(preferences.endLeaves || 0),
+        spineLength: Number(preferences.spineLength || 0),
+        sewingSupports: Number(preferences.sewingSupports || 0),
+        headbands: preferences.headband === true,
+        changeOver: preferences.changeOvers === true,
+        collationStyle: preferences.collationFormula || "",
+        quiresStyle: preferences.quiresStyle || "",
+        sewingType: preferences.sewingType || "",
+        location: preferences.location || "", // fallback
+      };
+
+      router.push({ path: "/input-screen", query: fields });
+    } catch (err) {
+      alert("Invalid JSON file: " + err.message);
+    }
+  };
+  reader.readAsText(file);
 }
 </script>
 
@@ -102,13 +132,12 @@ function handleFileUpload(event) {
 }
 </style>
 
-<!-- Ensure body and html have no margins (place this in your global style, e.g., main.css or index.css) -->
 <style>
 html,
 body {
   margin: 0;
   padding: 0;
-  overflow: hidden; /* Prevent scrolling */
+  overflow: hidden;
   height: 100%;
 }
 </style>
