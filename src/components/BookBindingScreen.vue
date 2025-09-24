@@ -34,67 +34,66 @@
         @mouseleave="endDraw"
       ></canvas>
 
+      <!-- Top ruler aligned to Head..Tail columns -->
+      <div
+        class="top-ruler"
+        :style="{ marginLeft: topRulerLeft + 'px', width: topRulerWidth + 'px' }"
+      >
+        <div
+          class="ruler"
+          ref="ruler"
+          @mousemove="onRulerMove"
+          @mouseleave="tooltipVisible = false"
+        >
+          <!-- Major ticks with labels -->
+          <div
+            v-for="cm in majorTicks"
+            :key="'M' + cm"
+            :class="[
+              'tick',
+              'major',
+              {
+                'tick-first': cm === 0,
+                'tick-last':
+                  totalCmNumber > 0 && Number.isInteger(totalCmNumber) && cm === totalCmNumber,
+              },
+            ]"
+            :style="{ left: (cm / Math.max(1, totalCmNumber)) * 100 + '%' }"
+          >
+            <span v-if="cm % 10 === 0" class="tick-label">{{ cm }}</span>
+          </div>
+          <div
+            v-for="pct in minorTicks"
+            :key="'m' + pct"
+            class="tick minor"
+            :style="{ left: pct + '%' }"
+          />
+
+          <!-- Drag feedback -->
+          <div v-if="dragFeedback.visible">
+            <div class="drag-marker start" :style="{ left: dragFeedback.startPct + '%' }"></div>
+            <div class="drag-marker current" :style="{ left: dragFeedback.currentPct + '%' }"></div>
+            <div class="drag-readout" :style="{ left: dragFeedback.currentPct + '%' }">
+              Start: {{ dragStartCm.toFixed(2) }} cm | Current: {{ dragCurrentCm.toFixed(2) }} cm | Δ:
+              {{ dragDeltaCm >= 0 ? "+" : "" }}{{ dragDeltaCm.toFixed(2) }} cm
+            </div>
+          </div>
+
+          <!-- Normal tooltip -->
+          <div v-if="tooltipVisible && !dragFeedback.visible" class="tooltip" :style="{ left: tooltipX + 'px' }">
+            {{ tooltipCm.toFixed(1) }} cm
+          </div>
+        </div>
+      </div>
+
       <table class="binding-table">
         <thead>
           <tr>
             <th class="header-dark quire-col">Quire</th>
             <th class="header-dark leaves-col">Leaves</th>
-            <th class="header-light head-col">Head</th>
-            <th class="header-light ruler-col" colspan="3">
-              <div
-                class="ruler"
-                ref="ruler"
-                @mousemove="onRulerMove"
-                @mouseleave="tooltipVisible = false"
-              >
-                <!-- Ticks -->
-                <div
-                  v-for="cm in majorTicks"
-                  :key="'M' + cm"
-                  class="tick major"
-                  :style="{
-                    left: (cm / Math.max(1, totalCmNumber)) * 100 + '%',
-                  }"
-                />
-                <div
-                  v-for="pct in minorTicks"
-                  :key="'m' + pct"
-                  class="tick minor"
-                  :style="{ left: pct + '%' }"
-                />
-
-                <!-- Drag feedback -->
-                <div v-if="dragFeedback.visible">
-                  <div
-                    class="drag-marker start"
-                    :style="{ left: dragFeedback.startPct + '%' }"
-                  ></div>
-                  <div
-                    class="drag-marker current"
-                    :style="{ left: dragFeedback.currentPct + '%' }"
-                  ></div>
-                  <div
-                    class="drag-readout"
-                    :style="{ left: dragFeedback.currentPct + '%' }"
-                  >
-                    Start: {{ dragStartCm.toFixed(2) }} cm | Current:
-                    {{ dragCurrentCm.toFixed(2) }} cm | Δ:
-                    {{ dragDeltaCm >= 0 ? "+" : ""
-                    }}{{ dragDeltaCm.toFixed(2) }} cm
-                  </div>
-                </div>
-
-                <!-- Normal tooltip -->
-                <div
-                  v-if="tooltipVisible && !dragFeedback.visible"
-                  class="tooltip"
-                  :style="{ left: tooltipX + 'px' }"
-                >
-                  {{ tooltipCm.toFixed(1) }} cm
-                </div>
-              </div>
-            </th>
-            <th class="header-light tail-col">Tail</th>
+            <th class="header-light head-col" ref="headTh">Head</th>
+            <th class="header-light ruler-col" colspan="3"></th>
+            <th class="header-light tail-col" ref="tailTh">Tail</th>
             <th class="header-dark notes-col">Notes</th>
           </tr>
         </thead>
@@ -112,15 +111,17 @@
             <!-- Headbands (left) -->
             <td class="canvas-cell">
               <div
-                v-for="(hb, hi) in headbandPositions"
+                v-for="(hb, hi) in headbandLeftPositions"
                 :key="'hb-left-' + hi"
                 class="headband-bar"
                 :style="{ left: hb + '%' }"
+                @contextmenu.prevent="openHeadbandMenu($event, 'left', hi)"
                 v-draggable="{
-                  onStart: (pct) => beginDragFeedback(pct),
-                  onChange: (pct) => {
-                    headbandPositions[hi] = clampPct(pct);
-                    updateDragFeedback(pct);
+                  getRect: getRulerRect,
+                  onStart: (localPct, globalPct) => beginDragFeedback(globalPct),
+                  onChange: (localPct, globalPct) => {
+                    headbandLeftPositions[hi] = clampPct(localPct);
+                    updateDragFeedback(globalPct);
                   },
                   onEnd: endDragFeedback,
                 }"
@@ -139,30 +140,94 @@
                 v-for="(sp, si) in supportEntries"
                 :key="'row-support-' + sp.id + '-' + rowIndex"
               >
-                <div
-                  class="hole-dot sewing"
-                  :style="{ left: `calc(${sp.position}% - 12px)` }"
-                ></div>
-                <div
-                  class="support-bar"
-                  :style="{ left: sp.position + '%' }"
-                  v-draggable="{
-                    onStart: (pct) => beginDragFeedback(pct),
-                    onChange: (pct) => {
-                      supportEntries[si].position = clampPct(pct);
-                      updateDragFeedback(pct);
-                    },
-                    onEnd: endDragFeedback,
-                  }"
-                  title="Sewing support"
-                ></div>
-                <div
-                  class="hole-dot sewing"
-                  :style="{ left: `calc(${sp.position}% + 6px)` }"
-                ></div>
+                <!-- Single or double sewing support -->
+                <template v-if="(sp.type || (isDoubleSupport ? 'double' : 'single')) === 'single'">
+                  <div
+                    class="hole-dot sewing"
+                    :style="{ left: `calc(${sp.position}% - 12px)` }"
+                  ></div>
+                  <div
+                    class="support-bar"
+                    :class="{ selected: isSupportSelected(sp.id) }"
+                    :style="{ left: sp.position + '%', background: sp.color }"
+                    @contextmenu.prevent="openSupportMenu($event, si)"
+                    @click.stop="onSupportClick(si)"
+                    v-draggable="{
+                      getRect: getRulerRect,
+                      onStart: (localPct, globalPct) => beginDragFeedback(globalPct),
+                      onChange: (localPct, globalPct) => {
+                        supportEntries[si].position = clampPct(localPct);
+                        updateDragFeedback(globalPct);
+                      },
+                      onEnd: endDragFeedback,
+                    }"
+                    title="Sewing support"
+                  ></div>
+                  <div
+                    class="hole-dot sewing"
+                    :style="{ left: `calc(${sp.position}% + 6px)` }"
+                  ></div>
+                </template>
+                <template v-else>
+                  <!-- Left bar and its dots -->
+                  <div
+                    class="hole-dot sewing"
+                    :style="{ left: `calc(${sp.position}% - ${supportHalfGapPx + 12}px)` }"
+                  ></div>
+                  <div
+                    class="support-bar"
+                    :class="{ selected: isSupportSelected(sp.id) }"
+                    :style="{ left: `calc(${sp.position}% - ${supportHalfGapPx}px)`, background: sp.color }"
+                    @contextmenu.prevent="openSupportMenu($event, si)"
+                    @click.stop="onSupportClick(si)"
+                    v-draggable="{
+                      getRect: getRulerRect,
+                      onStart: (localPct, globalPct) => beginDragFeedback(globalPct),
+                      onChange: (localPct, globalPct, pxToPct) => {
+                        const center = localPct + pxToPct(supportHalfGapPx);
+                        supportEntries[si].position = clampPct(center);
+                        updateDragFeedback(globalPct);
+                      },
+                      onEnd: endDragFeedback,
+                    }"
+                    title="Sewing support (double)"
+                  ></div>
+                  <div
+                    class="hole-dot sewing"
+                    :style="{ left: `calc(${sp.position}% - ${supportHalfGapPx - 6}px)` }"
+                  ></div>
+
+                  <!-- Right bar and its dots -->
+                  <div
+                    class="hole-dot sewing"
+                    :style="{ left: `calc(${sp.position}% + ${supportHalfGapPx - 12}px)` }"
+                  ></div>
+                  <div
+                    class="support-bar"
+                    :class="{ selected: isSupportSelected(sp.id) }"
+                    :style="{ left: `calc(${sp.position}% + ${supportHalfGapPx}px)`, background: sp.color }"
+                    @contextmenu.prevent="openSupportMenu($event, si)"
+                    @click.stop="onSupportClick(si)"
+                    v-draggable="{
+                      getRect: getRulerRect,
+                      onStart: (localPct, globalPct) => beginDragFeedback(globalPct),
+                      onChange: (localPct, globalPct, pxToPct) => {
+                        const center = localPct - pxToPct(supportHalfGapPx);
+                        supportEntries[si].position = clampPct(center);
+                        updateDragFeedback(globalPct);
+                      },
+                      onEnd: endDragFeedback,
+                    }"
+                    title="Sewing support (double)"
+                  ></div>
+                  <div
+                    class="hole-dot sewing"
+                    :style="{ left: `calc(${sp.position}% + ${supportHalfGapPx + 6}px)` }"
+                  ></div>
+                </template>
               </div>
 
-              <!-- Change-over holes (individual per row, include 0% & 100%) -->
+              <!-- Change-over stations (individual per row, include 0% & 100%) -->
               <div
                 v-for="hole in changeHolesByRow[rowIndex]"
                 :key="'co-' + hole.uid"
@@ -176,10 +241,11 @@
                     : '#222',
                 }"
                 v-draggable="{
-                  onStart: (pct) => beginDragFeedback(pct),
-                  onChange: (pct) => {
-                    onChangeHoleDragged(rowIndex, hole.uid, pct);
-                    updateDragFeedback(pct);
+                  getRect: getRulerRect,
+                  onStart: (localPct, globalPct) => beginDragFeedback(globalPct),
+                  onChange: (localPct, globalPct) => {
+                    onChangeHoleDragged(rowIndex, hole.uid, localPct);
+                    updateDragFeedback(globalPct);
                   },
                   onEnd: endDragFeedback,
                 }"
@@ -188,23 +254,25 @@
                 :title="
                   isSelected(holeKey(rowIndex, hole.uid))
                     ? 'Selected'
-                    : 'Change-over hole'
+                    : 'Change-over station'
                 "
               ></div>
             </td>
 
-            <!-- Headbands (right, mirrored) -->
+            <!-- Headbands (right, independent) -->
             <td class="canvas-cell">
               <div
-                v-for="(hb, hi) in headbandPositions"
+                v-for="(hb, hi) in headbandRightPositions"
                 :key="'hb-right-' + hi"
                 class="headband-bar"
-                :style="{ left: 100 - hb + '%' }"
+                :style="{ left: hb + '%' }"
+                @contextmenu.prevent="openHeadbandMenu($event, 'right', hi)"
                 v-draggable="{
-                  onStart: (pct) => beginDragFeedback(pct),
-                  onChange: (pct) => {
-                    headbandPositions[hi] = clampPct(100 - pct);
-                    updateDragFeedback(pct);
+                  getRect: getRulerRect,
+                  onStart: (localPct, globalPct) => beginDragFeedback(globalPct),
+                  onChange: (localPct, globalPct) => {
+                    headbandRightPositions[hi] = clampPct(localPct);
+                    updateDragFeedback(globalPct);
                   },
                   onEnd: endDragFeedback,
                 }"
@@ -212,11 +280,12 @@
             </td>
 
             <td>
-              <input
-                type="text"
+              <textarea
                 class="notes-input"
                 v-model="notes[rowIndex]"
-              />
+                rows="1"
+                wrap="off"
+              ></textarea>
             </td>
           </tr>
         </tbody>
@@ -225,7 +294,7 @@
 
     <!-- Selection bars -->
     <div v-if="selectingMode" class="selection-bar">
-      <span>Select individual holes. Selected: {{ selectedCount }}</span>
+      <span>Select items (holes or supports). Selected: {{ selectedCount }}</span>
       <div class="selection-actions">
         <button @click="finishSelection" class="btn">Done</button>
         <button @click="cancelSelection" class="btn btn-ghost">Cancel</button>
@@ -233,10 +302,7 @@
     </div>
 
     <div v-else-if="postSelectMode" class="selection-bar">
-      <span
-        >{{ selectedCount }} hole(s) selected. Right‑click a selected hole for
-        group actions.</span
-      >
+      <span>{{ selectedCount }} item(s) selected. Right‑click a selected item for group actions.</span>
       <div class="selection-actions">
         <button class="btn btn-ghost" @click="clearSelection">Exit</button>
       </div>
@@ -247,14 +313,15 @@
       <div class="legend">
         <div>
           <span class="swatch headband"></span> Headbands
-          <button @click="addHeadband">+ Add</button>
+          <button @click="addHeadbandLeft">+ Add Headband</button>
+          <button @click="addHeadbandRight" class="ml8">+ Add Tailband</button>
         </div>
         <div>
           <span class="swatch support"></span> Sewing support
-          <button @click="addSupport">+ Add</button>
+          <button @click="openAddSupportPopup">+ Add</button>
         </div>
         <div>
-          <span class="swatch change"></span> Change‑over hole
+          <span class="swatch change"></span> Change‑over station
           <button :class="{ 'btn-active': addHoleMode }" @click="toggleAddHole">
             {{ addHoleMode ? "Click in a row to place…" : "+ Add" }}
           </button>
@@ -274,14 +341,23 @@
             🧹 Eraser
           </button>
           <template v-for="pen in pens" :key="pen.id">
-            <button
-              class="pen-btn"
-              :class="{ active: activePenId === pen.id && !eraserActive }"
-              @click="togglePen(pen.id)"
-              :style="{ borderColor: pen.color, color: pen.color }"
-            >
-              Pen{{ pen.id }}
-            </button>
+            <span class="pen-wrap">
+              <button
+                class="pen-btn"
+                :class="{ active: activePenId === pen.id && !eraserActive }"
+                @click="togglePen(pen.id)"
+                :style="{ borderColor: pen.color, color: pen.color }"
+                :title="penTooltip(pen)"
+              >
+                Pen{{ pen.id }}
+              </button>
+              <div
+                v-if="penHintVisible && lastCreatedPenId === pen.id"
+                class="pen-hint"
+              >
+                Click the pen button again to hide it
+              </div>
+            </span>
           </template>
         </div>
       </div>
@@ -298,24 +374,49 @@
       :style="{ left: menu.x + 'px', top: menu.y + 'px' }"
       @mousedown.stop
     >
-      <template v-if="menu.group">
-        <button class="menu-item" @click="openRecolorPopup(true)">
-          Recolor Selected…
-        </button>
-        <button class="menu-item danger" @click="deleteSelected">
-          Delete Selected
-        </button>
-        <hr class="menu-sep" />
-        <button class="menu-item" @click="exitPostSelect">
-          Exit selection
-        </button>
+      <!-- Hole menu -->
+      <template v-if="menu.kind === 'hole'">
+        <template v-if="menu.group">
+          <button class="menu-item" @click="openRecolorPopup(true)">
+            Recolor Selected…
+          </button>
+          <button class="menu-item danger" @click="deleteSelected">
+            Delete Selected
+          </button>
+          <hr class="menu-sep" />
+          <button class="menu-item" @click="exitPostSelect">
+            Exit selection
+          </button>
+        </template>
+        <template v-else>
+          <button class="menu-item" @click="beginSelectFromMenu">Select</button>
+          <button class="menu-item" @click="openRecolorPopup(false)">
+            Recolor…
+          </button>
+          <button class="menu-item danger" @click="removeFromMenu">Remove</button>
+        </template>
       </template>
+
+      <!-- Support menu -->
+      <template v-else-if="menu.kind === 'support'">
+        <template v-if="menu.group">
+          <button class="menu-item" @click="openRecolorPopup(true)">Recolor Selected…</button>
+          <button class="menu-item danger" @click="deleteSelected">Delete Selected</button>
+          <hr class="menu-sep" />
+          <button class="menu-item" @click="exitPostSelect">Exit selection</button>
+        </template>
+        <template v-else>
+          <button class="menu-item" @click="beginSupportSelectFromMenu">Select</button>
+          <button class="menu-item" @click="openRecolorPopup(false)">Recolor…</button>
+          <button class="menu-item danger" @click="removeFromMenu">Remove sewing support</button>
+        </template>
+      </template>
+
+      <!-- Headband/tailband menu -->
       <template v-else>
-        <button class="menu-item" @click="beginSelectFromMenu">Select</button>
-        <button class="menu-item" @click="openRecolorPopup(false)">
-          Recolor…
+        <button class="menu-item danger" @click="removeFromMenu">
+          Remove {{ menu.kind === 'headband-left' ? 'headband' : 'tailband' }}
         </button>
-        <button class="menu-item danger" @click="removeFromMenu">Remove</button>
       </template>
     </div>
 
@@ -354,9 +455,7 @@
     <!-- Hole Recolor Popup -->
     <div v-if="showRecolorPopup" class="overlay">
       <div class="popup">
-        <h3>
-          {{ recolorForGroup ? "Recolor Selected Holes" : "Recolor Hole" }}
-        </h3>
+        <h3>{{ recolorHeading }}</h3>
         <div class="popup-section">
           <label>Color:</label>
           <input type="color" v-model="recolorColor" />
@@ -377,6 +476,7 @@
       <div class="popup">
         <h3>Save as PDF?</h3>
         <div class="popup-actions">
+          <button class="popup-btn" @click="previewPDF">Preview</button>
           <button class="popup-btn confirm" @click="exportToPDF">
             Confirm
           </button>
@@ -386,19 +486,49 @@
         </div>
       </div>
     </div>
+
+    <!-- PDF Preview Popup -->
+    <div v-if="showPreviewPopup" class="overlay">
+      <div class="popup">
+        <h3>Preview</h3>
+        <div style="max-width: 80vw; max-height: 60vh; overflow: auto; background:#fff; padding:8px; border-radius:6px;">
+          <img :src="previewImg" style="max-width: 100%; height: auto;" />
+        </div>
+        <div class="popup-actions" style="margin-top:12px;">
+          <button class="popup-btn confirm" @click="exportToPDF">Download PDF</button>
+          <button class="popup-btn cancel" @click="showPreviewPopup = false">Close</button>
+        </div>
+      </div>
+    </div>
+
+    <!-- Add Support Popup -->
+    <div v-if="showAddSupportPopup" class="overlay">
+      <div class="popup">
+        <h3>Add Sewing Support</h3>
+        <div class="popup-section">
+          <label>Type:</label>
+          <label class="radio-inline"><input type="radio" value="single" v-model="supportTypeChoice" /> Single</label>
+          <label class="radio-inline"><input type="radio" value="double" v-model="supportTypeChoice" /> Double</label>
+        </div>
+        <div class="popup-actions">
+          <button class="popup-btn confirm" @click="confirmAddSupport">Add</button>
+          <button class="popup-btn cancel" @click="showAddSupportPopup = false">Cancel</button>
+        </div>
+      </div>
+    </div>
   </div>
 </template>
 
 <script>
 /* eslint-disable */
-import { ref, computed, reactive, onMounted, watch, nextTick } from "vue";
+import { ref, computed, reactive, onMounted, onUnmounted, watch, nextTick } from "vue";
 import html2canvas from "html2canvas";
 import jsPDF from "jspdf";
 
 export default {
   name: "BookBindingScreen",
   directives: {
-    // v-draggable: accepts { onStart?, onChange, onEnd? }
+    // v-draggable: accepts { onStart?(localPct, globalPct, pxToPct), onChange(localPct, globalPct, pxToPct), onEnd?, getRect? }
     draggable: {
       mounted(el, binding) {
         el.style.position = "absolute";
@@ -410,21 +540,43 @@ export default {
             : binding.value || {};
 
         const onMove = (e) => {
-          const r = el.parentElement.getBoundingClientRect();
-          const x = Math.max(0, Math.min(r.width, e.clientX - r.left));
-          const pct = (x / r.width) * 100;
+          const parentRect = el.parentElement.getBoundingClientRect();
+          let measureRect = parentRect;
+          try {
+            const getter = getHandler().getRect;
+            const maybeRect = typeof getter === 'function' ? getter() : null;
+            if (maybeRect && typeof maybeRect.left === 'number') measureRect = maybeRect;
+          } catch (_) {
+            measureRect = parentRect;
+          }
+          const xLocal = Math.max(0, Math.min(parentRect.width, e.clientX - parentRect.left));
+          const xGlobal = Math.max(0, Math.min(measureRect.width, e.clientX - measureRect.left));
+          const pctLocal = (xLocal / parentRect.width) * 100;
+          const pctGlobal = (xGlobal / Math.max(1, measureRect.width)) * 100;
           const { onChange } = getHandler();
-          if (onChange) onChange(pct);
-          el.style.left = pct + "%";
+          const pxToPct = (px) => (px / Math.max(1, parentRect.width)) * 100;
+          if (onChange) onChange(pctLocal, pctGlobal, pxToPct);
+          el.style.left = pctLocal + "%";
         };
 
         const onDown = (ev) => {
           ev.preventDefault();
-          const r = el.parentElement.getBoundingClientRect();
-          const x = Math.max(0, Math.min(r.width, ev.clientX - r.left));
-          const pct = (x / r.width) * 100;
+          const parentRect = el.parentElement.getBoundingClientRect();
+          let measureRect = parentRect;
+          try {
+            const getter = getHandler().getRect;
+            const maybeRect = typeof getter === 'function' ? getter() : null;
+            if (maybeRect && typeof maybeRect.left === 'number') measureRect = maybeRect;
+          } catch (_) {
+            measureRect = parentRect;
+          }
+          const xLocal = Math.max(0, Math.min(parentRect.width, ev.clientX - parentRect.left));
+          const xGlobal = Math.max(0, Math.min(measureRect.width, ev.clientX - measureRect.left));
+          const pctLocal = (xLocal / parentRect.width) * 100;
+          const pctGlobal = (xGlobal / Math.max(1, measureRect.width)) * 100;
           const { onStart } = getHandler();
-          if (onStart) onStart(pct);
+          const pxToPct = (px) => (px / Math.max(1, parentRect.width)) * 100;
+          if (onStart) onStart(pctLocal, pctGlobal, pxToPct);
           document.addEventListener("mousemove", onMove);
           document.addEventListener("mouseup", onUp, { once: true });
         };
@@ -474,10 +626,10 @@ export default {
 
     /* ---------- Rows & numbering ---------- */
     const rows = computed(() => {
-      const q = Math.max(0, num(props.quires, 0));
-      const l = Math.max(
-        0,
-        num(props.foliosPerQuire, num(props.leavesPerQuire, 0))
+      const q = Math.min(10, Math.max(0, num(props.quires, 0)));
+      const l = Math.min(
+        20,
+        Math.max(0, num(props.foliosPerQuire, num(props.leavesPerQuire, 0)))
       );
       const fe = Math.max(0, num(props.frontEndleaves, 0));
       const be = Math.max(0, num(props.backEndleaves, 0));
@@ -538,23 +690,33 @@ export default {
     onMounted(syncNotes);
     watch(rows, syncNotes, { immediate: true });
 
-    /* ---------- Table sizing ---------- */
+    /* ---------- Table sizing (auto height; fixed row height) ---------- */
     const tableContainer = ref(null);
-    const containerHeight = 430;
-    const headerHeight = 40;
-    const rowHeight = ref(40);
-    function calcRowHeight() {
-      const rowCount = rows.value.length || 1;
-      rowHeight.value = Math.max(
-        18,
-        Math.floor((containerHeight - headerHeight) / rowCount)
-      );
-    }
-    onMounted(() => {
-      nextTick(calcRowHeight);
-      window.addEventListener("resize", calcRowHeight);
-    });
-    watch(rows, () => nextTick(calcRowHeight));
+    const rowHeight = ref(40); // fixed row height; container grows to fit all rows
+
+  /* ---------- Top ruler alignment to Head..Tail columns ---------- */
+  const headTh = ref(null);
+  const tailTh = ref(null);
+  const topRulerLeft = ref(0);
+  const topRulerWidth = ref(0);
+  function updateTopRulerAlignment() {
+    if (!tableContainer.value || !headTh.value || !tailTh.value) return;
+    const containerRect = tableContainer.value.getBoundingClientRect();
+    const headRect = headTh.value.getBoundingClientRect();
+    const tailRect = tailTh.value.getBoundingClientRect();
+    const left = Math.max(0, headRect.left - containerRect.left);
+    const right = Math.max(0, tailRect.right - containerRect.left);
+    topRulerLeft.value = left;
+    topRulerWidth.value = Math.max(0, right - left);
+  }
+  onMounted(() => {
+    nextTick(updateTopRulerAlignment);
+    window.addEventListener("resize", updateTopRulerAlignment);
+  });
+  watch([rows, () => rowHeight.value], () => nextTick(updateTopRulerAlignment));
+  onUnmounted(() => {
+    window.removeEventListener("resize", updateTopRulerAlignment);
+  });
 
     /* ---------- Ruler ---------- */
     const totalCm = computed(() => Math.max(0, num(props.spineLength, 0)));
@@ -580,6 +742,9 @@ export default {
       tooltipCm.value = (tooltipX.value / r.width) * totalCm.value;
       tooltipVisible.value = true;
     }
+
+    // Provide rect getter for mapping local drags to top-ruler coordinates
+    const getRulerRect = () => ruler.value?.getBoundingClientRect() || null;
 
     // Drag feedback overlay
     const dragFeedback = reactive({
@@ -608,25 +773,30 @@ export default {
     }
 
     /* ---------- Headbands ---------- */
-    const headbandPositions = reactive(props.headbands ? [5, 95] : []);
-    function addHeadband() {
-      headbandPositions.push(50);
+    const headbandLeftPositions = reactive(props.headbands ? [5] : []);
+    const headbandRightPositions = reactive(props.headbands ? [95] : []);
+    function addHeadbandLeft() {
+      headbandLeftPositions.push(50);
+    }
+    function addHeadbandRight() {
+      headbandRightPositions.push(50);
     }
 
     /* ---------- Sewing supports (yellow, movable) ---------- */
     const supportEntries = reactive([]);
+    const isDoubleSupport = computed(
+      () => String(props.sewingType || '').toLowerCase() === 'double'
+    );
+    const supportHalfGapPx = 8; // pixel offset for double supports
     function initSupportsFromCount(count) {
       const n = Math.max(0, num(count, 0));
       supportEntries.splice(0, supportEntries.length);
       if (n === 0) {
         // Fallback so a yellow bar is always visible
-        supportEntries.push({ id: 1, position: 50 });
+        supportEntries.push({ id: 1, position: 50, color: '#e2b043' });
       } else {
         for (let i = 0; i < n; i++) {
-          supportEntries.push({
-            id: i + 1,
-            position: ((i + 1) / (n + 1)) * 100,
-          });
+          supportEntries.push({ id: i + 1, position: ((i + 1) / (n + 1)) * 100, color: '#e2b043' });
         }
       }
     }
@@ -639,8 +809,17 @@ export default {
         initSupportsFromCount(val);
       }
     );
-    function addSupport() {
-      supportEntries.push({ id: supportEntries.length + 1, position: 50 });
+    // Add support via popup (single/double)
+    const showAddSupportPopup = ref(false);
+    const supportTypeChoice = ref('single');
+    function openAddSupportPopup() {
+      supportTypeChoice.value = (props.sewingType || 'single').toLowerCase() === 'double' ? 'double' : 'single';
+      showAddSupportPopup.value = true;
+    }
+    function confirmAddSupport() {
+      const id = supportEntries.length + 1;
+      supportEntries.push({ id, position: 50, color: '#e2b043', type: supportTypeChoice.value });
+      showAddSupportPopup.value = false;
     }
 
     /* ---------- Change‑over holes (per row) ---------- */
@@ -709,22 +888,36 @@ export default {
     }
 
     const holeKey = (rowIndex, uid) => `${rowIndex}:${uid}`;
-    const selectedKeys = ref(new Set());
+    const selectedKeys = ref(new Set()); // holes
+    const selectedSupportIds = ref(new Set()); // supports (by id/index)
     const selectingMode = ref(false);
     const postSelectMode = ref(false);
-    const selectedCount = computed(() => selectedKeys.value.size);
+    const selectedCount = computed(
+      () => selectedKeys.value.size + selectedSupportIds.value.size
+    );
     const isSelected = (key) => selectedKeys.value.has(key);
     const toggleSelected = (key) => {
       const s = new Set(selectedKeys.value);
       s.has(key) ? s.delete(key) : s.add(key);
       selectedKeys.value = s;
     };
+    const isSupportSelected = (indexOrId) => selectedSupportIds.value.has(indexOrId);
+    const toggleSupportSelected = (indexOrId) => {
+      const s = new Set(selectedSupportIds.value);
+      s.has(indexOrId) ? s.delete(indexOrId) : s.add(indexOrId);
+      selectedSupportIds.value = s;
+    };
     const clearSelected = () => {
       selectedKeys.value = new Set();
+      selectedSupportIds.value = new Set();
     };
     function onHoleClick(rowIndex, uid) {
       if (!selectingMode.value) return;
       toggleSelected(holeKey(rowIndex, uid));
+    }
+    function onSupportClick(index) {
+      if (!selectingMode.value) return;
+      toggleSupportSelected(supportEntries[index].id ?? index);
     }
 
     // Context menu
@@ -735,6 +928,10 @@ export default {
       rowIndex: null,
       uid: null,
       group: false,
+      kind: 'hole', // 'hole' | 'support' | 'headband-left' | 'headband-right'
+      hbSide: null,
+      hbIndex: null,
+      supportIndex: null,
     });
     function openHoleMenu(e, rowIndex, uid) {
       const key = holeKey(rowIndex, uid);
@@ -743,7 +940,61 @@ export default {
       menu.y = e.clientY;
       menu.rowIndex = rowIndex;
       menu.uid = uid;
-      menu.group = postSelectMode.value && selectedKeys.value.has(key);
+      // Treat as group if the clicked hole is within the current selection
+      // and there is more than one item selected (or at least one if you want single‑selection group ops).
+      menu.group = selectedKeys.value.has(key) && selectedKeys.value.size >= 2;
+      menu.kind = 'hole';
+      menu.hbSide = null;
+      menu.hbIndex = null;
+      menu.supportIndex = null;
+
+      const close = (ev) => {
+        const el = document.querySelector(".context-menu");
+        if (el && el.contains(ev.target)) return;
+        menu.visible = false;
+        window.removeEventListener("mousedown", close, true);
+        window.removeEventListener("scroll", close, true);
+        window.removeEventListener("resize", close, true);
+      };
+      window.addEventListener("mousedown", close, true);
+      window.addEventListener("scroll", close, true);
+      window.addEventListener("resize", close, true);
+    }
+    function openSupportMenu(e, index) {
+      menu.visible = true;
+      menu.x = e.clientX;
+      menu.y = e.clientY;
+      menu.kind = 'support';
+      menu.supportIndex = index;
+      menu.hbSide = null;
+      menu.hbIndex = null;
+      menu.rowIndex = null;
+      menu.uid = null;
+      const suppId = supportEntries[index]?.id ?? index;
+      menu.group = postSelectMode.value && selectedSupportIds.value.has(suppId);
+
+      const close = (ev) => {
+        const el = document.querySelector(".context-menu");
+        if (el && el.contains(ev.target)) return;
+        menu.visible = false;
+        window.removeEventListener("mousedown", close, true);
+        window.removeEventListener("scroll", close, true);
+        window.removeEventListener("resize", close, true);
+      };
+      window.addEventListener("mousedown", close, true);
+      window.addEventListener("scroll", close, true);
+      window.addEventListener("resize", close, true);
+    }
+    function openHeadbandMenu(e, side, index) {
+      menu.visible = true;
+      menu.x = e.clientX;
+      menu.y = e.clientY;
+      menu.kind = side === 'right' ? 'headband-right' : 'headband-left';
+      menu.hbSide = side;
+      menu.hbIndex = index;
+      menu.supportIndex = null;
+      menu.rowIndex = null;
+      menu.uid = null;
 
       const close = (ev) => {
         const el = document.querySelector(".context-menu");
@@ -765,16 +1016,42 @@ export default {
         toggleSelected(holeKey(menu.rowIndex, menu.uid));
       menu.visible = false;
     }
+    function beginSupportSelectFromMenu() {
+      selectingMode.value = true;
+      postSelectMode.value = false;
+      clearSelected();
+      if (menu.supportIndex != null) {
+        const suppId = supportEntries[menu.supportIndex]?.id ?? menu.supportIndex;
+        toggleSupportSelected(suppId);
+      }
+      menu.visible = false;
+    }
     function removeFromMenu() {
-      if (menu.rowIndex == null || menu.uid == null) return;
-      const row = changeHolesByRow.value[menu.rowIndex];
-      const idx = row.findIndex((h) => h.uid === menu.uid);
-      if (idx >= 0) row.splice(idx, 1);
-      const key = holeKey(menu.rowIndex, menu.uid);
-      if (selectedKeys.value.has(key)) {
-        const s = new Set(selectedKeys.value);
-        s.delete(key);
-        selectedKeys.value = s;
+      // If this is a group context, route to group delete
+      if (menu.group) {
+        deleteSelected();
+        return;
+      }
+      if (menu.kind === 'hole') {
+        if (menu.rowIndex == null || menu.uid == null) return;
+        const row = changeHolesByRow.value[menu.rowIndex];
+        const idx = row.findIndex((h) => h.uid === menu.uid);
+        if (idx >= 0) row.splice(idx, 1);
+        const key = holeKey(menu.rowIndex, menu.uid);
+        if (selectedKeys.value.has(key)) {
+          const s = new Set(selectedKeys.value);
+          s.delete(key);
+          selectedKeys.value = s;
+        }
+      } else if (menu.kind === 'support') {
+        if (menu.supportIndex == null) return;
+        supportEntries.splice(menu.supportIndex, 1);
+      } else if (menu.kind === 'headband-left') {
+        if (menu.hbIndex == null) return;
+        headbandLeftPositions.splice(menu.hbIndex, 1);
+      } else if (menu.kind === 'headband-right') {
+        if (menu.hbIndex == null) return;
+        headbandRightPositions.splice(menu.hbIndex, 1);
       }
       menu.visible = false;
     }
@@ -802,6 +1079,11 @@ export default {
         const idx = row.findIndex((h) => h.uid === u);
         if (idx >= 0) row.splice(idx, 1);
       });
+      // Remove selected supports
+      if (selectedSupportIds.value.size) {
+        const keep = supportEntries.filter((sp) => !selectedSupportIds.value.has(sp.id));
+        supportEntries.splice(0, supportEntries.length, ...keep);
+      }
       clearSelection();
       menu.visible = false;
     }
@@ -809,29 +1091,50 @@ export default {
     /* ---------- Recolor (popup) ---------- */
     function openRecolorPopup(isGroup) {
       recolorForGroup.value = !!isGroup;
-      if (!isGroup && menu.rowIndex != null && menu.uid != null) {
-        const row = changeHolesByRow.value[menu.rowIndex];
-        const hole = row.find((h) => h.uid === menu.uid);
-        if (hole) recolorColor.value = hole.color || "#4ea5de";
+      if (!isGroup) {
+        if (menu.kind === 'hole' && menu.rowIndex != null && menu.uid != null) {
+          const row = changeHolesByRow.value[menu.rowIndex];
+          const hole = row.find((h) => h.uid === menu.uid);
+          if (hole) recolorColor.value = hole.color || "#4ea5de";
+        } else if (menu.kind === 'support' && menu.supportIndex != null) {
+          const sp = supportEntries[menu.supportIndex];
+          if (sp) recolorColor.value = sp.color || "#e2b043";
+        }
       }
       showRecolorPopup.value = true;
       menu.visible = false;
     }
+    const recolorHeading = computed(() => {
+      if (recolorForGroup.value) return 'Recolor Selected…';
+      if (menu.kind === 'support') return 'Recolor Support';
+      if (menu.kind === 'hole') return 'Recolor Station';
+      return 'Recolor';
+    });
     function cancelRecolor() {
       showRecolorPopup.value = false;
     }
     function confirmRecolor() {
       if (recolorForGroup.value) {
+        // Holes in selection
         selectedKeys.value.forEach((key) => {
           const [r, u] = key.split(":").map(Number);
           const hole = changeHolesByRow.value[r].find((h) => h.uid === u);
           if (hole) hole.color = recolorColor.value;
         });
-      } else if (menu.rowIndex != null && menu.uid != null) {
-        const hole = changeHolesByRow.value[menu.rowIndex].find(
-          (h) => h.uid === menu.uid
-        );
-        if (hole) hole.color = recolorColor.value;
+        // Supports in selection
+        supportEntries.forEach((sp) => {
+          if (selectedSupportIds.value.has(sp.id)) sp.color = recolorColor.value;
+        });
+      } else {
+        if (menu.kind === 'hole' && menu.rowIndex != null && menu.uid != null) {
+          const hole = changeHolesByRow.value[menu.rowIndex].find(
+            (h) => h.uid === menu.uid
+          );
+          if (hole) hole.color = recolorColor.value;
+        } else if (menu.kind === 'support' && menu.supportIndex != null) {
+          const sp = supportEntries[menu.supportIndex];
+          if (sp) sp.color = recolorColor.value;
+        }
       }
       showRecolorPopup.value = false;
     }
@@ -846,13 +1149,24 @@ export default {
       style: "solid",
       color: "#4ea5de",
     });
+    const penHintVisible = ref(false);
+    const lastCreatedPenId = ref(null);
+    const penTooltip = (p) => `Color: ${p.color} • Type: ${p.type} • Style: ${p.style}`;
 
     function confirmPen() {
       const id = pens.value.length + 1;
-      pens.value.push({ id, ...JSON.parse(JSON.stringify(penForm)) });
+      const data = JSON.parse(JSON.stringify(penForm));
+      pens.value.push({ id, ...data });
       activePenId.value = id;
       eraserActive.value = false;
       showPenPopup.value = false;
+
+      // Show 3s hint over the newly created pen button
+      lastCreatedPenId.value = id;
+      penHintVisible.value = true;
+      setTimeout(() => {
+        penHintVisible.value = false;
+      }, 3000);
     }
     function togglePen(id) {
       activePenId.value = activePenId.value === id ? null : id;
@@ -904,15 +1218,27 @@ export default {
       startPoint.value = point;
       const pen = getPenStyle();
       const ctx = drawCanvas.value.getContext("2d");
-      snapshot =
-        pen.type === "straight"
-          ? ctx.getImageData(
-              0,
-              0,
-              drawCanvas.value.width,
-              drawCanvas.value.height
-            )
-          : null;
+      if (eraserActive.value) return; // eraser doesn't need setup
+
+      if (pen.type === "straight") {
+        snapshot = ctx.getImageData(
+          0,
+          0,
+          drawCanvas.value.width,
+          drawCanvas.value.height
+        );
+      } else {
+        // Freehand: start a continuous path so dashed/dotted are consistent
+        snapshot = null;
+        ctx.lineWidth = 2;
+        ctx.lineCap = "round";
+        ctx.strokeStyle = pen.color;
+        if (pen.style === "dotted") ctx.setLineDash([2, 6]);
+        else if (pen.style === "dashed") ctx.setLineDash([10, 8]);
+        else ctx.setLineDash([]);
+        ctx.beginPath();
+        ctx.moveTo(point.x, point.y);
+      }
     }
 
     function drawMove(e) {
@@ -934,25 +1260,26 @@ export default {
 
       if (!activePenId.value) return;
       const pen = getPenStyle();
-      ctx.lineWidth = 2;
-      ctx.lineCap = "round";
-      ctx.strokeStyle = pen.color;
-      if (pen.style === "dotted") ctx.setLineDash([2, 6]);
-      else if (pen.style === "dashed") ctx.setLineDash([10, 8]);
-      else ctx.setLineDash([]);
-
-      ctx.beginPath();
       if (pen.type === "straight") {
+        // Prepare styles for straight preview
+        ctx.lineWidth = 2;
+        ctx.lineCap = "round";
+        ctx.strokeStyle = pen.color;
+        if (pen.style === "dotted") ctx.setLineDash([2, 6]);
+        else if (pen.style === "dashed") ctx.setLineDash([10, 8]);
+        else ctx.setLineDash([]);
+        ctx.beginPath();
         if (snapshot) ctx.putImageData(snapshot, 0, 0);
         ctx.moveTo(startPoint.value.x, startPoint.value.y);
         ctx.lineTo(curr.x, curr.y);
+        ctx.stroke();
+        ctx.setLineDash([]);
       } else {
-        ctx.moveTo(lastPoint.value.x, lastPoint.value.y);
+        // Freehand: continue existing path without restarting dashes
         ctx.lineTo(curr.x, curr.y);
         lastPoint.value = curr;
+        ctx.stroke();
       }
-      ctx.stroke();
-      ctx.setLineDash([]);
     }
 
     function endDraw(e) {
@@ -982,6 +1309,9 @@ export default {
         ctx.lineTo(end.x, end.y);
         ctx.stroke();
         ctx.setLineDash([]);
+      } else {
+        // Freehand: close out dash styles to default
+        ctx.setLineDash([]);
       }
       drawing.value = false;
       snapshot = null;
@@ -989,6 +1319,18 @@ export default {
 
     /* ---------- Export to PDF (legend + pens) ---------- */
     const showExportPopup = ref(false);
+    const showPreviewPopup = ref(false);
+    const previewImg = ref("");
+    async function previewPDF() {
+      try {
+        const target = tableContainer.value || document.querySelector(".bookbinding-screen");
+        const canvas = await html2canvas(target, { scale: 1.5, useCORS: true });
+        previewImg.value = canvas.toDataURL("image/png");
+        showPreviewPopup.value = true;
+      } catch (e) {
+        console.error("Preview failed:", e);
+      }
+    }
     async function exportToPDF() {
       try {
         const target =
@@ -1004,10 +1346,11 @@ export default {
         const pageWidth = pdf.internal.pageSize.getWidth();
         const pageHeight = pdf.internal.pageSize.getHeight();
 
-        const margin = 32;
-        const gap = 20;
+        const margin = 24; // smaller margins to allow larger table
+        const gap = 10; // tighter spacing between sections
 
-        const hasHeadbands = headbandPositions.length > 0;
+        const hasHeadbands =
+          headbandLeftPositions.length > 0 || headbandRightPositions.length > 0;
         const hasSupports = supportEntries.length > 0;
         const hasChangeovers = changeHolesByRow.value.some(
           (r) => r && r.length > 0
@@ -1019,11 +1362,11 @@ export default {
         if (hasSupports) rowsLegend.push({ kind: "support" });
         if (hasChangeovers) rowsLegend.push({ kind: "changeover" });
 
-        const headerH = 22;
-        const sectionH = 18;
-        const lineH = 18;
-        const padX = 14;
-        const padY = 12;
+        const headerH = 16;
+        const sectionH = 14;
+        const lineH = 14;
+        const padX = 10;
+        const padY = 8;
 
         const legendItemsH =
           rowsLegend.length * lineH +
@@ -1033,9 +1376,22 @@ export default {
             ? headerH + padY + legendItemsH + padY
             : 0;
 
+        // Metadata box — before legend
+        const metaItems = [];
+        if (props.title) metaItems.push(["Title", String(props.title)]);
+        if (props.location) metaItems.push(["City/Repository", String(props.location)]);
+        if (props.shelfmark) metaItems.push(["Shelfmark", String(props.shelfmark)]);
+        if (props.manuscriptDate) metaItems.push(["Date", String(props.manuscriptDate)]);
+        const metaBoxH = metaItems.length
+          ? headerH + padY + metaItems.length * lineH + padY
+          : 0;
+
         const availableWidth = pageWidth - margin * 2;
         const availableHeight =
-          pageHeight - margin * 2 - (legendBoxH ? legendBoxH + gap : 0);
+          pageHeight -
+          margin * 2 -
+          (metaBoxH ? metaBoxH + gap : 0) -
+          (legendBoxH ? legendBoxH + gap : 0);
 
         const ratio = Math.min(
           availableWidth / canvas.width,
@@ -1048,10 +1404,41 @@ export default {
 
         pdf.addImage(imgData, "PNG", x, y, w, h);
 
+        // Place metadata and legend beneath the image on the same page
+        let nextY = y + h + gap;
+        if (metaBoxH > 0) {
+          const metaW = Math.max(420, Math.min(520, w));
+          const metaX = (pageWidth - metaW) / 2;
+          const metaY = nextY;
+
+          pdf.setDrawColor(200, 208, 219);
+          pdf.setFillColor(249, 251, 253);
+          pdf.roundedRect(metaX, metaY, metaW, metaBoxH, 8, 8, "FD");
+
+          pdf.setTextColor(20, 30, 45);
+          pdf.setFontSize(13);
+          pdf.setFont("helvetica", "bold");
+          pdf.text("Metadata", metaX + padX, metaY + padY + 10);
+
+          pdf.setDrawColor(220, 224, 230);
+          pdf.line(metaX + padX, metaY + padY + headerH, metaX + metaW - padX, metaY + padY + headerH);
+
+          let rowY = metaY + padY + headerH + 10;
+          pdf.setFont("helvetica", "normal");
+          pdf.setFontSize(11);
+          pdf.setTextColor(26, 33, 45);
+          for (const [k, v] of metaItems) {
+            pdf.text(`${k}: ${v}`, metaX + padX, rowY);
+            rowY += lineH;
+          }
+
+          nextY = metaY + metaBoxH + gap;
+        }
+
         if (legendBoxH > 0) {
           const legendW = Math.max(420, Math.min(520, w));
           const legendX = (pageWidth - legendW) / 2;
-          const legendY = y + h + gap;
+          const legendY = nextY;
 
           pdf.setDrawColor(200, 208, 219);
           pdf.setFillColor(249, 251, 253);
@@ -1109,7 +1496,7 @@ export default {
               pdf.setFillColor(color.r, color.g, color.b);
               pdf.setDrawColor(34, 34, 34);
               pdf.circle(iconX + 8, rowY - 5, 4, "FD");
-              drawLabel(labelX, "Change‑over hole (dot)");
+              drawLabel(labelX, "Change‑over station (dot)");
             }
             rowY += lineH;
           }
@@ -1176,10 +1563,17 @@ export default {
       totalCmNumber,
       majorTicks,
       minorTicks,
+      isDoubleSupport,
+      supportHalfGapPx,
+      headTh,
+      tailTh,
+      topRulerLeft,
+      topRulerWidth,
       tooltipVisible,
       tooltipX,
       tooltipCm,
       onRulerMove,
+      getRulerRect,
 
       // drag feedback
       dragFeedback,
@@ -1192,10 +1586,15 @@ export default {
       clampPct,
 
       // headbands / supports
-      headbandPositions,
-      addHeadband,
+      headbandLeftPositions,
+      headbandRightPositions,
+      addHeadbandLeft,
+      addHeadbandRight,
       supportEntries,
-      addSupport,
+      openAddSupportPopup,
+      showAddSupportPopup,
+      supportTypeChoice,
+      confirmAddSupport,
 
       // change‑over holes (per row)
       changeHolesByRow,
@@ -1205,11 +1604,14 @@ export default {
       onChangeHoleDragged,
       holeKey,
       selectedKeys,
+      selectedSupportIds,
       selectingMode,
       postSelectMode,
       selectedCount,
       isSelected,
+      isSupportSelected,
       onHoleClick,
+      onSupportClick,
       finishSelection,
       cancelSelection,
       clearSelection,
@@ -1218,7 +1620,10 @@ export default {
       // context menu + actions
       menu,
       openHoleMenu,
+      openSupportMenu,
+      openHeadbandMenu,
       beginSelectFromMenu,
+      beginSupportSelectFromMenu,
       removeFromMenu,
       deleteSelected,
 
@@ -1229,6 +1634,7 @@ export default {
       openRecolorPopup,
       cancelRecolor,
       confirmRecolor,
+      recolorHeading,
 
       // pens
       pens,
@@ -1239,6 +1645,9 @@ export default {
       penForm,
       confirmPen,
       togglePen,
+      penTooltip,
+      penHintVisible,
+      lastCreatedPenId,
 
       // canvas
       drawCanvas,
@@ -1250,6 +1659,9 @@ export default {
 
       // export
       showExportPopup,
+      showPreviewPopup,
+      previewImg,
+      previewPDF,
       exportToPDF,
     };
   },
@@ -1260,7 +1672,8 @@ export default {
 .bookbinding-screen {
   display: flex;
   flex-direction: column;
-  height: 100vh;
+  min-height: 100vh; /* allow page to grow and scroll */
+  overflow-y: auto; /* ensure scrolling when content exceeds viewport */
   background: #112233;
   color: white;
   font-family: Arial, sans-serif;
@@ -1337,10 +1750,10 @@ export default {
   position: relative;
   margin: 0 auto;
   width: 80%;
-  height: 430px;
+  height: auto;
   min-height: 200px;
-  max-height: 430px;
-  overflow: hidden;
+  max-height: none;
+  overflow: visible;
   flex: 1 1 auto;
   display: flex;
   flex-direction: column;
@@ -1395,6 +1808,12 @@ export default {
   width: 25%;
 }
 
+/* Separate top ruler that aligns from Head to Tail columns */
+.top-ruler {
+  position: relative;
+  margin-bottom: 8px;
+}
+
 /* Canvas cells */
 .canvas-cell {
   position: relative;
@@ -1405,7 +1824,7 @@ export default {
   position: absolute;
   top: 0;
   bottom: 0;
-  width: 16px;
+  width: 8px; /* narrower endband */
   background: #4ea5de;
   transform: translateX(-50%);
   pointer-events: auto;
@@ -1429,11 +1848,15 @@ export default {
   top: 0;
   bottom: 0;
   width: 6px;
-  background: #e2b043; /* yellow */
+  background: #e2b043; /* default yellow; overridden inline when recolored */
   transform: translateX(-50%);
   cursor: grab;
   z-index: 3; /* above dots in the cell */
   pointer-events: auto; /* draggable even though wrapper ignores events */
+}
+
+.support-bar.selected {
+  outline: 2px solid #00b7ff;
 }
 
 /* Dots */
@@ -1479,26 +1902,64 @@ export default {
   padding: 4px;
   font-size: 14px;
   border: 1px solid #999;
+  box-sizing: border-box;
+  height: 28px; /* keep single-line visual */
+  line-height: 20px;
+  resize: none;
+  overflow-x: auto;
+  overflow-y: hidden;
+  white-space: pre; /* prevent wrapping so horizontal scroll appears */
 }
 
 /* Ruler */
 .ruler {
   position: relative;
-  height: 40px;
+  height: 56px;
+  padding: 6px 0 16px;
   background: #f7f7f7;
-  border-bottom: 1px solid #ccc;
+  border: 1px solid #ccc;
+  border-radius: 4px;
+  box-sizing: border-box;
 }
 .tick {
   position: absolute;
-  bottom: 0;
   width: 1px;
   background: #666;
 }
 .tick.major {
-  height: 24px;
+  top: 6px;
+  height: 30px;
 }
 .tick.minor {
-  height: 12px;
+  top: 14px;
+  height: 18px;
+  opacity: 0.7;
+}
+.tick-label {
+  position: absolute;
+  top: 38px;
+  left: 50%;
+  transform: translateX(-50%);
+  font-size: 11px;
+  font-weight: 600;
+  color: #1f2a3a;
+  white-space: nowrap;
+  pointer-events: none;
+}
+.tick-label small {
+  font-size: 9px;
+  margin-left: 2px;
+  text-transform: lowercase;
+}
+.tick-first .tick-label {
+  left: 0;
+  transform: translateX(0);
+  text-align: left;
+}
+.tick-last .tick-label {
+  left: 0;
+  transform: translateX(-100%);
+  text-align: right;
 }
 .tooltip {
   position: absolute;
@@ -1515,8 +1976,8 @@ export default {
 /* Drag feedback UI on ruler */
 .drag-marker {
   position: absolute;
-  top: 0;
-  bottom: 0;
+  top: 6px;
+  bottom: 16px;
   width: 2px;
 }
 .drag-marker.start {
@@ -1527,7 +1988,7 @@ export default {
 }
 .drag-readout {
   position: absolute;
-  top: 0;
+  top: 4px;
   transform: translateX(-50%);
   background: rgba(17, 34, 51, 0.9);
   color: #e9f2ff;
@@ -1564,6 +2025,7 @@ export default {
   cursor: pointer;
   border-radius: 4px;
 }
+.legend .ml8 { margin-left: 8px; }
 .swatch {
   display: inline-block;
   width: 16px;
@@ -1610,6 +2072,23 @@ export default {
 .pen-btn.active {
   background: #4ea5de;
   color: #fff !important;
+}
+
+.pen-wrap { position: relative; display: inline-block; }
+.pen-hint {
+  position: absolute;
+  bottom: 110%;
+  left: 50%;
+  transform: translateX(-50%);
+  background: rgba(17, 34, 51, 0.95);
+  color: #e9f2ff;
+  padding: 6px 8px;
+  border-radius: 6px;
+  font-size: 12px;
+  white-space: nowrap;
+  border: 1px solid #2b3d56;
+  box-shadow: 0 4px 14px rgba(0,0,0,0.35);
+  pointer-events: none;
 }
 
 /* Context menu & overlays sit ABOVE canvas */

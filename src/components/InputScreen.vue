@@ -20,12 +20,12 @@
             placeholder="Enter title"
           />
 
-          <label class="field-label mt">Location</label>
+          <label class="field-label mt">City/Repository</label>
           <input
             v-model="location"
             type="text"
             class="field-input"
-            placeholder="Enter repository"
+            placeholder="Enter city or repository"
           />
         </div>
         <div class="meta-group">
@@ -83,7 +83,7 @@
               <span class="field-title">Folios per Quire</span>
               <span
                 class="info"
-                data-tooltip="These entries can be modified later"
+                data-tooltip="Max 20; can be modified later"
                 >ℹ</span
               >
             </div>
@@ -92,6 +92,7 @@
                 v-model.number="foliosPerQuire"
                 type="number"
                 min="1"
+                max="20"
                 class="number-input"
               />
               <div class="radios">
@@ -150,7 +151,7 @@
           <div class="field">
             <div class="field-header">
               <span class="field-title">Spine Length (cm)</span>
-              <span class="info" data-tooltip="Enter spine length in cm"
+              <span class="info" data-tooltip="Enter spine length in cm."
                 >ℹ</span
               >
             </div>
@@ -207,7 +208,7 @@
           <!-- Extras -->
           <div class="extras">
             <label class="checkbox">
-              <input type="checkbox" v-model="headbands" /> Headbands
+              <input type="checkbox" v-model="headbands" /> Endbands
             </label>
             <label class="checkbox">
               <input type="checkbox" v-model="changeOver" /> Change‐Over
@@ -232,7 +233,7 @@
 </template>
 
 <script setup>
-import { ref, computed } from "vue";
+import { ref, computed, onMounted, watch } from "vue";
 import { useRouter, useRoute } from "vue-router";
 
 const router = useRouter();
@@ -274,6 +275,83 @@ sewingType.value = route.query.sewingType || "";
 headbands.value = route.query.headbands === "true";
 changeOver.value = route.query.changeOver === "true";
 
+// Default date to today if not provided
+onMounted(() => {
+  if (!manuscriptDate.value) {
+    try {
+      manuscriptDate.value = new Date().toISOString().slice(0, 10);
+    } catch (_) {
+      // no-op
+    }
+  }
+  try {
+    const saved = localStorage.getItem("feniusForm");
+    if (saved) {
+      const s = JSON.parse(saved);
+      title.value = s.title ?? title.value;
+      manuscriptDate.value = s.manuscriptDate ?? manuscriptDate.value;
+      location.value = s.location ?? location.value;
+      shelfmark.value = s.shelfmark ?? shelfmark.value;
+      quires.value = s.quires ?? quires.value;
+      quiresStyle.value = s.quiresStyle ?? quiresStyle.value;
+      foliosPerQuire.value = s.foliosPerQuire ?? foliosPerQuire.value;
+      collationStyle.value = s.collationStyle ?? collationStyle.value;
+      sewingSupports.value = s.sewingSupports ?? sewingSupports.value;
+      sewingType.value = s.sewingType ?? sewingType.value;
+      spineLength.value = s.spineLength ?? spineLength.value;
+      frontEndleaves.value = s.frontEndleaves ?? frontEndleaves.value;
+      backEndleaves.value = s.backEndleaves ?? backEndleaves.value;
+      headbands.value = s.headbands ?? headbands.value;
+      changeOver.value = s.changeOver ?? changeOver.value;
+    }
+  } catch (_) { void 0; }
+});
+
+watch(
+  [
+    title,
+    manuscriptDate,
+    location,
+    shelfmark,
+    quires,
+    quiresStyle,
+    foliosPerQuire,
+    collationStyle,
+    sewingSupports,
+    sewingType,
+    spineLength,
+    frontEndleaves,
+    backEndleaves,
+    headbands,
+    changeOver,
+  ],
+  () => {
+    try {
+      localStorage.setItem(
+        "feniusForm",
+        JSON.stringify({
+          title: title.value,
+          manuscriptDate: manuscriptDate.value,
+          location: location.value,
+          shelfmark: shelfmark.value,
+          quires: quires.value,
+          quiresStyle: quiresStyle.value,
+          foliosPerQuire: foliosPerQuire.value,
+          collationStyle: collationStyle.value,
+          sewingSupports: sewingSupports.value,
+          sewingType: sewingType.value,
+          spineLength: spineLength.value,
+          frontEndleaves: frontEndleaves.value,
+          backEndleaves: backEndleaves.value,
+          headbands: headbands.value,
+          changeOver: changeOver.value,
+        })
+      );
+    } catch (_) { void 0; }
+  },
+  { deep: false }
+);
+
 const canContinue = computed(
   () => title.value.trim() !== "" && quires.value >= 1
 );
@@ -307,7 +385,7 @@ function onContinue() {
 .input-page {
   display: flex;
   flex-direction: column;
-  height: 100vh;
+  min-height: 100vh; /* allow page to grow and scroll */
   background: linear-gradient(to bottom, #3a4b60, #112233);
   color: white;
 }
