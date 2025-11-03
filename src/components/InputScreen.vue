@@ -385,7 +385,12 @@ function onContinue() {
 .input-page {
   display: flex;
   flex-direction: column;
-  min-height: 100vh; /* allow page to grow and scroll */
+  /* Use viewport height and enable internal scrolling */
+  min-height: 100vh; /* baseline */
+  height: 100vh;     /* fallback */
+  height: 100dvh;    /* mobile-safe dynamic viewport */
+  overflow-y: auto;  /* scroll only when needed */
+  -webkit-overflow-scrolling: touch;
   background: linear-gradient(to bottom, #3a4b60, #112233);
   color: white;
 }
@@ -404,8 +409,9 @@ function onContinue() {
 }
 .form-container {
   margin: 0 auto;
-  width: 800px;
-  padding: 64px 0 48px;
+  max-width: 800px;
+  width: calc(100% - 32px); /* responsive on narrow viewports */
+  padding: 32px 0 48px;
 }
 .metadata {
   display: flex;

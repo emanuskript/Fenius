@@ -1,5 +1,5 @@
 <template>
-  <div class="bookbinding-screen">
+  <div class="bookbinding-screen" ref="rootEl" :class="{ 'force-scroll': isScrollForced }">
     <!-- HEADER BAR -->
     <div class="header-bar">
       <span class="product-label">eManuskript Produkt</span>
@@ -60,7 +60,12 @@
             ]"
             :style="{ left: (cm / Math.max(1, totalCmNumber)) * 100 + '%' }"
           >
-            <span v-if="cm % 10 === 0" class="tick-label">{{ cm }}</span>
+            <span
+              v-if="cm % 5 === 0 || (Number.isInteger(totalCmNumber) && cm === totalCmNumber)"
+              class="tick-label"
+            >
+              {{ cm }}
+            </span>
           </div>
           <div
             v-for="pct in minorTicks"
@@ -105,8 +110,22 @@
             :style="{ height: rowHeight + 'px' }"
             :class="rowIndex % 2 === 0 ? 'even' : 'odd'"
           >
-            <td class="cell-text">{{ row.roman }}</td>
-            <td class="cell-text">{{ row.range }}</td>
+            <td class="cell-text">
+              <template v-if="editRowsMode">
+                <input class="cell-input small" v-model="rowsManual[rowIndex].roman" />
+              </template>
+              <template v-else>
+                {{ (rowsManual[rowIndex] && rowsManual[rowIndex].roman) || row.roman }}
+              </template>
+            </td>
+            <td class="cell-text">
+              <template v-if="editRowsMode">
+                <input class="cell-input" v-model="rowsManual[rowIndex].range" />
+              </template>
+              <template v-else>
+                {{ (rowsManual[rowIndex] && rowsManual[rowIndex].range) || row.range }}
+              </template>
+            </td>
 
             <!-- Headbands (left) -->
             <td class="canvas-cell">
@@ -128,7 +147,7 @@
               />
             </td>
 
-            <!-- Spine area with supports + per-row changeover holes -->
+            <!-- Spine area with supports + sewing holes + per-row changeover holes -->
             <td
               class="canvas-cell supports-cell"
               colspan="3"
@@ -143,37 +162,30 @@
                 <!-- Single or double sewing support -->
                 <template v-if="(sp.type || (isDoubleSupport ? 'double' : 'single')) === 'single'">
                   <div
-                    class="hole-dot sewing"
-                    :style="{ left: `calc(${sp.position}% - 12px)` }"
-                  ></div>
-                  <div
                     class="support-bar"
                     :class="{ selected: isSupportSelected(sp.id) }"
                     :style="{ left: sp.position + '%', background: sp.color }"
                     @contextmenu.prevent="openSupportMenu($event, si)"
                     @click.stop="onSupportClick(si)"
-                    v-draggable="{
-                      getRect: getRulerRect,
-                      onStart: (localPct, globalPct) => beginDragFeedback(globalPct),
-                      onChange: (localPct, globalPct) => {
-                        supportEntries[si].position = clampPct(localPct);
-                        updateDragFeedback(globalPct);
-                      },
-                      onEnd: endDragFeedback,
-                    }"
+                  v-draggable="{
+                    getRect: getRulerRect,
+                    onStart: (localPct, globalPct) => beginDragFeedback(globalPct),
+                    onChange: (localPct, globalPct) => {
+                      const prev = supportEntries[si].position;
+                      const next = clampPct(localPct);
+                      if (next !== prev) {
+                        supportEntries[si].position = next;
+                        moveSewingHolesForSupport(supportEntries[si].id ?? si, next - prev);
+                      }
+                      updateDragFeedback(globalPct);
+                    },
+                    onEnd: endDragFeedback,
+                  }"
                     title="Sewing support"
-                  ></div>
-                  <div
-                    class="hole-dot sewing"
-                    :style="{ left: `calc(${sp.position}% + 6px)` }"
                   ></div>
                 </template>
                 <template v-else>
                   <!-- Left bar and its dots -->
-                  <div
-                    class="hole-dot sewing"
-                    :style="{ left: `calc(${sp.position}% - ${supportHalfGapPx + 12}px)` }"
-                  ></div>
                   <div
                     class="support-bar"
                     :class="{ selected: isSupportSelected(sp.id) }"
@@ -184,24 +196,20 @@
                       getRect: getRulerRect,
                       onStart: (localPct, globalPct) => beginDragFeedback(globalPct),
                       onChange: (localPct, globalPct, pxToPct) => {
-                        const center = localPct + pxToPct(supportHalfGapPx);
-                        supportEntries[si].position = clampPct(center);
+                        const prev = supportEntries[si].position;
+                        const center = clampPct(localPct + pxToPct(supportHalfGapPx));
+                        if (center !== prev) {
+                          supportEntries[si].position = center;
+                          moveSewingHolesForSupport(supportEntries[si].id ?? si, center - prev);
+                        }
                         updateDragFeedback(globalPct);
                       },
                       onEnd: endDragFeedback,
                     }"
                     title="Sewing support (double)"
                   ></div>
-                  <div
-                    class="hole-dot sewing"
-                    :style="{ left: `calc(${sp.position}% - ${supportHalfGapPx - 6}px)` }"
-                  ></div>
 
                   <!-- Right bar and its dots -->
-                  <div
-                    class="hole-dot sewing"
-                    :style="{ left: `calc(${sp.position}% + ${supportHalfGapPx - 12}px)` }"
-                  ></div>
                   <div
                     class="support-bar"
                     :class="{ selected: isSupportSelected(sp.id) }"
@@ -212,20 +220,48 @@
                       getRect: getRulerRect,
                       onStart: (localPct, globalPct) => beginDragFeedback(globalPct),
                       onChange: (localPct, globalPct, pxToPct) => {
-                        const center = localPct - pxToPct(supportHalfGapPx);
-                        supportEntries[si].position = clampPct(center);
+                        const prev = supportEntries[si].position;
+                        const center = clampPct(localPct - pxToPct(supportHalfGapPx));
+                        if (center !== prev) {
+                          supportEntries[si].position = center;
+                          moveSewingHolesForSupport(supportEntries[si].id ?? si, center - prev);
+                        }
                         updateDragFeedback(globalPct);
                       },
                       onEnd: endDragFeedback,
                     }"
                     title="Sewing support (double)"
                   ></div>
-                  <div
-                    class="hole-dot sewing"
-                    :style="{ left: `calc(${sp.position}% + ${supportHalfGapPx + 6}px)` }"
-                  ></div>
                 </template>
               </div>
+
+              <!-- Sewing holes (individual per row, draggable) -->
+              <div
+                v-for="sh in sewingHolesByRow[rowIndex]"
+                :key="'sh-' + sh.uid"
+                class="hole-dot sewing"
+                :class="{ selected: isSewingSelected(sewingKey(rowIndex, sh.uid)) }"
+                :style="{
+                  left: sewingHoleLeft(sh),
+                  background: sh.color,
+                }"
+                v-draggable="{
+                  getRect: getRulerRect,
+                  onStart: (localPct, globalPct) => beginDragFeedback(globalPct),
+                  onChange: (localPct, globalPct) => {
+                    onSewingHoleDragged(rowIndex, sh.uid, localPct);
+                    updateDragFeedback(globalPct);
+                  },
+                  onEnd: endDragFeedback,
+                }"
+                @contextmenu.prevent="openSewingMenu($event, rowIndex, sh.uid)"
+                @click.stop="onSewingHoleClick(rowIndex, sh.uid)"
+                :title="
+                  isSewingSelected(sewingKey(rowIndex, sh.uid))
+                    ? 'Selected'
+                    : 'Sewing hole'
+                "
+              ></div>
 
               <!-- Change-over stations (individual per row, include 0% & 100%) -->
               <div
@@ -309,7 +345,10 @@
     </div>
 
     <!-- FOOTER -->
-    <div class="footer">
+    <!-- Extra scroll range when rows are long -->
+    <div v-if="isScrollForced" class="scroll-spacer"></div>
+
+    <div class="footer" ref="footer">
       <div class="legend">
         <div>
           <span class="swatch headband"></span> Headbands
@@ -325,6 +364,14 @@
           <button :class="{ 'btn-active': addHoleMode }" @click="toggleAddHole">
             {{ addHoleMode ? "Click in a row to place…" : "+ Add" }}
           </button>
+        </div>
+
+        <div>
+          Rows
+          <button class="ml8" :class="{ 'btn-active': editRowsMode }" @click="toggleEditRows">
+            {{ editRowsMode ? 'Editing…' : 'Edit quires/leaves' }}
+          </button>
+          <button v-if="editRowsMode" class="ml8" @click="resetRowsManual">Reset from metadata</button>
         </div>
 
         <!-- Pens -->
@@ -410,6 +457,26 @@
           <button class="menu-item" @click="openRecolorPopup(false)">Recolor…</button>
           <button class="menu-item danger" @click="removeFromMenu">Remove sewing support</button>
         </template>
+      </template>
+
+      <!-- Sewing hole menu -->
+      <template v-else-if="menu.kind === 'sewing'">
+        <template v-if="menu.group">
+          <button class="menu-item" @click="openRecolorPopup(true)">Recolor Selected…</button>
+          <button class="menu-item danger" @click="deleteSelected">Delete Selected</button>
+          <hr class="menu-sep" />
+          <button class="menu-item" @click="exitPostSelect">Exit selection</button>
+        </template>
+        <template v-else>
+          <button class="menu-item" @click="beginSewingSelectFromMenu">Select</button>
+          <button class="menu-item" @click="openRecolorPopup(false)">Recolor…</button>
+          <button class="menu-item danger" @click="removeFromMenu">Remove</button>
+        </template>
+      </template>
+
+      <!-- Stroke (pen line) menu -->
+      <template v-else-if="menu.kind === 'stroke'">
+        <button class="menu-item" @click="openRecolorPopup(false)">Recolor…</button>
       </template>
 
       <!-- Headband/tailband menu -->
@@ -679,6 +746,32 @@ export default {
       return out;
     });
 
+    // Editable copies of quire label + leaves/range per row
+    const rowsManual = reactive([]);
+    const editRowsMode = ref(false);
+    function ensureRowsManual() {
+      const src = rows.value;
+      // Grow/shrink to match base row count
+      while (rowsManual.length < src.length) rowsManual.push({ roman: src[rowsManual.length]?.roman || "", range: src[rowsManual.length]?.range || "" });
+      while (rowsManual.length > src.length) rowsManual.splice(rowsManual.length - 1, 1);
+      // If not in edit mode, keep rowsManual in sync with metadata-driven rows
+      if (!editRowsMode.value) {
+        for (let i = 0; i < src.length; i++) {
+          rowsManual[i].roman = src[i].roman;
+          rowsManual[i].range = src[i].range;
+        }
+      }
+    }
+    onMounted(ensureRowsManual);
+    watch(rows, ensureRowsManual, { immediate: true });
+    function toggleEditRows() {
+      editRowsMode.value = !editRowsMode.value;
+    }
+    function resetRowsManual() {
+      editRowsMode.value = false;
+      ensureRowsManual();
+    }
+
     // Notes sync with rows
     const notes = reactive([]);
     const syncNotes = () => {
@@ -699,6 +792,39 @@ export default {
   const tailTh = ref(null);
   const topRulerLeft = ref(0);
   const topRulerWidth = ref(0);
+  const rootEl = ref(null);
+  const footer = ref(null);
+  const prevHtmlOverflow = ref("");
+  const prevBodyOverflow = ref("");
+  function applyGlobalScroll(forceOn) {
+    try {
+      if (forceOn) {
+        // Save previous inline values once
+        if (!prevHtmlOverflow.value) prevHtmlOverflow.value = document.documentElement.style.overflow;
+        if (!prevBodyOverflow.value) prevBodyOverflow.value = document.body.style.overflow;
+        document.documentElement.style.overflow = 'auto';
+        document.body.style.overflow = 'auto';
+      } else {
+        document.documentElement.style.overflow = prevHtmlOverflow.value;
+        document.body.style.overflow = prevBodyOverflow.value;
+      }
+    } catch (_) { /* no-op */ }
+  }
+  function updateScrollability() {
+    try {
+      if (!rootEl.value || !tableContainer.value || !footer.value) return;
+      const tableRect = tableContainer.value.getBoundingClientRect();
+      const footerRect = footer.value.getBoundingClientRect();
+      // Force scroll when more than 10 rows; otherwise fall back to geometry threshold
+      if (rows.value.length > 10) {
+        rootEl.value.style.overflowY = 'auto';
+      } else {
+        const needsScroll = tableRect.bottom > (footerRect.top - 30);
+        rootEl.value.style.overflowY = needsScroll ? 'auto' : 'hidden';
+      }
+      rootEl.value.style.height = '100dvh';
+    } catch (_) { /* no-op */ }
+  }
   function updateTopRulerAlignment() {
     if (!tableContainer.value || !headTh.value || !tailTh.value) return;
     const containerRect = tableContainer.value.getBoundingClientRect();
@@ -710,16 +836,21 @@ export default {
     topRulerWidth.value = Math.max(0, right - left);
   }
   onMounted(() => {
-    nextTick(updateTopRulerAlignment);
+    nextTick(() => { updateTopRulerAlignment(); updateScrollability(); applyGlobalScroll(isScrollForced.value); });
     window.addEventListener("resize", updateTopRulerAlignment);
+    window.addEventListener("resize", updateScrollability);
   });
-  watch([rows, () => rowHeight.value], () => nextTick(updateTopRulerAlignment));
+  watch([rows, () => rowHeight.value], () => nextTick(() => { updateTopRulerAlignment(); updateScrollability(); }));
+  watch(rows, () => nextTick(() => { updateScrollability(); applyGlobalScroll(isScrollForced.value); }), { immediate: false });
   onUnmounted(() => {
     window.removeEventListener("resize", updateTopRulerAlignment);
+    window.removeEventListener("resize", updateScrollability);
+    applyGlobalScroll(false);
   });
 
     /* ---------- Ruler ---------- */
     const totalCm = computed(() => Math.max(0, num(props.spineLength, 0)));
+    const isScrollForced = computed(() => rows.value.length > 10);
     const totalCmNumber = computed(() => totalCm.value);
     const majorTicks = computed(() => {
       const t = Math.floor(totalCm.value);
@@ -787,7 +918,17 @@ export default {
     const isDoubleSupport = computed(
       () => String(props.sewingType || '').toLowerCase() === 'double'
     );
-    const supportHalfGapPx = 8; // pixel offset for double supports
+  const supportHalfGapPx = 8; // pixel offset for double supports
+  function moveSewingHolesForSupport(supportId, delta) {
+    if (!delta) return;
+    try {
+      sewingHolesByRow.value.forEach((row) => {
+        row.forEach((h) => {
+          if (h.supportId === supportId) h.position = clampPct(h.position + delta);
+        });
+      });
+    } catch (_) { /* no-op */ }
+  }
     function initSupportsFromCount(count) {
       const n = Math.max(0, num(count, 0));
       supportEntries.splice(0, supportEntries.length);
@@ -867,10 +1008,10 @@ export default {
       });
       addHoleMode.value = false;
     }
-    function onChangeHoleDragged(rowIndex, uid, pct) {
-      const row = changeHolesByRow.value[rowIndex];
-      const hole = row.find((h) => h.uid === uid);
-      if (!hole) return;
+  function onChangeHoleDragged(rowIndex, uid, pct) {
+    const row = changeHolesByRow.value[rowIndex];
+    const hole = row.find((h) => h.uid === uid);
+    if (!hole) return;
 
       const key = holeKey(rowIndex, uid);
       if (isSelected(key)) {
@@ -884,41 +1025,153 @@ export default {
         });
       } else {
         hole.position = clampPct(pct);
-      }
+    }
     }
 
     const holeKey = (rowIndex, uid) => `${rowIndex}:${uid}`;
     const selectedKeys = ref(new Set()); // holes
-    const selectedSupportIds = ref(new Set()); // supports (by id/index)
-    const selectingMode = ref(false);
-    const postSelectMode = ref(false);
-    const selectedCount = computed(
-      () => selectedKeys.value.size + selectedSupportIds.value.size
-    );
-    const isSelected = (key) => selectedKeys.value.has(key);
-    const toggleSelected = (key) => {
-      const s = new Set(selectedKeys.value);
+    // Sewing holes (per row, independent)
+    const sewingHolesByRow = ref([]);
+    const sewingKey = (rowIndex, uid) => `${rowIndex}:${uid}`;
+    const selectedSewingKeys = ref(new Set());
+    const isSewingSelected = (key) => selectedSewingKeys.value.has(key);
+    const toggleSewingSelected = (key) => {
+      const s = new Set(selectedSewingKeys.value);
       s.has(key) ? s.delete(key) : s.add(key);
-      selectedKeys.value = s;
+      selectedSewingKeys.value = s;
     };
-    const isSupportSelected = (indexOrId) => selectedSupportIds.value.has(indexOrId);
-    const toggleSupportSelected = (indexOrId) => {
-      const s = new Set(selectedSupportIds.value);
-      s.has(indexOrId) ? s.delete(indexOrId) : s.add(indexOrId);
-      selectedSupportIds.value = s;
-    };
-    const clearSelected = () => {
-      selectedKeys.value = new Set();
-      selectedSupportIds.value = new Set();
-    };
-    function onHoleClick(rowIndex, uid) {
-      if (!selectingMode.value) return;
-      toggleSelected(holeKey(rowIndex, uid));
+    // (sewingHolesByRow declared above)
+    const middleRowIndex = computed(() => Math.max(0, Math.floor((rows.value.length - 1) / 2)));
+    function ensureSewingHolesArrays() {
+      const need = rows.value.length;
+      // Ensure rows exist
+      while (sewingHolesByRow.value.length < need) sewingHolesByRow.value.push([]);
+      while (sewingHolesByRow.value.length > need) sewingHolesByRow.value.pop();
+
+      // Remove holes for supports that no longer exist
+      const supportIds = new Set(supportEntries.map((s) => s.id));
+      for (const row of sewingHolesByRow.value) {
+        for (let i = row.length - 1; i >= 0; i--) {
+          if (row[i].supportId != null && !supportIds.has(row[i].supportId)) row.splice(i, 1);
+        }
+      }
+
+      // For each row, ensure default holes exist for each support
+      // - Single support: ensure at least 2 side holes per row (user can adjust later)
+      // - Double support: ensure at least 2 side holes on every row, and exactly 1 additional center hole on the middle row only
+      const sideOffset = 1.2; // percent offset from support center for side holes
+      const centerThreshold = 0.6; // percent: classify holes near center as 'center'
+      sewingHolesByRow.value.forEach((row, ri) => {
+        for (const sp of supportEntries) {
+          const type = (sp.type || (isDoubleSupport.value ? 'double' : 'single'));
+          const holes = row.filter((h) => h.supportId === sp.id);
+          // Classify center vs side for double; for single, treat all as side
+          const centers = type === 'double'
+            ? holes.filter((h) => (h.role === 'center') || Math.abs(h.position - sp.position) <= centerThreshold)
+            : [];
+          const sides = holes.filter((h) => !centers.includes(h));
+
+          // Ensure side holes (at least two) exist on every row
+          if (sides.length < 2) {
+            const desired = [clampPct(sp.position - sideOffset), clampPct(sp.position + sideOffset)];
+            for (let i = sides.length; i < 2; i++) {
+              row.push({ uid: nextUid.value++, position: desired[i], color: '#333', supportId: sp.id, role: 'side' });
+            }
+          }
+
+          if (type === 'double') {
+            // Middle row should have exactly one center hole; other rows none
+            if (ri === middleRowIndex.value) {
+              if (centers.length === 0) {
+                row.push({ uid: nextUid.value++, position: clampPct(sp.position), color: '#333', supportId: sp.id, role: 'center' });
+              } else if (centers.length > 1) {
+                // keep the closest to center
+                centers.sort((a, b) => Math.abs(a.position - sp.position) - Math.abs(b.position - sp.position));
+                for (const h of centers.slice(1)) {
+                  const idx = row.indexOf(h);
+                  if (idx >= 0) row.splice(idx, 1);
+                }
+              }
+            } else {
+              // remove center holes from non-middle rows
+              for (const h of centers) {
+                const idx = row.indexOf(h);
+                if (idx >= 0) row.splice(idx, 1);
+              }
+            }
+          }
+        }
+      });
     }
-    function onSupportClick(index) {
-      if (!selectingMode.value) return;
-      toggleSupportSelected(supportEntries[index].id ?? index);
+    onMounted(ensureSewingHolesArrays);
+    watch(rows, ensureSewingHolesArrays, { immediate: true });
+    watch(supportEntries, ensureSewingHolesArrays, { deep: true });
+    watch(isDoubleSupport, () => ensureSewingHolesArrays());
+
+    function onSewingHoleDragged(rowIndex, uid, pct) {
+      const row = sewingHolesByRow.value[rowIndex];
+      const hole = row.find((h) => h.uid === uid);
+      if (!hole) return;
+      const key = sewingKey(rowIndex, uid);
+      if (isSewingSelected(key)) {
+        const delta = clampPct(pct) - hole.position;
+        selectedSewingKeys.value.forEach((selectedKey) => {
+          const [r, u] = selectedKey.split(":").map(Number);
+          const h = sewingHolesByRow.value[r].find((hh) => hh.uid === u);
+          if (h) h.position = clampPct(h.position + delta);
+        });
+      } else {
+        hole.position = clampPct(pct);
+      }
     }
+
+    // Visual offset to keep side holes from sitting on top of support bar
+    const sewingSideMarginPx = 8;
+    function sewingHoleLeft(hole) {
+      const sp = supportEntries.find((s) => s.id === hole.supportId);
+      // Center hole stays exactly centered on the support position
+      if (hole.role === 'center' && sp) return `calc(${sp.position}% + 0px)`;
+      const basePct = Number.isFinite(hole.position) ? hole.position : 0;
+      if (!sp) return `${basePct}%`;
+      const dir = basePct >= sp.position ? 1 : -1;
+      return `calc(${basePct}% + ${dir * sewingSideMarginPx}px)`;
+    }
+  const selectedSupportIds = ref(new Set()); // supports (by id/index)
+  const selectingMode = ref(false);
+  const postSelectMode = ref(false);
+  const selectedCount = computed(
+      () => selectedKeys.value.size + selectedSewingKeys.value.size + selectedSupportIds.value.size
+    );
+  const isSelected = (key) => selectedKeys.value.has(key);
+  const toggleSelected = (key) => {
+    const s = new Set(selectedKeys.value);
+    s.has(key) ? s.delete(key) : s.add(key);
+    selectedKeys.value = s;
+  };
+  // sewingKey/isSewingSelected/toggleSewingSelected declared above
+  const isSupportSelected = (indexOrId) => selectedSupportIds.value.has(indexOrId);
+  const toggleSupportSelected = (indexOrId) => {
+    const s = new Set(selectedSupportIds.value);
+    s.has(indexOrId) ? s.delete(indexOrId) : s.add(indexOrId);
+    selectedSupportIds.value = s;
+  };
+  const clearSelected = () => {
+    selectedKeys.value = new Set();
+    selectedSewingKeys.value = new Set();
+    selectedSupportIds.value = new Set();
+  };
+  function onHoleClick(rowIndex, uid) {
+    if (!selectingMode.value) return;
+    toggleSelected(holeKey(rowIndex, uid));
+  }
+  function onSewingHoleClick(rowIndex, uid) {
+    if (!selectingMode.value) return;
+    toggleSewingSelected(sewingKey(rowIndex, uid));
+  }
+  function onSupportClick(index) {
+    if (!selectingMode.value) return;
+    toggleSupportSelected(supportEntries[index].id ?? index);
+  }
 
     // Context menu
     const menu = reactive({
@@ -928,10 +1181,11 @@ export default {
       rowIndex: null,
       uid: null,
       group: false,
-      kind: 'hole', // 'hole' | 'support' | 'headband-left' | 'headband-right'
+      kind: 'hole', // 'hole' | 'support' | 'sewing' | 'stroke' | 'headband-left' | 'headband-right'
       hbSide: null,
       hbIndex: null,
       supportIndex: null,
+      strokeId: null,
     });
     function openHoleMenu(e, rowIndex, uid) {
       const key = holeKey(rowIndex, uid);
@@ -940,9 +1194,8 @@ export default {
       menu.y = e.clientY;
       menu.rowIndex = rowIndex;
       menu.uid = uid;
-      // Treat as group if the clicked hole is within the current selection
-      // and there is more than one item selected (or at least one if you want single‑selection group ops).
-      menu.group = selectedKeys.value.has(key) && selectedKeys.value.size >= 2;
+      // Group ops if clicked hole is selected and total holes selected across types >= 2
+      menu.group = selectedKeys.value.has(key) && (selectedKeys.value.size + selectedSewingKeys.value.size) >= 2;
       menu.kind = 'hole';
       menu.hbSide = null;
       menu.hbIndex = null;
@@ -985,6 +1238,32 @@ export default {
       window.addEventListener("scroll", close, true);
       window.addEventListener("resize", close, true);
     }
+    function openSewingMenu(e, rowIndex, uid) {
+      const key = sewingKey(rowIndex, uid);
+      menu.visible = true;
+      menu.x = e.clientX;
+      menu.y = e.clientY;
+      menu.rowIndex = rowIndex;
+      menu.uid = uid;
+      // Group ops if clicked sewing hole is selected and total holes selected across types >= 2
+      menu.group = selectedSewingKeys.value.has(key) && (selectedKeys.value.size + selectedSewingKeys.value.size) >= 2;
+      menu.kind = 'sewing';
+      menu.hbSide = null;
+      menu.hbIndex = null;
+      menu.supportIndex = null;
+
+      const close = (ev) => {
+        const el = document.querySelector(".context-menu");
+        if (el && el.contains(ev.target)) return;
+        menu.visible = false;
+        window.removeEventListener("mousedown", close, true);
+        window.removeEventListener("scroll", close, true);
+        window.removeEventListener("resize", close, true);
+      };
+      window.addEventListener("mousedown", close, true);
+      window.addEventListener("scroll", close, true);
+      window.addEventListener("resize", close, true);
+    }
     function openHeadbandMenu(e, side, index) {
       menu.visible = true;
       menu.x = e.clientX;
@@ -1008,12 +1287,90 @@ export default {
       window.addEventListener("scroll", close, true);
       window.addEventListener("resize", close, true);
     }
+    // Context menu for strokes drawn on canvas (recolor)
+    function distToSeg(px, py, ax, ay, bx, by) {
+      const vx = bx - ax, vy = by - ay;
+      const wx = px - ax, wy = py - ay;
+      const c1 = vx * wx + vy * wy;
+      if (c1 <= 0) return Math.hypot(px - ax, py - ay);
+      const c2 = vx * vx + vy * vy;
+      if (c2 <= c1) return Math.hypot(px - bx, py - by);
+      const t = c1 / c2;
+      const projx = ax + t * vx, projy = ay + t * vy;
+      return Math.hypot(px - projx, py - projy);
+    }
+    function hitStrokeAtClient(clientX, clientY) {
+      const rect = drawCanvas.value?.getBoundingClientRect();
+      if (!rect) return null;
+      const x = clientX - rect.left,
+        y = clientY - rect.top;
+      if (x < 0 || y < 0 || x > rect.width || y > rect.height) return null;
+      const tol = 6; // pixels
+      // search from top-most stroke
+      for (let i = strokes.value.length - 1; i >= 0; i--) {
+        const s = strokes.value[i];
+        if (s.tool !== 'pen') continue; // recolor only pen strokes
+        if (s.type === 'straight' && s.start && s.end) {
+          const a = absPoint(s.start), b = absPoint(s.end);
+          if (distToSeg(x, y, a.x, a.y, b.x, b.y) <= tol) return s.id;
+        } else if (s.type === 'freehand' && s.points && s.points.length >= 2) {
+          const pts = s.points.map(absPoint);
+          for (let j = 1; j < pts.length; j++) {
+            if (distToSeg(x, y, pts[j - 1].x, pts[j - 1].y, pts[j].x, pts[j].y) <= tol)
+              return s.id;
+          }
+        }
+      }
+      return null;
+    }
+    function onGlobalContextMenu(ev) {
+      const id = hitStrokeAtClient(ev.clientX, ev.clientY);
+      if (!id) return; // let other menus work
+      ev.preventDefault();
+      ev.stopPropagation();
+      menu.visible = true;
+      menu.x = ev.clientX;
+      menu.y = ev.clientY;
+      menu.kind = 'stroke';
+      menu.strokeId = id;
+      menu.rowIndex = null;
+      menu.uid = null;
+      menu.supportIndex = null;
+      menu.hbSide = null;
+      menu.hbIndex = null;
+
+      const close = (e2) => {
+        const el = document.querySelector('.context-menu');
+        if (el && el.contains(e2.target)) return;
+        menu.visible = false;
+        window.removeEventListener('mousedown', close, true);
+        window.removeEventListener('scroll', close, true);
+        window.removeEventListener('resize', close, true);
+      };
+      window.addEventListener('mousedown', close, true);
+      window.addEventListener('scroll', close, true);
+      window.addEventListener('resize', close, true);
+    }
+    onMounted(() => {
+      window.addEventListener('contextmenu', onGlobalContextMenu, true);
+    });
+    onUnmounted(() => {
+      window.removeEventListener('contextmenu', onGlobalContextMenu, true);
+    });
     function beginSelectFromMenu() {
       selectingMode.value = true;
       postSelectMode.value = false;
       clearSelected();
       if (menu.rowIndex != null && menu.uid != null)
         toggleSelected(holeKey(menu.rowIndex, menu.uid));
+      menu.visible = false;
+    }
+    function beginSewingSelectFromMenu() {
+      selectingMode.value = true;
+      postSelectMode.value = false;
+      clearSelected();
+      if (menu.rowIndex != null && menu.uid != null)
+        toggleSewingSelected(sewingKey(menu.rowIndex, menu.uid));
       menu.visible = false;
     }
     function beginSupportSelectFromMenu() {
@@ -1043,9 +1400,28 @@ export default {
           s.delete(key);
           selectedKeys.value = s;
         }
+      } else if (menu.kind === 'sewing') {
+        if (menu.rowIndex == null || menu.uid == null) return;
+        const row = sewingHolesByRow.value[menu.rowIndex];
+        const idx = row.findIndex((h) => h.uid === menu.uid);
+        if (idx >= 0) row.splice(idx, 1);
+        const key = sewingKey(menu.rowIndex, menu.uid);
+        if (selectedSewingKeys.value.has(key)) {
+          const s = new Set(selectedSewingKeys.value);
+          s.delete(key);
+          selectedSewingKeys.value = s;
+        }
       } else if (menu.kind === 'support') {
         if (menu.supportIndex == null) return;
-        supportEntries.splice(menu.supportIndex, 1);
+        const removed = supportEntries.splice(menu.supportIndex, 1)[0];
+        if (removed && removed.id != null) {
+          // Remove all sewing holes linked to this support
+          sewingHolesByRow.value.forEach((arr) => {
+            for (let i = arr.length - 1; i >= 0; i--) {
+              if (arr[i].supportId === removed.id) arr.splice(i, 1);
+            }
+          });
+        }
       } else if (menu.kind === 'headband-left') {
         if (menu.hbIndex == null) return;
         headbandLeftPositions.splice(menu.hbIndex, 1);
@@ -1079,10 +1455,29 @@ export default {
         const idx = row.findIndex((h) => h.uid === u);
         if (idx >= 0) row.splice(idx, 1);
       });
+      // Remove selected sewing holes
+      selectedSewingKeys.value.forEach((key) => {
+        const [r, u] = key.split(":").map(Number);
+        const row = sewingHolesByRow.value[r];
+        const idx = row.findIndex((h) => h.uid === u);
+        if (idx >= 0) row.splice(idx, 1);
+      });
       // Remove selected supports
       if (selectedSupportIds.value.size) {
-        const keep = supportEntries.filter((sp) => !selectedSupportIds.value.has(sp.id));
+        const removedIds = new Set();
+        supportEntries.forEach((sp) => {
+          if (selectedSupportIds.value.has(sp.id)) removedIds.add(sp.id);
+        });
+        const keep = supportEntries.filter((sp) => !removedIds.has(sp.id));
         supportEntries.splice(0, supportEntries.length, ...keep);
+        // Remove sewing holes belonging to removed supports
+        if (removedIds.size) {
+          sewingHolesByRow.value.forEach((arr) => {
+            for (let i = arr.length - 1; i >= 0; i--) {
+              if (removedIds.has(arr[i].supportId)) arr.splice(i, 1);
+            }
+          });
+        }
       }
       clearSelection();
       menu.visible = false;
@@ -1096,6 +1491,10 @@ export default {
           const row = changeHolesByRow.value[menu.rowIndex];
           const hole = row.find((h) => h.uid === menu.uid);
           if (hole) recolorColor.value = hole.color || "#4ea5de";
+        } else if (menu.kind === 'sewing' && menu.rowIndex != null && menu.uid != null) {
+          const row = sewingHolesByRow.value[menu.rowIndex];
+          const hole = row.find((h) => h.uid === menu.uid);
+          if (hole) recolorColor.value = hole.color || "#333";
         } else if (menu.kind === 'support' && menu.supportIndex != null) {
           const sp = supportEntries[menu.supportIndex];
           if (sp) recolorColor.value = sp.color || "#e2b043";
@@ -1108,6 +1507,8 @@ export default {
       if (recolorForGroup.value) return 'Recolor Selected…';
       if (menu.kind === 'support') return 'Recolor Support';
       if (menu.kind === 'hole') return 'Recolor Station';
+      if (menu.kind === 'sewing') return 'Recolor Sewing Hole';
+      if (menu.kind === 'stroke') return 'Recolor Pen Stroke';
       return 'Recolor';
     });
     function cancelRecolor() {
@@ -1121,6 +1522,12 @@ export default {
           const hole = changeHolesByRow.value[r].find((h) => h.uid === u);
           if (hole) hole.color = recolorColor.value;
         });
+        // Sewing holes in selection
+        selectedSewingKeys.value.forEach((key) => {
+          const [r, u] = key.split(":").map(Number);
+          const hole = sewingHolesByRow.value[r].find((h) => h.uid === u);
+          if (hole) hole.color = recolorColor.value;
+        });
         // Supports in selection
         supportEntries.forEach((sp) => {
           if (selectedSupportIds.value.has(sp.id)) sp.color = recolorColor.value;
@@ -1131,9 +1538,21 @@ export default {
             (h) => h.uid === menu.uid
           );
           if (hole) hole.color = recolorColor.value;
+        } else if (menu.kind === 'sewing' && menu.rowIndex != null && menu.uid != null) {
+          const hole = sewingHolesByRow.value[menu.rowIndex].find(
+            (h) => h.uid === menu.uid
+          );
+          if (hole) hole.color = recolorColor.value;
         } else if (menu.kind === 'support' && menu.supportIndex != null) {
           const sp = supportEntries[menu.supportIndex];
           if (sp) sp.color = recolorColor.value;
+        } else if (menu.kind === 'stroke' && menu.strokeId != null) {
+          const s = strokes.value.find((st) => st.id === menu.strokeId);
+          if (s) {
+            s.color = recolorColor.value;
+            // redraw all strokes to apply new color
+            nextTick(reRenderCanvas);
+          }
         }
       }
       showRecolorPopup.value = false;
@@ -1152,6 +1571,74 @@ export default {
     const penHintVisible = ref(false);
     const lastCreatedPenId = ref(null);
     const penTooltip = (p) => `Color: ${p.color} • Type: ${p.type} • Style: ${p.style}`;
+
+    // Vector strokes so we can recolor later
+    const strokes = ref([]); // [{ id, tool:'pen'|'eraser', type:'straight'|'freehand'|'eraser', style, color, width, points:[{x,y}], start:{x,y}, end:{x,y} }];
+    let strokeSeq = 1;
+    let currentStroke = null; // working object while drawing
+
+    function normPoint(pt) {
+      const w = Math.max(1, canvasWidth.value);
+      const h = Math.max(1, canvasHeight.value);
+      return { x: pt.x / w, y: pt.y / h };
+    }
+    function absPoint(pt) {
+      return { x: pt.x * canvasWidth.value, y: pt.y * canvasHeight.value };
+    }
+    function drawOneStroke(ctx, s) {
+      const w = 2;
+      if (s.tool === 'eraser') {
+        ctx.save();
+        ctx.globalCompositeOperation = 'destination-out';
+        ctx.lineWidth = s.width || 24;
+        ctx.lineCap = 'round';
+        const pts = (s.points || []).map(absPoint);
+        if (pts.length === 1) {
+          ctx.beginPath();
+          ctx.arc(pts[0].x, pts[0].y, (s.width || 24) / 2, 0, 2 * Math.PI);
+          ctx.fill();
+        } else if (pts.length > 1) {
+          ctx.beginPath();
+          ctx.moveTo(pts[0].x, pts[0].y);
+          for (let i = 1; i < pts.length; i++) ctx.lineTo(pts[i].x, pts[i].y);
+          ctx.stroke();
+        }
+        ctx.restore();
+        return;
+      }
+      // pen stroke
+      ctx.save();
+      ctx.globalCompositeOperation = 'source-over';
+      ctx.lineWidth = w;
+      ctx.lineCap = 'round';
+      ctx.strokeStyle = s.color || '#4ea5de';
+      if (ctx.setLineDash) {
+        if (s.style === 'dotted') ctx.setLineDash([2, 6]);
+        else if (s.style === 'dashed') ctx.setLineDash([10, 8]);
+        else ctx.setLineDash([]);
+      }
+      if (s.type === 'straight' && s.start && s.end) {
+        const a = absPoint(s.start), b = absPoint(s.end);
+        ctx.beginPath();
+        ctx.moveTo(a.x, a.y);
+        ctx.lineTo(b.x, b.y);
+        ctx.stroke();
+      } else if (s.type === 'freehand' && s.points && s.points.length > 0) {
+        const pts = s.points.map(absPoint);
+        ctx.beginPath();
+        ctx.moveTo(pts[0].x, pts[0].y);
+        for (let i = 1; i < pts.length; i++) ctx.lineTo(pts[i].x, pts[i].y);
+        ctx.stroke();
+      }
+      if (ctx.setLineDash) ctx.setLineDash([]);
+      ctx.restore();
+    }
+    function reRenderCanvas() {
+      const ctx = drawCanvas.value?.getContext('2d');
+      if (!ctx) return;
+      ctx.clearRect(0, 0, drawCanvas.value.width, drawCanvas.value.height);
+      for (const s of strokes.value) drawOneStroke(ctx, s);
+    }
 
     function confirmPen() {
       const id = pens.value.length + 1;
@@ -1186,6 +1673,8 @@ export default {
         canvasWidth.value = tableContainer.value.offsetWidth;
         canvasHeight.value = tableContainer.value.offsetHeight;
       }
+      // Repaint stored strokes after resize to keep positions consistent
+      nextTick(() => { reRenderCanvas(); updateScrollability(); });
     }
     onMounted(() => {
       nextTick(resizeCanvas);
@@ -1218,7 +1707,10 @@ export default {
       startPoint.value = point;
       const pen = getPenStyle();
       const ctx = drawCanvas.value.getContext("2d");
-      if (eraserActive.value) return; // eraser doesn't need setup
+      if (eraserActive.value) {
+        currentStroke = { id: strokeSeq++, tool: 'eraser', type: 'eraser', width: 24, points: [normPoint(point)] };
+        return; // eraser doesn't need pen setup
+      }
 
       if (pen.type === "straight") {
         snapshot = ctx.getImageData(
@@ -1227,6 +1719,7 @@ export default {
           drawCanvas.value.width,
           drawCanvas.value.height
         );
+        currentStroke = { id: strokeSeq++, tool: 'pen', type: 'straight', style: pen.style, color: pen.color, start: normPoint(point), end: null };
       } else {
         // Freehand: start a continuous path so dashed/dotted are consistent
         snapshot = null;
@@ -1238,6 +1731,7 @@ export default {
         else ctx.setLineDash([]);
         ctx.beginPath();
         ctx.moveTo(point.x, point.y);
+        currentStroke = { id: strokeSeq++, tool: 'pen', type: 'freehand', style: pen.style, color: pen.color, points: [normPoint(point)] };
       }
     }
 
@@ -1254,6 +1748,7 @@ export default {
         ctx.arc(curr.x, curr.y, 12, 0, 2 * Math.PI);
         ctx.fill();
         ctx.restore();
+        if (currentStroke) currentStroke.points.push(normPoint(curr));
         lastPoint.value = curr;
         return;
       }
@@ -1279,6 +1774,7 @@ export default {
         ctx.lineTo(curr.x, curr.y);
         lastPoint.value = curr;
         ctx.stroke();
+        if (currentStroke && currentStroke.points) currentStroke.points.push(normPoint(curr));
       }
     }
 
@@ -1287,6 +1783,8 @@ export default {
       const ctx = drawCanvas.value.getContext("2d");
       if (eraserActive.value) {
         drawing.value = false;
+        if (currentStroke) strokes.value.push(currentStroke);
+        currentStroke = null;
         snapshot = null;
         return;
       }
@@ -1309,9 +1807,18 @@ export default {
         ctx.lineTo(end.x, end.y);
         ctx.stroke();
         ctx.setLineDash([]);
+        if (currentStroke) {
+          currentStroke.end = normPoint(end);
+          strokes.value.push(currentStroke);
+          currentStroke = null;
+        }
       } else {
         // Freehand: close out dash styles to default
         ctx.setLineDash([]);
+        if (currentStroke) {
+          strokes.value.push(currentStroke);
+          currentStroke = null;
+        }
       }
       drawing.value = false;
       snapshot = null;
@@ -1569,11 +2076,14 @@ export default {
       tailTh,
       topRulerLeft,
       topRulerWidth,
+      rootEl,
+      footer,
       tooltipVisible,
       tooltipX,
       tooltipCm,
       onRulerMove,
       getRulerRect,
+      isScrollForced,
 
       // drag feedback
       dragFeedback,
@@ -1595,22 +2105,36 @@ export default {
       showAddSupportPopup,
       supportTypeChoice,
       confirmAddSupport,
+      moveSewingHolesForSupport,
 
       // change‑over holes (per row)
       changeHolesByRow,
+      // sewing holes (per row)
+      sewingHolesByRow,
+      // rows edit
+      rowsManual,
+      editRowsMode,
+      toggleEditRows,
+      resetRowsManual,
       addHoleMode,
       toggleAddHole,
       maybeAddHole,
       onChangeHoleDragged,
+      onSewingHoleDragged,
       holeKey,
+      sewingKey,
       selectedKeys,
+      selectedSewingKeys,
       selectedSupportIds,
       selectingMode,
       postSelectMode,
       selectedCount,
       isSelected,
+      isSewingSelected,
       isSupportSelected,
       onHoleClick,
+      onSewingHoleClick,
+      sewingHoleLeft,
       onSupportClick,
       finishSelection,
       cancelSelection,
@@ -1621,8 +2145,10 @@ export default {
       menu,
       openHoleMenu,
       openSupportMenu,
+      openSewingMenu,
       openHeadbandMenu,
       beginSelectFromMenu,
+      beginSewingSelectFromMenu,
       beginSupportSelectFromMenu,
       removeFromMenu,
       deleteSelected,
@@ -1672,11 +2198,25 @@ export default {
 .bookbinding-screen {
   display: flex;
   flex-direction: column;
-  min-height: 100vh; /* allow page to grow and scroll */
-  overflow-y: auto; /* ensure scrolling when content exceeds viewport */
+  /* Make this view its own scroll container (works despite global body overflow hidden) */
+  min-height: 100vh;
+  height: 100vh;     /* fallback */
+  height: 100dvh;    /* mobile-safe dynamic viewport */
+  overflow-y: auto;  /* scroll only when needed */
+  -webkit-overflow-scrolling: touch;
   background: #112233;
   color: white;
   font-family: Arial, sans-serif;
+}
+.bookbinding-screen.force-scroll {
+  position: fixed;
+  inset: 0;
+  overflow-y: auto;
+}
+
+.scroll-spacer {
+  height: 50px;
+  flex: 0 0 auto;
 }
 .header-bar {
   display: flex;
@@ -1754,11 +2294,15 @@ export default {
   min-height: 200px;
   max-height: none;
   overflow: visible;
-  flex: 1 1 auto;
+  /* Do not shrink; allow content to define height so parent can scroll */
+  flex: 0 0 auto;
+  flex-shrink: 0;
   display: flex;
   flex-direction: column;
   margin-top: 50px;
   z-index: 1; /* table layer */
+  /* Reserve space so the sticky footer doesn't cover last rows */
+  padding-bottom: 96px;
 }
 
 /* Canvas must sit ABOVE the table; still only intercepts events if pen/eraser active */
@@ -1785,6 +2329,18 @@ export default {
   overflow: hidden;
   white-space: nowrap;
   text-overflow: ellipsis;
+}
+
+.cell-input {
+  width: 100%;
+  padding: 4px 6px;
+  font-size: 14px;
+  border: 1px solid #999;
+  border-radius: 4px;
+  box-sizing: border-box;
+}
+.cell-input.small {
+  max-width: 80px;
 }
 
 /* Column widths */
@@ -1863,15 +2419,16 @@ export default {
 .hole-dot {
   position: absolute;
   border-radius: 50%;
-  z-index: 2;
+  z-index: 4; /* above support bars for easier interaction */
   top: 50%;
   transform: translateY(-50%);
 }
 .hole-dot.sewing {
-  width: 5px;
-  height: 5px;
+  width: 6px;
+  height: 6px;
   background: #333;
   border: none;
+  transform: translate(-50%, -50%); /* center at percentage position */
 }
 /* Center change-over holes so 0% and 100% show fully */
 .hole-dot.change {
@@ -2002,12 +2559,16 @@ export default {
 
 /* Footer */
 .footer {
+  position: sticky;
+  bottom: 0;
   background: #1f2a3a;
   padding: 16px 24px;
   display: flex;
   justify-content: space-between;
   align-items: center;
   margin-top: auto;
+  z-index: 5;
+  box-shadow: 0 -4px 12px rgba(0,0,0,0.25);
 }
 .legend {
   display: flex;
