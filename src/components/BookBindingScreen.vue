@@ -1,5 +1,5 @@
 <template>
-  <div class="bookbinding-screen" ref="rootEl" :class="{ 'force-scroll': isScrollForced }">
+  <div class="bookbinding-screen" ref="rootEl" :class="{ 'force-scroll': isScrollForced, 'export-mode': exportMode }">
     <!-- HEADER BAR -->
     <div class="header-bar">
       <span class="product-label">eManuskript Produkt</span>
@@ -107,7 +107,7 @@
           <tr
             v-for="(row, rowIndex) in rows"
             :key="rowIndex"
-            :style="{ height: rowHeight + 'px' }"
+            :style="exportMode ? null : { height: rowHeight + 'px' }"
             :class="rowIndex % 2 === 0 ? 'even' : 'odd'"
           >
             <td class="cell-text">
@@ -316,12 +316,23 @@
             </td>
 
             <td>
-              <textarea
-                class="notes-input"
-                v-model="notes[rowIndex]"
-                rows="1"
-                wrap="off"
-              ></textarea>
+              <template v-if="exportMode">
+                <div
+                  class="notes-export"
+                  :style="{ minHeight: (noteHeights[rowIndex] || 28) + 'px' }"
+                >{{ notes[rowIndex] }}</div>
+              </template>
+              <template v-else>
+                <textarea
+                  class="notes-input"
+                  v-model="notes[rowIndex]"
+                  rows="1"
+                  :wrap="'soft'"
+                  :ref="el => noteRefs[rowIndex] = el"
+                  :style="{ height: (noteHeights[rowIndex] || 28) + 'px' }"
+                  @input="onNoteInput(rowIndex)"
+                ></textarea>
+              </template>
             </td>
           </tr>
         </tbody>
@@ -373,6 +384,8 @@
           </button>
           <button v-if="editRowsMode" class="ml8" @click="resetRowsManual">Reset from metadata</button>
         </div>
+
+        
 
         <!-- Pens -->
         <div>
@@ -1828,11 +1841,43 @@ export default {
     const showExportPopup = ref(false);
     const showPreviewPopup = ref(false);
     const previewImg = ref("");
+    const exportMode = ref(false);
+    const noteRefs = ref([]);
+    const noteHeights = ref([]);
+    function measureNoteHeights() {
+      try {
+        noteHeights.value = noteRefs.value.map((el) => (el ? Math.max(28, el.scrollHeight) : 28));
+      } catch (_) { /* no-op */ }
+    }
+    function onNoteInput(idx) {
+      try {
+        const el = noteRefs.value[idx];
+        if (el) noteHeights.value[idx] = Math.max(28, el.scrollHeight);
+      } catch (_) { /* no-op */ }
+    }
+    watch(rows, () => nextTick(measureNoteHeights));
+    watch(notes, () => nextTick(measureNoteHeights), { deep: true });
+    onMounted(() => nextTick(measureNoteHeights));
+    async function withExportLayout(fn) {
+      exportMode.value = true;
+      await nextTick();
+      measureNoteHeights();
+      await nextTick();
+      try {
+        return await fn();
+      } finally {
+        exportMode.value = false;
+        await nextTick();
+      }
+    }
     async function previewPDF() {
       try {
         const target = tableContainer.value || document.querySelector(".bookbinding-screen");
-        const canvas = await html2canvas(target, { scale: 1.5, useCORS: true });
-        previewImg.value = canvas.toDataURL("image/png");
+        const dataUrl = await withExportLayout(async () => {
+          const canvas = await html2canvas(target, { scale: 1.2, useCORS: true });
+          return canvas.toDataURL("image/jpeg", 0.72);
+        });
+        previewImg.value = dataUrl;
         showPreviewPopup.value = true;
       } catch (e) {
         console.error("Preview failed:", e);
@@ -1840,10 +1885,12 @@ export default {
     }
     async function exportToPDF() {
       try {
-        const target =
-          tableContainer.value || document.querySelector(".bookbinding-screen");
-        const canvas = await html2canvas(target, { scale: 2, useCORS: true });
-        const imgData = canvas.toDataURL("image/png");
+        const target = tableContainer.value || document.querySelector(".bookbinding-screen");
+        const snap = await withExportLayout(async () => {
+          const canvas = await html2canvas(target, { scale: 1.2, useCORS: true });
+          return { dataUrl: canvas.toDataURL("image/jpeg", 0.72), width: canvas.width, height: canvas.height };
+        });
+        const imgData = snap.dataUrl;
 
         const pdf = new jsPDF({
           orientation: "landscape",
@@ -1901,15 +1948,15 @@ export default {
           (legendBoxH ? legendBoxH + gap : 0);
 
         const ratio = Math.min(
-          availableWidth / canvas.width,
-          availableHeight / canvas.height
+          availableWidth / Math.max(1, snap.width),
+          availableHeight / Math.max(1, snap.height)
         );
-        const w = canvas.width * ratio;
-        const h = canvas.height * ratio;
+        const w = Math.max(1, snap.width) * ratio;
+        const h = Math.max(1, snap.height) * ratio;
         const x = (pageWidth - w) / 2;
         const y = margin;
 
-        pdf.addImage(imgData, "PNG", x, y, w, h);
+        pdf.addImage(imgData, "JPEG", x, y, w, h, undefined, "FAST");
 
         // Place metadata and legend beneath the image on the same page
         let nextY = y + h + gap;
@@ -2048,7 +2095,20 @@ export default {
 
         const fileName =
           (props.title && String(props.title).trim()) || "Untitled";
-        pdf.save(`${fileName}.pdf`);
+        try {
+          // Prefer manual link to avoid any browser quirks
+          const blob = pdf.output('blob');
+          const url = URL.createObjectURL(blob);
+          const a = document.createElement('a');
+          a.href = url;
+          a.download = `${fileName}.pdf`;
+          document.body.appendChild(a);
+          a.click();
+          a.remove();
+          URL.revokeObjectURL(url);
+        } catch (e) {
+          try { pdf.save(`${fileName}.pdf`); } catch (_) { /* no-op */ }
+        }
       } catch (e) {
         console.error("PDF export failed:", e);
       } finally {
@@ -2187,6 +2247,10 @@ export default {
       showExportPopup,
       showPreviewPopup,
       previewImg,
+      exportMode,
+      noteRefs,
+      noteHeights,
+      onNoteInput,
       previewPDF,
       exportToPDF,
     };
@@ -2460,12 +2524,25 @@ export default {
   font-size: 14px;
   border: 1px solid #999;
   box-sizing: border-box;
-  height: 28px; /* keep single-line visual */
+  height: 28px; /* base single-line; JS expands as needed */
   line-height: 20px;
   resize: none;
-  overflow-x: auto;
-  overflow-y: hidden;
-  white-space: pre; /* prevent wrapping so horizontal scroll appears */
+  overflow: hidden; /* hide scrollbars; JS sets height to scrollHeight */
+  word-break: break-word;
+  overflow-wrap: anywhere;
+}
+
+.notes-export {
+  width: 100%;
+  padding: 4px;
+  font-size: 14px;
+  border: 1px solid #999;
+  box-sizing: border-box;
+  background: #fff;
+  color: #000;
+  white-space: pre-wrap;
+  word-break: break-word;
+  overflow-wrap: anywhere;
 }
 
 /* Ruler */
@@ -2567,7 +2644,7 @@ export default {
   justify-content: space-between;
   align-items: center;
   margin-top: auto;
-  z-index: 5;
+  z-index: 3000;
   box-shadow: 0 -4px 12px rgba(0,0,0,0.25);
 }
 .legend {
