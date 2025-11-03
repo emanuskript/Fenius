@@ -11,10 +11,53 @@
 
     <!-- METADATA BREADCRUMB -->
     <div class="breadcrumb">
-      {{ title }}
-      <span v-if="location">, {{ location }}</span>
-      <span v-if="shelfmark">, {{ shelfmark }}</span>
-      <span v-if="manuscriptDate">, {{ manuscriptDate }}</span>
+      <div class="breadcrumb-text">
+        {{ title }}
+        <span v-if="location">, {{ location }}</span>
+        <span v-if="shelfmark">, {{ shelfmark }}</span>
+        <span v-if="manuscriptDate">, {{ manuscriptDate }}</span>
+      </div>
+      
+      <!-- Main Pen Controls (Center) -->
+      <div class="breadcrumb-main-controls">
+        <button class="pen-btn-header" @click="showPenPopup = true">
+          + Add Pen
+        </button>
+        
+        <!-- Individual Pen Buttons (next to Add Pen) -->
+        <template v-for="pen in pens" :key="pen.id">
+          <span class="pen-wrap-header">
+            <button
+              class="pen-btn-header"
+              :class="{ active: activePenId === pen.id && !eraserActive }"
+              @click="togglePen(pen.id)"
+              :style="{ borderColor: pen.color, color: pen.color }"
+              :title="penTooltip(pen)"
+            >
+              Pen{{ pen.id }}
+            </button>
+            <div
+              v-if="penHintVisible && lastCreatedPenId === pen.id"
+              class="pen-hint-header"
+            >
+              Click the pen button again to hide it
+            </div>
+          </span>
+        </template>
+        
+        <button
+          class="pen-btn-header"
+          :class="{ active: eraserActive }"
+          @click="toggleEraser"
+        >
+          🧹 Eraser
+        </button>
+      </div>
+
+      <!-- Empty right section for balance -->
+      <div class="breadcrumb-pen-controls">
+        <!-- This div maintains the grid layout balance -->
+      </div>
     </div>
 
     <!-- TABLE CONTAINER -->
@@ -33,6 +76,73 @@
         @mouseup="endDraw"
         @mouseleave="endDraw"
       ></canvas>
+
+      <!-- Element overlay (sits ABOVE the drawing canvas; captures events when knot or rupture mode is active) -->
+      <div
+        class="element-overlay"
+        :style="{
+          pointerEvents: (addKnotMode || addRuptureMode) ? 'auto' : 'none',
+        }"
+        @click="handleElementOverlayClick"
+      >
+        <!-- Rendered knots -->
+        <div
+          v-for="knot in knotEntries"
+          :key="'knot-' + knot.id"
+          class="knot-element"
+          :style="{
+            left: knot.x + '%',
+            top: knot.y + '%',
+            width: knot.size + 'px',
+            height: knot.size + 'px',
+          }"
+          @contextmenu.prevent="openKnotMenu($event, knot.id)"
+          @click.stop
+          v-draggable="{
+            onChange: (localPctX, globalPctX) => {
+              updateKnotPosition(knot.id, localPctX, null);
+            }
+          }"
+          title="Medieval Knot - right-click for options"
+        >
+          ⧗
+        </div>
+
+        <!-- Rendered ruptures -->
+        <div
+          v-for="rupture in ruptureEntries"
+          :key="'rupture-' + rupture.id"
+          class="rupture-container"
+          :style="{
+            left: rupture.x + '%',
+            top: rupture.y + '%',
+            width: (rupture.size + 8) + 'px',
+            height: (rupture.size + 8) + 'px',
+          }"
+          @contextmenu.prevent="openRuptureMenu($event, rupture.id)"
+          @click.stop
+          v-draggable="{
+            onChange: (localPctX, globalPctX) => {
+              updateRupturePosition(rupture.id, localPctX, null);
+            }
+          }"
+          title="Use this to indicate where a sewing support or thread has broken."
+        >
+          <!-- Eraser mask (creates gap in underlying elements) -->
+          <div class="rupture-mask"></div>
+          
+          <!-- Lightning bolt symbol -->
+          <div 
+            class="rupture-element"
+            :style="{
+              width: rupture.size + 'px',
+              height: rupture.size + 'px',
+            }"
+          >
+            ⚡
+          </div>
+        </div>
+      </div>
 
       <!-- Top ruler aligned to Head..Tail columns -->
       <div
@@ -378,6 +488,20 @@
         </div>
 
         <div>
+          <span class="swatch knot"></span> Bow/Knot
+          <button :class="{ 'btn-active': addKnotMode }" @click="toggleAddKnot">
+            {{ addKnotMode ? "Click on table to place…" : "+ Add knot" }}
+          </button>
+        </div>
+
+        <div>
+          <span class="swatch rupture"></span> Sewing rupture
+          <button :class="{ 'btn-active': addRuptureMode }" @click="toggleAddRupture">
+            {{ addRuptureMode ? "Click on table to place…" : "+ Insert sewing rupture" }}
+          </button>
+        </div>
+
+        <div>
           Rows
           <button class="ml8" :class="{ 'btn-active': editRowsMode }" @click="toggleEditRows">
             {{ editRowsMode ? 'Editing…' : 'Edit quires/leaves' }}
@@ -385,41 +509,7 @@
           <button v-if="editRowsMode" class="ml8" @click="resetRowsManual">Reset from metadata</button>
         </div>
 
-        
 
-        <!-- Pens -->
-        <div>
-          <button class="pen-btn" @click="showPenPopup = true">
-            + Add Pen
-          </button>
-          <button
-            class="pen-btn"
-            :class="{ active: eraserActive }"
-            @click="toggleEraser"
-            style="border-color: #fff; color: #fff"
-          >
-            🧹 Eraser
-          </button>
-          <template v-for="pen in pens" :key="pen.id">
-            <span class="pen-wrap">
-              <button
-                class="pen-btn"
-                :class="{ active: activePenId === pen.id && !eraserActive }"
-                @click="togglePen(pen.id)"
-                :style="{ borderColor: pen.color, color: pen.color }"
-                :title="penTooltip(pen)"
-              >
-                Pen{{ pen.id }}
-              </button>
-              <div
-                v-if="penHintVisible && lastCreatedPenId === pen.id"
-                class="pen-hint"
-              >
-                Click the pen button again to hide it
-              </div>
-            </span>
-          </template>
-        </div>
       </div>
 
       <button class="continue-btn" @click="showExportPopup = true">
@@ -492,12 +582,43 @@
         <button class="menu-item" @click="openRecolorPopup(false)">Recolor…</button>
       </template>
 
+      <!-- Knot menu -->
+      <template v-else-if="menu.kind === 'knot'">
+        <button class="menu-item danger" @click="deleteKnotFromMenu">
+          Remove Knot
+        </button>
+      </template>
+
       <!-- Headband/tailband menu -->
       <template v-else>
         <button class="menu-item danger" @click="removeFromMenu">
           Remove {{ menu.kind === 'headband-left' ? 'headband' : 'tailband' }}
         </button>
       </template>
+    </div>
+
+    <!-- Knot Context Menu (separate from main context menu) -->
+    <div
+      v-if="showKnotMenu"
+      class="context-menu"
+      :style="{ left: knotMenuPosition.x + 'px', top: knotMenuPosition.y + 'px' }"
+      @mousedown.stop
+    >
+      <button class="menu-item danger" @click="deleteKnotFromMenu">
+        Remove Knot
+      </button>
+    </div>
+
+    <!-- Rupture Context Menu (separate from main context menu) -->
+    <div
+      v-if="showRuptureMenu"
+      class="context-menu"
+      :style="{ left: ruptureMenuPosition.x + 'px', top: ruptureMenuPosition.y + 'px' }"
+      @mousedown.stop
+    >
+      <button class="menu-item danger" @click="deleteRuptureFromMenu">
+        Remove Rupture
+      </button>
     </div>
 
     <!-- Pen Creation Popup -->
@@ -976,6 +1097,155 @@ export default {
       showAddSupportPopup.value = false;
     }
 
+    /* ---------- Knots/Bows ---------- */
+    const knotEntries = reactive([]);
+    const addKnotMode = ref(false);
+    
+    function toggleAddKnot() {
+      addKnotMode.value = !addKnotMode.value;
+    }
+    
+    function handleElementOverlayClick(evt) {
+      const rect = evt.currentTarget.getBoundingClientRect();
+      const x = ((evt.clientX - rect.left) / rect.width) * 100;
+      const y = ((evt.clientY - rect.top) / rect.height) * 100;
+      
+      if (addKnotMode.value) {
+        addKnotAtPosition(x, y);
+      } else if (addRuptureMode.value) {
+        addRuptureAtPosition(x, y);
+      }
+    }
+
+    function handleKnotOverlayClick(evt) {
+      // Keep for backward compatibility, but delegate to the new function
+      handleElementOverlayClick(evt);
+    }
+    
+    function addKnotAtPosition(x, y) {
+      const id = knotEntries.length + 1;
+      knotEntries.push({
+        id,
+        x: clampPct(x), // percentage from left
+        y: clampPct(y), // percentage from top
+        color: '#654321', // dark leather brown for medieval knot
+        size: 18 // size in pixels
+      });
+      
+      addKnotMode.value = false;
+    }
+    
+    function updateKnotPosition(id, x, y) {
+      const knot = knotEntries.find(k => k.id === id);
+      if (!knot) return;
+      
+      if (x !== null) knot.x = clampPct(x);
+      if (y !== null) knot.y = clampPct(y);
+    }
+    
+    function removeKnot(id) {
+      const index = knotEntries.findIndex(knot => knot.id === id);
+      if (index !== -1) {
+        knotEntries.splice(index, 1);
+      }
+    }
+
+    // Knot context menu
+    const showKnotMenu = ref(false);
+    const knotMenuPosition = reactive({ x: 0, y: 0 });
+    const knotMenuTargetId = ref(null);
+    
+    function openKnotMenu(evt, id) {
+      evt.preventDefault();
+      knotMenuPosition.x = evt.clientX;
+      knotMenuPosition.y = evt.clientY;
+      knotMenuTargetId.value = id;
+      showKnotMenu.value = true;
+    }
+    
+    function closeKnotMenu() {
+      showKnotMenu.value = false;
+      knotMenuTargetId.value = null;
+    }
+    
+    function deleteKnotFromMenu() {
+      if (knotMenuTargetId.value !== null) {
+        removeKnot(knotMenuTargetId.value);
+      }
+      closeKnotMenu();
+    }
+
+    /* ---------- Sewing Ruptures ---------- */
+    const ruptureEntries = reactive([]);
+    const addRuptureMode = ref(false);
+    
+    function toggleAddRupture() {
+      addRuptureMode.value = !addRuptureMode.value;
+    }
+    
+    function handleRuptureOverlayClick(evt) {
+      if (!addRuptureMode.value) return;
+      
+      const rect = evt.currentTarget.getBoundingClientRect();
+      const x = ((evt.clientX - rect.left) / rect.width) * 100;
+      const y = ((evt.clientY - rect.top) / rect.height) * 100;
+      
+      addRuptureAtPosition(x, y);
+    }
+    
+    function addRuptureAtPosition(x, y) {
+      const id = ruptureEntries.length + 1;
+      ruptureEntries.push({
+        id,
+        x: clampPct(x), // percentage from left
+        y: clampPct(y), // percentage from top
+        color: '#FF6B47', // orange-red color for rupture/break
+        size: 16 // size in pixels
+      });
+      
+      addRuptureMode.value = false;
+    }
+    
+    function updateRupturePosition(id, x, y) {
+      const rupture = ruptureEntries.find(r => r.id === id);
+      if (!rupture) return;
+      
+      if (x !== null) rupture.x = clampPct(x);
+      if (y !== null) rupture.y = clampPct(y);
+    }
+    
+    function removeRupture(id) {
+      const index = ruptureEntries.findIndex(rupture => rupture.id === id);
+      if (index !== -1) {
+        ruptureEntries.splice(index, 1);
+      }
+    }
+
+    // Rupture context menu
+    const showRuptureMenu = ref(false);
+    const ruptureMenuPosition = reactive({ x: 0, y: 0 });
+    const ruptureMenuTargetId = ref(null);
+    
+    function openRuptureMenu(evt, id) {
+      evt.preventDefault();
+      ruptureMenuPosition.x = evt.clientX;
+      ruptureMenuPosition.y = evt.clientY;
+      ruptureMenuTargetId.value = id;
+      showRuptureMenu.value = true;
+    }
+    
+    function closeRuptureMenu() {
+      showRuptureMenu.value = false;
+      ruptureMenuTargetId.value = null;
+    }
+    
+    function deleteRuptureFromMenu() {
+      if (ruptureMenuTargetId.value !== null) {
+        removeRupture(ruptureMenuTargetId.value);
+      }
+      closeRuptureMenu();
+    }
+
     /* ---------- Change‑over holes (per row) ---------- */
     const changeHolesByRow = ref([]);
     const nextUid = ref(1);
@@ -1369,6 +1639,36 @@ export default {
     });
     onUnmounted(() => {
       window.removeEventListener('contextmenu', onGlobalContextMenu, true);
+    });
+
+    // Watch for knot menu changes to add/remove event listeners
+    watch(showKnotMenu, (isVisible) => {
+      if (isVisible) {
+        const close = () => {
+          closeKnotMenu();
+          window.removeEventListener('mousedown', close, true);
+          window.removeEventListener('scroll', close, true);
+          window.removeEventListener('resize', close, true);
+        };
+        window.addEventListener('mousedown', close, true);
+        window.addEventListener('scroll', close, true);
+        window.addEventListener('resize', close, true);
+      }
+    });
+
+    // Watch for rupture menu changes to add/remove event listeners
+    watch(showRuptureMenu, (isVisible) => {
+      if (isVisible) {
+        const close = () => {
+          closeRuptureMenu();
+          window.removeEventListener('mousedown', close, true);
+          window.removeEventListener('scroll', close, true);
+          window.removeEventListener('resize', close, true);
+        };
+        window.addEventListener('mousedown', close, true);
+        window.addEventListener('scroll', close, true);
+        window.addEventListener('resize', close, true);
+      }
     });
     function beginSelectFromMenu() {
       selectingMode.value = true;
@@ -2167,6 +2467,37 @@ export default {
       confirmAddSupport,
       moveSewingHolesForSupport,
 
+      // knots/bows
+      knotEntries,
+      addKnotMode,
+      toggleAddKnot,
+      handleElementOverlayClick,
+      handleKnotOverlayClick,
+      addKnotAtPosition,
+      updateKnotPosition,
+      removeKnot,
+      showKnotMenu,
+      knotMenuPosition,
+      knotMenuTargetId,
+      openKnotMenu,
+      closeKnotMenu,
+      deleteKnotFromMenu,
+
+      // sewing ruptures
+      ruptureEntries,
+      addRuptureMode,
+      toggleAddRupture,
+      handleRuptureOverlayClick,
+      addRuptureAtPosition,
+      updateRupturePosition,
+      removeRupture,
+      showRuptureMenu,
+      ruptureMenuPosition,
+      ruptureMenuTargetId,
+      openRuptureMenu,
+      closeRuptureMenu,
+      deleteRuptureFromMenu,
+
       // change‑over holes (per row)
       changeHolesByRow,
       // sewing holes (per row)
@@ -2310,6 +2641,72 @@ export default {
   padding: 8px 24px;
   font-size: 14px;
   color: white;
+  display: grid;
+  grid-template-columns: 1fr auto 1fr;
+  align-items: center;
+  gap: 16px;
+}
+
+.breadcrumb-text {
+  justify-self: start;
+}
+
+.breadcrumb-main-controls {
+  justify-self: center;
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.breadcrumb-pen-controls {
+  justify-self: end;
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+/* Pen buttons in header */
+.pen-btn-header {
+  padding: 4px 12px;
+  font-size: 12px;
+  border: 1px solid #4ea5de;
+  background: transparent;
+  color: #4ea5de;
+  border-radius: 4px;
+  cursor: pointer;
+  transition: all 0.2s ease;
+}
+
+.pen-btn-header:hover {
+  background: #4ea5de;
+  color: white;
+}
+
+.pen-btn-header.active {
+  background: #4ea5de;
+  color: white;
+  box-shadow: 0 0 8px rgba(78, 165, 222, 0.4);
+}
+
+.pen-wrap-header {
+  position: relative;
+  display: inline-block;
+}
+
+.pen-hint-header {
+  position: absolute;
+  top: 100%;
+  left: 50%;
+  transform: translateX(-50%);
+  background: #2a3b54;
+  color: white;
+  padding: 4px 8px;
+  border-radius: 4px;
+  font-size: 11px;
+  white-space: nowrap;
+  margin-top: 4px;
+  z-index: 1000;
+  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.3);
 }
 
 /* Selection bars */
@@ -2816,5 +3213,219 @@ export default {
 .popup-btn.cancel {
   background: #555;
   color: #fff;
+}
+
+/* Element overlay (knots and ruptures) */
+.element-overlay {
+  position: absolute;
+  top: 0;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  z-index: 5000; /* Much higher than drawing canvas to ensure DOM stacking order works */
+  pointer-events: none; /* Let clicks pass through when not in add mode */
+}
+
+.element-overlay * {
+  pointer-events: auto; /* Re-enable pointer events for child elements */
+}
+
+.knot-element {
+  position: absolute;
+  transform: translate(-50%, -50%);
+  cursor: grab;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 14px;
+  z-index: 3;
+  background: radial-gradient(circle at 30% 30%, #8B4513, #654321, #3D2914);
+  border: 2px solid #2F1B14;
+  border-radius: 3px;
+  box-shadow: 
+    0 2px 4px rgba(0, 0, 0, 0.4),
+    inset 0 1px 0 rgba(139, 69, 19, 0.3),
+    inset 0 -1px 0 rgba(47, 27, 20, 0.8);
+  transition: transform 0.1s ease;
+  text-shadow: 0 1px 2px rgba(0, 0, 0, 0.6);
+}
+
+.knot-element::before {
+  content: '';
+  position: absolute;
+  top: 1px;
+  left: 1px;
+  right: 1px;
+  bottom: 1px;
+  background: linear-gradient(135deg, 
+    rgba(139, 69, 19, 0.2) 0%, 
+    transparent 25%, 
+    rgba(47, 27, 20, 0.3) 75%
+  );
+  border-radius: 1px;
+  pointer-events: none;
+}
+
+.knot-element:hover {
+  transform: translate(-50%, -50%) scale(1.1);
+  box-shadow: 
+    0 3px 8px rgba(0, 0, 0, 0.5),
+    inset 0 1px 0 rgba(139, 69, 19, 0.4),
+    inset 0 -1px 0 rgba(47, 27, 20, 0.9);
+}
+
+.knot-element:active {
+  cursor: grabbing;
+  transform: translate(-50%, -50%) scale(0.95);
+  box-shadow: 
+    0 1px 3px rgba(0, 0, 0, 0.6),
+    inset 0 2px 4px rgba(47, 27, 20, 0.8);
+}
+
+/* Knot swatch in legend */
+.swatch.knot {
+  background: radial-gradient(circle at 30% 30%, #8B4513, #654321);
+  border: 2px solid #2F1B14;
+  box-shadow: inset 0 1px 0 rgba(139, 69, 19, 0.3);
+}
+
+/* Rupture container and masking */
+.rupture-container {
+  position: absolute;
+  transform: translate(-50%, -50%);
+  cursor: grab;
+  z-index: 5100; /* Extremely high to ensure it's above canvas drawings */
+}
+
+.rupture-mask {
+  position: absolute;
+  top: 50%;
+  left: 50%;
+  transform: translate(-50%, -50%);
+  width: 24px;
+  height: 6px;
+  background: #f8f4e6; /* Match table background */
+  border-radius: 1px;
+  z-index: 999; /* Just below drawing canvas to create gap in table elements */
+  box-shadow: 
+    0 0 0 1px #f8f4e6,
+    0 0 0 2px rgba(0, 0, 0, 0.1);
+}
+
+/* Alternative mask for different colored supports */
+.rupture-mask::before {
+  content: '';
+  position: absolute;
+  top: -1px;
+  left: -2px;
+  right: -2px;
+  bottom: -1px;
+  background: linear-gradient(90deg, 
+    transparent 0%, 
+    #f8f4e6 20%, 
+    #f8f4e6 80%, 
+    transparent 100%
+  );
+  border-radius: 2px;
+}
+
+.rupture-mask::after {
+  content: '';
+  position: absolute;
+  top: -2px;
+  left: -4px;
+  right: -4px;
+  bottom: -2px;
+  background: radial-gradient(ellipse at center, 
+    rgba(248, 244, 230, 0.9) 0%, 
+    rgba(248, 244, 230, 0.7) 50%, 
+    transparent 100%
+  );
+  border-radius: 50%;
+}
+
+/* Rupture lightning bolt element */
+.rupture-element {
+  position: absolute;
+  top: 50%;
+  left: 50%;
+  transform: translate(-50%, -50%);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 14px;
+  z-index: 5100; /* Extremely high to ensure it's above canvas drawings */
+  background: radial-gradient(circle at 30% 30%, #FF6B47, #CC3A1F, #991F0A);
+  border: 2px solid #661100;
+  border-radius: 2px;
+  box-shadow: 
+    0 2px 4px rgba(0, 0, 0, 0.4),
+    inset 0 1px 0 rgba(255, 107, 71, 0.4),
+    inset 0 -1px 0 rgba(102, 17, 0, 0.8),
+    0 0 8px rgba(255, 107, 71, 0.3);
+  transition: transform 0.1s ease;
+  text-shadow: 0 1px 2px rgba(0, 0, 0, 0.8);
+  animation: flicker 2s infinite alternate;
+}
+
+@keyframes flicker {
+  0%, 50% { opacity: 1; }
+  75%, 100% { opacity: 0.7; }
+}
+
+.rupture-element::before {
+  content: '';
+  position: absolute;
+  top: 1px;
+  left: 1px;
+  right: 1px;
+  bottom: 1px;
+  background: linear-gradient(135deg, 
+    rgba(255, 107, 71, 0.3) 0%, 
+    transparent 25%, 
+    rgba(102, 17, 0, 0.4) 75%
+  );
+  border-radius: 0px;
+  pointer-events: none;
+}
+
+.rupture-container:hover .rupture-element {
+  transform: translate(-50%, -50%) scale(1.1);
+  box-shadow: 
+    0 3px 8px rgba(0, 0, 0, 0.5),
+    inset 0 1px 0 rgba(255, 107, 71, 0.5),
+    inset 0 -1px 0 rgba(102, 17, 0, 0.9),
+    0 0 12px rgba(255, 107, 71, 0.5);
+  animation-duration: 1s;
+}
+
+.rupture-container:hover .rupture-mask {
+  width: 28px;
+  box-shadow: 
+    0 0 0 1px #f8f4e6,
+    0 0 0 2px rgba(0, 0, 0, 0.2),
+    0 0 4px rgba(255, 107, 71, 0.2);
+}
+
+.rupture-container:active {
+  cursor: grabbing;
+}
+
+.rupture-container:active .rupture-element {
+  transform: translate(-50%, -50%) scale(0.95);
+  box-shadow: 
+    0 1px 3px rgba(0, 0, 0, 0.6),
+    inset 0 2px 4px rgba(102, 17, 0, 0.8),
+    0 0 6px rgba(255, 107, 71, 0.4);
+}
+
+/* Rupture swatch in legend */
+.swatch.rupture {
+  background: radial-gradient(circle at 30% 30%, #FF6B47, #CC3A1F);
+  border: 2px solid #661100;
+  box-shadow: 
+    inset 0 1px 0 rgba(255, 107, 71, 0.4),
+    0 0 4px rgba(255, 107, 71, 0.3);
+  animation: flicker 2s infinite alternate;
 }
 </style>
