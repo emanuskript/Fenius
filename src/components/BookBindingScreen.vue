@@ -84,6 +84,8 @@
           pointerEvents: (addKnotMode || addRuptureMode) ? 'auto' : 'none',
         }"
         @click="handleElementOverlayClick"
+        @mousemove="handleElementOverlayMouseMove"
+        @mouseleave="handleElementOverlayMouseLeave"
       >
         <!-- Rendered knots -->
         <div
@@ -153,7 +155,7 @@
           class="ruler"
           ref="ruler"
           @mousemove="onRulerMove"
-          @mouseleave="tooltipVisible = false"
+          @mouseleave="onRulerLeave"
         >
           <!-- Major ticks with labels -->
           <div
@@ -209,7 +211,7 @@
             <th class="header-light head-col" ref="headTh">Head</th>
             <th class="header-light ruler-col" colspan="3"></th>
             <th class="header-light tail-col" ref="tailTh">Tail</th>
-            <th class="header-dark notes-col">Notes</th>
+            <th class="header-dark notes-col" v-if="!exportMode">Notes</th>
           </tr>
         </thead>
 
@@ -425,24 +427,14 @@
               />
             </td>
 
-            <td>
-              <template v-if="exportMode">
-                <div
-                  class="notes-export"
-                  :style="{ minHeight: (noteHeights[rowIndex] || 28) + 'px' }"
-                >{{ notes[rowIndex] }}</div>
-              </template>
-              <template v-else>
-                <textarea
-                  class="notes-input"
-                  v-model="notes[rowIndex]"
-                  rows="1"
-                  :wrap="'soft'"
-                  :ref="el => noteRefs[rowIndex] = el"
-                  :style="{ height: (noteHeights[rowIndex] || 28) + 'px' }"
-                  @input="onNoteInput(rowIndex)"
-                ></textarea>
-              </template>
+            <td v-if="!exportMode">
+              <input
+                type="text"
+                class="notes-input"
+                v-model="notes[rowIndex]"
+                :ref="el => noteRefs[rowIndex] = el"
+                placeholder="Add note..."
+              />
             </td>
           </tr>
         </tbody>
@@ -1002,10 +994,23 @@ export default {
       tooltipX = ref(0),
       tooltipCm = ref(0);
     function onRulerMove(e) {
+      // Don't show ruler tooltip when in knot or rupture add mode (overlay handles it)
+      if (addKnotMode.value || addRuptureMode.value) {
+        return;
+      }
+      
       const r = ruler.value.getBoundingClientRect();
       tooltipX.value = e.clientX - r.left;
       tooltipCm.value = (tooltipX.value / r.width) * totalCm.value;
       tooltipVisible.value = true;
+    }
+
+    function onRulerLeave() {
+      // Don't hide tooltip when in knot or rupture add mode (overlay controls it)
+      if (addKnotMode.value || addRuptureMode.value) {
+        return;
+      }
+      tooltipVisible.value = false;
     }
 
     // Provide rect getter for mapping local drags to top-ruler coordinates
@@ -1110,16 +1115,81 @@ export default {
       const x = ((evt.clientX - rect.left) / rect.width) * 100;
       const y = ((evt.clientY - rect.top) / rect.height) * 100;
       
-      if (addKnotMode.value) {
-        addKnotAtPosition(x, y);
-      } else if (addRuptureMode.value) {
-        addRuptureAtPosition(x, y);
+      // Check if we clicked on a drawn line
+      const strokeId = hitStrokeAtClient(evt.clientX, evt.clientY);
+      
+      if (strokeId && (addKnotMode.value || addRuptureMode.value)) {
+        // Get the exact click position on the stroke
+        const clickPoint = getClickPositionOnStroke(evt.clientX, evt.clientY, strokeId);
+        
+        if (addKnotMode.value) {
+          createKnotOnLine(strokeId, clickPoint, x, y);
+        } else if (addRuptureMode.value) {
+          createRuptureOnLine(strokeId, clickPoint, x, y);
+        }
+      } else {
+        // Regular placement when not clicking on a line
+        if (addKnotMode.value) {
+          addKnotAtPosition(x, y);
+        } else if (addRuptureMode.value) {
+          addRuptureAtPosition(x, y);
+        }
       }
     }
 
     function handleKnotOverlayClick(evt) {
       // Keep for backward compatibility, but delegate to the new function
       handleElementOverlayClick(evt);
+    }
+
+    function handleElementOverlayMouseMove(evt) {
+      // Only show position tracking when in knot or rupture add mode
+      if (!addKnotMode.value && !addRuptureMode.value) {
+        return;
+      }
+
+      const rulerRect = ruler.value?.getBoundingClientRect();
+      
+      if (rulerRect) {
+        // Get mouse position relative to the ruler area
+        const mouseX = evt.clientX;
+        const rulerLeft = rulerRect.left;
+        const rulerRight = rulerRect.right;
+        
+        // Check if mouse is within the ruler area horizontally
+        if (mouseX >= rulerLeft && mouseX <= rulerRight) {
+          // Calculate position within the ruler (0 to ruler width)
+          const rulerX = mouseX - rulerLeft;
+          
+          // Calculate the cm position (0 to totalCm)
+          const cmPosition = (rulerX / rulerRect.width) * totalCm.value;
+          
+          // Clamp to valid range
+          const clampedCm = Math.max(0, Math.min(totalCm.value, cmPosition));
+          
+          // Update tooltip
+          tooltipX.value = rulerX;
+          tooltipCm.value = clampedCm;
+          tooltipVisible.value = true;
+        } else {
+          // Mouse is outside ruler area - show boundary values
+          if (mouseX < rulerLeft) {
+            tooltipX.value = 0;
+            tooltipCm.value = 0;
+          } else {
+            tooltipX.value = rulerRect.width;
+            tooltipCm.value = totalCm.value;
+          }
+          tooltipVisible.value = true;
+        }
+      }
+    }
+
+    function handleElementOverlayMouseLeave(evt) {
+      // Hide tooltip when mouse leaves the overlay area
+      if (addKnotMode.value || addRuptureMode.value) {
+        tooltipVisible.value = false;
+      }
     }
     
     function addKnotAtPosition(x, y) {
@@ -1341,7 +1411,7 @@ export default {
 
       // For each row, ensure default holes exist for each support
       // - Single support: ensure at least 2 side holes per row (user can adjust later)
-      // - Double support: ensure at least 2 side holes on every row, and exactly 1 additional center hole on the middle row only
+      // - Double support: ensure exactly 1 center hole per row (between the two yellow bars)
       const sideOffset = 1.2; // percent offset from support center for side holes
       const centerThreshold = 0.6; // percent: classify holes near center as 'center'
       sewingHolesByRow.value.forEach((row, ri) => {
@@ -1354,32 +1424,29 @@ export default {
             : [];
           const sides = holes.filter((h) => !centers.includes(h));
 
-          // Ensure side holes (at least two) exist on every row
-          if (sides.length < 2) {
-            const desired = [clampPct(sp.position - sideOffset), clampPct(sp.position + sideOffset)];
-            for (let i = sides.length; i < 2; i++) {
-              row.push({ uid: nextUid.value++, position: desired[i], color: '#333', supportId: sp.id, role: 'side' });
-            }
-          }
-
           if (type === 'double') {
-            // Middle row should have exactly one center hole; other rows none
-            if (ri === middleRowIndex.value) {
-              if (centers.length === 0) {
-                row.push({ uid: nextUid.value++, position: clampPct(sp.position), color: '#333', supportId: sp.id, role: 'center' });
-              } else if (centers.length > 1) {
-                // keep the closest to center
-                centers.sort((a, b) => Math.abs(a.position - sp.position) - Math.abs(b.position - sp.position));
-                for (const h of centers.slice(1)) {
-                  const idx = row.indexOf(h);
-                  if (idx >= 0) row.splice(idx, 1);
-                }
-              }
-            } else {
-              // remove center holes from non-middle rows
-              for (const h of centers) {
+            // For double supports: ensure exactly one center hole in each row (between the two yellow bars)
+            if (centers.length === 0) {
+              row.push({ uid: nextUid.value++, position: clampPct(sp.position), color: '#333', supportId: sp.id, role: 'center' });
+            } else if (centers.length > 1) {
+              // keep the closest to center
+              centers.sort((a, b) => Math.abs(a.position - sp.position) - Math.abs(b.position - sp.position));
+              for (const h of centers.slice(1)) {
                 const idx = row.indexOf(h);
                 if (idx >= 0) row.splice(idx, 1);
+              }
+            }
+            // Remove any side holes for double supports
+            for (const h of sides) {
+              const idx = row.indexOf(h);
+              if (idx >= 0) row.splice(idx, 1);
+            }
+          } else {
+            // For single supports: ensure side holes (at least two) exist on every row
+            if (sides.length < 2) {
+              const desired = [clampPct(sp.position - sideOffset), clampPct(sp.position + sideOffset)];
+              for (let i = sides.length; i < 2; i++) {
+                row.push({ uid: nextUid.value++, position: desired[i], color: '#333', supportId: sp.id, role: 'side' });
               }
             }
           }
@@ -1606,6 +1673,426 @@ export default {
       }
       return null;
     }
+
+    // Get the exact position where user clicked on a stroke
+    function getClickPositionOnStroke(clientX, clientY, strokeId) {
+      const rect = drawCanvas.value?.getBoundingClientRect();
+      if (!rect) return null;
+      
+      const x = clientX - rect.left;
+      const y = clientY - rect.top;
+      const stroke = strokes.value.find(s => s.id === strokeId);
+      
+      if (!stroke) return null;
+      
+      if (stroke.type === 'straight' && stroke.start && stroke.end) {
+        const startAbs = absPoint(stroke.start);
+        const endAbs = absPoint(stroke.end);
+        
+        // Find the closest point on the line to the click
+        const A = { x: startAbs.x, y: startAbs.y };
+        const B = { x: endAbs.x, y: endAbs.y };
+        const P = { x, y };
+        
+        // Calculate the projection of P onto line AB
+        const AB = { x: B.x - A.x, y: B.y - A.y };
+        const AP = { x: P.x - A.x, y: P.y - A.y };
+        const AB_squared = AB.x * AB.x + AB.y * AB.y;
+        
+        if (AB_squared === 0) return { ...A, progress: 0 };
+        
+        const t = Math.max(0, Math.min(1, (AP.x * AB.x + AP.y * AB.y) / AB_squared));
+        
+        return {
+          x: A.x + t * AB.x,
+          y: A.y + t * AB.y,
+          progress: t, // 0 to 1 along the line
+          stroke
+        };
+      } else if (stroke.type === 'freehand' && stroke.points && stroke.points.length >= 2) {
+        // For freehand, find the closest segment
+        const pts = stroke.points.map(absPoint);
+        let closestPoint = null;
+        let closestDist = Infinity;
+        let segmentIndex = 0;
+        
+        for (let i = 1; i < pts.length; i++) {
+          const A = pts[i - 1];
+          const B = pts[i];
+          const P = { x, y };
+          
+          const AB = { x: B.x - A.x, y: B.y - A.y };
+          const AP = { x: P.x - A.x, y: P.y - A.y };
+          const AB_squared = AB.x * AB.x + AB.y * AB.y;
+          
+          if (AB_squared === 0) continue;
+          
+          const t = Math.max(0, Math.min(1, (AP.x * AB.x + AP.y * AB.y) / AB_squared));
+          const projection = {
+            x: A.x + t * AB.x,
+            y: A.y + t * AB.y
+          };
+          
+          const dist = Math.hypot(P.x - projection.x, P.y - projection.y);
+          if (dist < closestDist) {
+            closestDist = dist;
+            segmentIndex = i - 1;
+            closestPoint = {
+              ...projection,
+              progress: (segmentIndex + t) / (pts.length - 1),
+              stroke
+            };
+          }
+        }
+        
+        return closestPoint;
+      }
+      
+      return null;
+    }
+
+    // Animation states
+    const animations = reactive({
+      knots: new Map(), // strokeId -> animation state
+      ruptures: new Map() // strokeId -> animation state
+    });
+
+    // Create knot animation on a line
+    function createKnotOnLine(strokeId, clickPoint, overlayX, overlayY) {
+      if (!clickPoint) {
+        // Fallback to regular placement
+        addKnotAtPosition(overlayX, overlayY);
+        return;
+      }
+      
+      const animationId = `knot_${strokeId}_${Date.now()}`;
+      
+      // Start knot tying animation
+      animateKnotTying(strokeId, clickPoint, animationId).then(() => {
+        // After animation, modify the stroke to show permanent knot (no separate icon)
+        modifyStrokeForKnot(strokeId, clickPoint);
+      });
+      
+      // Exit knot mode
+      addKnotMode.value = false;
+    }
+
+    // Create rupture animation on a line
+    function createRuptureOnLine(strokeId, clickPoint, overlayX, overlayY) {
+      if (!clickPoint) {
+        // Fallback to regular placement
+        addRuptureAtPosition(overlayX, overlayY);
+        return;
+      }
+      
+      const animationId = `rupture_${strokeId}_${Date.now()}`;
+      
+      // Start line snapping animation
+      animateLineSnap(strokeId, clickPoint, animationId).then(() => {
+        // After animation, split the stroke and add debris (no separate icon)
+        splitStrokeWithDebris(strokeId, clickPoint);
+      });
+      
+      // Exit rupture mode
+      addRuptureMode.value = false;
+    }
+
+    // Animate knot tying effect
+    async function animateKnotTying(strokeId, clickPoint, animationId) {
+      const stroke = strokes.value.find(s => s.id === strokeId);
+      if (!stroke) return;
+      
+      animations.knots.set(strokeId, {
+        id: animationId,
+        phase: 'gathering', // gathering -> looping -> tightening -> complete
+        progress: 0,
+        clickPoint,
+        startTime: Date.now()
+      });
+      
+      return new Promise((resolve) => {
+        const animate = () => {
+          const anim = animations.knots.get(strokeId);
+          if (!anim || anim.id !== animationId) {
+            resolve();
+            return;
+          }
+          
+          const elapsed = Date.now() - anim.startTime;
+          const totalDuration = 2000; // 2 seconds
+          
+          if (elapsed >= totalDuration) {
+            animations.knots.delete(strokeId);
+            reRenderCanvas();
+            resolve();
+            return;
+          }
+          
+          // Update animation progress
+          anim.progress = elapsed / totalDuration;
+          
+          if (anim.progress < 0.3) {
+            anim.phase = 'gathering';
+          } else if (anim.progress < 0.7) {
+            anim.phase = 'looping';
+          } else {
+            anim.phase = 'tightening';
+          }
+          
+          reRenderCanvas();
+          requestAnimationFrame(animate);
+        };
+        
+        requestAnimationFrame(animate);
+      });
+    }
+
+    // Animate line snapping effect
+    async function animateLineSnap(strokeId, clickPoint, animationId) {
+      const stroke = strokes.value.find(s => s.id === strokeId);
+      if (!stroke) return;
+      
+      animations.ruptures.set(strokeId, {
+        id: animationId,
+        phase: 'tension', // tension -> crack -> snap -> separate
+        progress: 0,
+        clickPoint,
+        startTime: Date.now()
+      });
+      
+      return new Promise((resolve) => {
+        const animate = () => {
+          const anim = animations.ruptures.get(strokeId);
+          if (!anim || anim.id !== animationId) {
+            resolve();
+            return;
+          }
+          
+          const elapsed = Date.now() - anim.startTime;
+          const totalDuration = 1500; // 1.5 seconds
+          
+          if (elapsed >= totalDuration) {
+            animations.ruptures.delete(strokeId);
+            reRenderCanvas();
+            resolve();
+            return;
+          }
+          
+          // Update animation progress
+          anim.progress = elapsed / totalDuration;
+          
+          if (anim.progress < 0.2) {
+            anim.phase = 'tension';
+          } else if (anim.progress < 0.4) {
+            anim.phase = 'crack';
+          } else if (anim.progress < 0.7) {
+            anim.phase = 'snap';
+          } else {
+            anim.phase = 'separate';
+          }
+          
+          reRenderCanvas();
+          requestAnimationFrame(animate);
+        };
+        
+        requestAnimationFrame(animate);
+      });
+    }
+
+    // Modify stroke to show knot
+    function modifyStrokeForKnot(strokeId, clickPoint) {
+      const strokeIndex = strokes.value.findIndex(s => s.id === strokeId);
+      if (strokeIndex === -1) return;
+      
+      const originalStroke = strokes.value[strokeIndex];
+      
+      if (originalStroke.type === 'straight') {
+        // Replace straight line with knotted segments
+        const knotStrokes = createKnottedStraightLine(originalStroke, clickPoint);
+        strokes.value.splice(strokeIndex, 1, ...knotStrokes);
+      } else if (originalStroke.type === 'freehand') {
+        // Add knot to freehand stroke
+        if (!originalStroke.knots) originalStroke.knots = [];
+        originalStroke.knots.push({
+          position: clickPoint.progress,
+          point: { x: clickPoint.x / canvasWidth.value, y: clickPoint.y / canvasHeight.value },
+          size: 12
+        });
+      }
+      
+      reRenderCanvas();
+    }
+
+    // Create multiple stroke segments that form a shoe-tie knot pattern
+    function createKnottedStraightLine(originalStroke, clickPoint) {
+      const knotStrokes = [];
+      const knotSize = 8; // Smaller for more realistic appearance
+      const knotX = clickPoint.x / canvasWidth.value;
+      const knotY = clickPoint.y / canvasHeight.value;
+      const loopWidth = knotSize * 1.5 / canvasWidth.value;
+      const loopHeight = knotSize * 0.8 / canvasHeight.value;
+      
+      // Segment before knot (approaching from left)
+      knotStrokes.push({
+        ...originalStroke,
+        id: strokeSeq++,
+        end: { x: knotX - loopWidth/2, y: knotY }
+      });
+      
+      // Left bow loop (like left side of shoelace bow)
+      knotStrokes.push({
+        ...originalStroke,
+        id: strokeSeq++,
+        type: 'bow-loop',
+        center: { x: knotX - loopWidth/3, y: knotY },
+        width: loopWidth/2,
+        height: loopHeight,
+        side: 'left',
+        layer: 'over'
+      });
+      
+      // Right bow loop (like right side of shoelace bow)
+      knotStrokes.push({
+        ...originalStroke,
+        id: strokeSeq++,
+        type: 'bow-loop',
+        center: { x: knotX + loopWidth/3, y: knotY },
+        width: loopWidth/2,
+        height: loopHeight,
+        side: 'right',
+        layer: 'over'
+      });
+      
+      // Center crossing (where the knot tightens)
+      knotStrokes.push({
+        ...originalStroke,
+        id: strokeSeq++,
+        type: 'bow-center',
+        center: { x: knotX, y: knotY },
+        width: loopWidth/4,
+        height: loopHeight/3,
+        layer: 'top'
+      });
+      
+      // Connecting segments that go through the center
+      // Left tail to center
+      knotStrokes.push({
+        ...originalStroke,
+        id: strokeSeq++,
+        type: 'bow-tail',
+        start: { x: knotX - loopWidth/2, y: knotY },
+        end: { x: knotX, y: knotY - loopHeight/4 },
+        layer: 'under'
+      });
+      
+      // Center to right tail  
+      knotStrokes.push({
+        ...originalStroke,
+        id: strokeSeq++,
+        type: 'bow-tail',
+        start: { x: knotX, y: knotY + loopHeight/4 },
+        end: { x: knotX + loopWidth/2, y: knotY },
+        layer: 'under'
+      });
+      
+      // Segment after knot (continuing to right)
+      knotStrokes.push({
+        ...originalStroke,
+        id: strokeSeq++,
+        start: { x: knotX + loopWidth/2, y: knotY }
+      });
+      
+      return knotStrokes;
+    }
+
+    // Split stroke with debris effects
+    function splitStrokeWithDebris(strokeId, clickPoint) {
+      const strokeIndex = strokes.value.findIndex(s => s.id === strokeId);
+      if (strokeIndex === -1) return;
+      
+      const originalStroke = strokes.value[strokeIndex];
+      const debrisStrokes = [];
+      
+      if (originalStroke.type === 'straight') {
+        // Split straight line into two parts with jagged breaks
+        const breakX = clickPoint.x / canvasWidth.value;
+        const breakY = clickPoint.y / canvasHeight.value;
+        
+        const newStroke1 = {
+          ...originalStroke,
+          id: strokeSeq++,
+          end: { x: breakX - 0.005, y: breakY }, // Small gap
+          broken: true,
+          breakEnd: true
+        };
+        
+        const newStroke2 = {
+          ...originalStroke,
+          id: strokeSeq++,
+          start: { x: breakX + 0.005, y: breakY }, // Small gap
+          broken: true,
+          breakStart: true
+        };
+        
+        debrisStrokes.push(newStroke1, newStroke2);
+        
+      } else if (originalStroke.type === 'freehand') {
+        // Split freehand stroke at the closest point
+        const points = originalStroke.points;
+        const splitIndex = Math.floor(clickPoint.progress * (points.length - 1));
+        
+        if (splitIndex > 0 && splitIndex < points.length - 1) {
+          const newStroke1 = {
+            ...originalStroke,
+            id: strokeSeq++,
+            points: points.slice(0, splitIndex + 1),
+            broken: true,
+            breakEnd: true
+          };
+          
+          const newStroke2 = {
+            ...originalStroke,
+            id: strokeSeq++,
+            points: points.slice(splitIndex),
+            broken: true,
+            breakStart: true
+          };
+          
+          debrisStrokes.push(newStroke1, newStroke2);
+        }
+      }
+      
+      // Create debris particles around break point
+      const debrisCount = 8;
+      const debrisX = clickPoint.x / canvasWidth.value;
+      const debrisY = clickPoint.y / canvasHeight.value;
+      
+      for (let i = 0; i < debrisCount; i++) {
+        const angle = (i / debrisCount) * Math.PI * 2;
+        const distance = (Math.random() * 0.01) + 0.005; // Random small distance
+        const size = (Math.random() * 0.003) + 0.001; // Random small size
+        
+        const debrisParticle = {
+          id: strokeSeq++,
+          tool: 'pen',
+          type: 'debris',
+          color: originalStroke.color,
+          center: {
+            x: debrisX + Math.cos(angle) * distance,
+            y: debrisY + Math.sin(angle) * distance
+          },
+          size: size,
+          rotation: Math.random() * Math.PI * 2
+        };
+        
+        debrisStrokes.push(debrisParticle);
+      }
+      
+      // Replace original with broken pieces and debris
+      strokes.value.splice(strokeIndex, 1, ...debrisStrokes);
+      reRenderCanvas();
+    }
+
     function onGlobalContextMenu(ev) {
       const id = hitStrokeAtClient(ev.clientX, ev.clientY);
       if (!id) return; // let other menus work
@@ -1900,6 +2387,11 @@ export default {
     }
     function drawOneStroke(ctx, s) {
       const w = 2;
+      
+      // Check for active animations
+      const knotAnim = animations.knots.get(s.id);
+      const ruptureAnim = animations.ruptures.get(s.id);
+      
       if (s.tool === 'eraser') {
         ctx.save();
         ctx.globalCompositeOperation = 'destination-out';
@@ -1919,32 +2411,766 @@ export default {
         ctx.restore();
         return;
       }
-      // pen stroke
+      
+      // pen stroke with animation support
       ctx.save();
       ctx.globalCompositeOperation = 'source-over';
       ctx.lineWidth = w;
       ctx.lineCap = 'round';
       ctx.strokeStyle = s.color || '#4ea5de';
+      
+      // Handle line dash styles
       if (ctx.setLineDash) {
         if (s.style === 'dotted') ctx.setLineDash([2, 6]);
         else if (s.style === 'dashed') ctx.setLineDash([10, 8]);
         else ctx.setLineDash([]);
       }
+      
+      // Draw the stroke with animation effects
       if (s.type === 'straight' && s.start && s.end) {
-        const a = absPoint(s.start), b = absPoint(s.end);
+        drawStraightStroke(ctx, s, knotAnim, ruptureAnim);
+      } else if (s.type === 'freehand' && s.points && s.points.length > 0) {
+        drawFreehandStroke(ctx, s, knotAnim, ruptureAnim);
+      } else if (s.type === 'knot-loop') {
+        drawKnotLoop(ctx, s);
+      } else if (s.type === 'bow-loop') {
+        drawBowLoop(ctx, s);
+      } else if (s.type === 'bow-center') {
+        drawBowCenter(ctx, s);
+      } else if (s.type === 'bow-tail') {
+        drawBowTail(ctx, s);
+      } else if (s.type === 'debris') {
+        drawDebrisParticle(ctx, s);
+      }
+      
+      // Draw knots on freehand strokes
+      if (s.knots && s.type === 'freehand') {
+        drawFreehandKnots(ctx, s);
+      }
+      
+      if (ctx.setLineDash) ctx.setLineDash([]);
+      ctx.restore();
+    }
+    
+    function drawStraightStroke(ctx, s, knotAnim, ruptureAnim) {
+      const a = absPoint(s.start);
+      const b = absPoint(s.end);
+      
+      if (ruptureAnim) {
+        drawRuptureAnimation(ctx, s, ruptureAnim, a, b);
+      } else if (knotAnim) {
+        drawKnotAnimation(ctx, s, knotAnim, a, b);
+      } else if (s.broken) {
+        drawBrokenLine(ctx, a, b, s.breakStart, s.breakEnd);
+      } else {
+        // Normal straight line
         ctx.beginPath();
         ctx.moveTo(a.x, a.y);
         ctx.lineTo(b.x, b.y);
         ctx.stroke();
-      } else if (s.type === 'freehand' && s.points && s.points.length > 0) {
-        const pts = s.points.map(absPoint);
+      }
+    }
+    
+    function drawFreehandStroke(ctx, s, knotAnim, ruptureAnim) {
+      const pts = s.points.map(absPoint);
+      
+      if (ruptureAnim) {
+        drawFreehandRuptureAnimation(ctx, s, ruptureAnim, pts);
+      } else if (knotAnim) {
+        drawFreehandKnotAnimation(ctx, s, knotAnim, pts);
+      } else if (s.broken) {
+        drawBrokenFreehand(ctx, pts, s.breakStart, s.breakEnd);
+      } else {
+        // Normal freehand line
         ctx.beginPath();
         ctx.moveTo(pts[0].x, pts[0].y);
-        for (let i = 1; i < pts.length; i++) ctx.lineTo(pts[i].x, pts[i].y);
+        for (let i = 1; i < pts.length; i++) {
+          ctx.lineTo(pts[i].x, pts[i].y);
+        }
         ctx.stroke();
       }
-      if (ctx.setLineDash) ctx.setLineDash([]);
+    }
+    
+    function drawRuptureAnimation(ctx, stroke, anim, startPt, endPt) {
+      const clickPt = anim.clickPoint;
+      const progress = anim.progress;
+      
+      if (anim.phase === 'tension') {
+        // Show line with increasing tension (slight wobble)
+        const wobbleIntensity = progress * 3;
+        ctx.beginPath();
+        
+        // Create slightly wavy line to show tension
+        const steps = 20;
+        for (let i = 0; i <= steps; i++) {
+          const t = i / steps;
+          const x = startPt.x + t * (endPt.x - startPt.x);
+          const y = startPt.y + t * (endPt.y - startPt.y);
+          
+          // Add wobble near the click point
+          const distanceFromClick = Math.abs(t - (clickPt.progress || 0.5));
+          const wobbleAmount = Math.max(0, wobbleIntensity * (1 - distanceFromClick * 4));
+          const wobbleY = y + Math.sin(t * Math.PI * 8) * wobbleAmount;
+          
+          if (i === 0) ctx.moveTo(x, wobbleY);
+          else ctx.lineTo(x, wobbleY);
+        }
+        ctx.stroke();
+        
+      } else if (anim.phase === 'crack') {
+        // Show crack forming
+        const crackProgress = (progress - 0.2) / 0.2;
+        drawCrackingLine(ctx, startPt, endPt, clickPt, crackProgress);
+        
+      } else if (anim.phase === 'snap') {
+        // Show dramatic snap
+        const snapProgress = (progress - 0.4) / 0.3;
+        drawSnappingLine(ctx, startPt, endPt, clickPt, snapProgress);
+        
+      } else if (anim.phase === 'separate') {
+        // Show pieces flying apart
+        const separateProgress = (progress - 0.7) / 0.3;
+        drawSeparatingPieces(ctx, startPt, endPt, clickPt, separateProgress);
+      }
+    }
+    
+    function drawKnotAnimation(ctx, stroke, anim, startPt, endPt) {
+      const clickPt = anim.clickPoint;
+      const progress = anim.progress;
+      
+      if (anim.phase === 'gathering') {
+        // Show line gathering toward knot point
+        const gatherProgress = progress / 0.3;
+        drawGatheringLine(ctx, startPt, endPt, clickPt, gatherProgress);
+        
+      } else if (anim.phase === 'looping') {
+        // Show loop formation
+        const loopProgress = (progress - 0.3) / 0.4;
+        drawLoopingLine(ctx, startPt, endPt, clickPt, loopProgress);
+        
+      } else if (anim.phase === 'tightening') {
+        // Show knot tightening
+        const tightenProgress = (progress - 0.7) / 0.3;
+        drawTighteningKnot(ctx, startPt, endPt, clickPt, tightenProgress);
+      }
+    }
+    
+    function drawCrackingLine(ctx, startPt, endPt, clickPt, progress) {
+      // Draw main line with small gap forming
+      const gapSize = progress * 8;
+      
+      // Draw first segment
+      ctx.beginPath();
+      ctx.moveTo(startPt.x, startPt.y);
+      ctx.lineTo(clickPt.x - gapSize/2, clickPt.y);
+      ctx.stroke();
+      
+      // Draw second segment
+      ctx.beginPath();
+      ctx.moveTo(clickPt.x + gapSize/2, clickPt.y);
+      ctx.lineTo(endPt.x, endPt.y);
+      ctx.stroke();
+      
+      // Draw crack lines
+      ctx.save();
+      ctx.strokeStyle = 'rgba(255, 100, 100, ' + progress + ')';
+      ctx.lineWidth = 1;
+      
+      for (let i = 0; i < 3; i++) {
+        const angle = (i - 1) * Math.PI / 6;
+        const crackLength = progress * 10;
+        ctx.beginPath();
+        ctx.moveTo(clickPt.x, clickPt.y);
+        ctx.lineTo(
+          clickPt.x + Math.cos(angle) * crackLength,
+          clickPt.y + Math.sin(angle) * crackLength
+        );
+        ctx.stroke();
+      }
       ctx.restore();
+    }
+    
+    function drawSnappingLine(ctx, startPt, endPt, clickPt, progress) {
+      const snapIntensity = Math.sin(progress * Math.PI * 10) * 5 * (1 - progress);
+      
+      // Draw pieces with snap displacement
+      ctx.beginPath();
+      ctx.moveTo(startPt.x, startPt.y);
+      ctx.lineTo(clickPt.x - 10 - snapIntensity, clickPt.y - snapIntensity);
+      ctx.stroke();
+      
+      ctx.beginPath();
+      ctx.moveTo(clickPt.x + 10 + snapIntensity, clickPt.y + snapIntensity);
+      ctx.lineTo(endPt.x, endPt.y);
+      ctx.stroke();
+      
+      // Add spark effects
+      ctx.save();
+      ctx.fillStyle = 'rgba(255, 255, 100, ' + (1 - progress) + ')';
+      for (let i = 0; i < 5; i++) {
+        const angle = Math.random() * Math.PI * 2;
+        const dist = Math.random() * 15;
+        const x = clickPt.x + Math.cos(angle) * dist;
+        const y = clickPt.y + Math.sin(angle) * dist;
+        ctx.beginPath();
+        ctx.arc(x, y, 2, 0, Math.PI * 2);
+        ctx.fill();
+      }
+      ctx.restore();
+    }
+    
+    function drawSeparatingPieces(ctx, startPt, endPt, clickPt, progress) {
+      const separation = progress * 20;
+      
+      // Calculate perpendicular direction for separation
+      const dx = endPt.x - startPt.x;
+      const dy = endPt.y - startPt.y;
+      const length = Math.sqrt(dx * dx + dy * dy);
+      const perpX = -dy / length;
+      const perpY = dx / length;
+      
+      // Draw separated pieces
+      ctx.save();
+      ctx.globalAlpha = 1 - progress * 0.5;
+      
+      // First piece
+      ctx.beginPath();
+      ctx.moveTo(startPt.x, startPt.y);
+      ctx.lineTo(
+        clickPt.x - 10 + perpX * separation,
+        clickPt.y - 10 + perpY * separation
+      );
+      ctx.stroke();
+      
+      // Second piece
+      ctx.beginPath();
+      ctx.moveTo(
+        clickPt.x + 10 - perpX * separation,
+        clickPt.y + 10 - perpY * separation
+      );
+      ctx.lineTo(endPt.x, endPt.y);
+      ctx.stroke();
+      
+      ctx.restore();
+    }
+    
+    function drawGatheringLine(ctx, startPt, endPt, clickPt, progress) {
+      // Draw line with curve toward knot point
+      const curves = progress * 0.3;
+      
+      ctx.beginPath();
+      const steps = 30;
+      for (let i = 0; i <= steps; i++) {
+        const t = i / steps;
+        const x = startPt.x + t * (endPt.x - startPt.x);
+        const y = startPt.y + t * (endPt.y - startPt.y);
+        
+        // Pull toward knot point
+        const pullStrength = curves * Math.sin(t * Math.PI) * 20;
+        const pullX = x + (clickPt.x - x) * pullStrength / 100;
+        const pullY = y + (clickPt.y - y) * pullStrength / 100;
+        
+        if (i === 0) ctx.moveTo(pullX, pullY);
+        else ctx.lineTo(pullX, pullY);
+      }
+      ctx.stroke();
+    }
+    
+    function drawLoopingLine(ctx, startPt, endPt, clickPt, progress) {
+      // Create loop at knot position
+      const loopRadius = progress * 15;
+      
+      // Draw line up to loop
+      ctx.beginPath();
+      ctx.moveTo(startPt.x, startPt.y);
+      ctx.lineTo(clickPt.x - loopRadius, clickPt.y);
+      ctx.stroke();
+      
+      // Draw loop
+      ctx.beginPath();
+      ctx.arc(clickPt.x, clickPt.y, loopRadius, 0, Math.PI * 2);
+      ctx.stroke();
+      
+      // Draw line from loop
+      ctx.beginPath();
+      ctx.moveTo(clickPt.x + loopRadius, clickPt.y);
+      ctx.lineTo(endPt.x, endPt.y);
+      ctx.stroke();
+    }
+    
+    function drawTighteningKnot(ctx, startPt, endPt, clickPt, progress) {
+      const tightness = 1 - progress;
+      const knotSize = 15 * tightness + 8;
+      
+      // Draw line segments
+      ctx.beginPath();
+      ctx.moveTo(startPt.x, startPt.y);
+      ctx.lineTo(clickPt.x - knotSize/2, clickPt.y);
+      ctx.stroke();
+      
+      ctx.beginPath();
+      ctx.moveTo(clickPt.x + knotSize/2, clickPt.y);
+      ctx.lineTo(endPt.x, endPt.y);
+      ctx.stroke();
+      
+      // Draw tightening knot
+      ctx.save();
+      ctx.lineWidth = 3;
+      ctx.strokeStyle = ctx.strokeStyle;
+      
+      // Complex knot pattern
+      const angles = [0, Math.PI/2, Math.PI, 3*Math.PI/2];
+      angles.forEach((angle, i) => {
+        ctx.beginPath();
+        ctx.arc(
+          clickPt.x + Math.cos(angle) * (knotSize/4),
+          clickPt.y + Math.sin(angle) * (knotSize/4),
+          knotSize/6,
+          angle,
+          angle + Math.PI + progress * Math.PI
+        );
+        ctx.stroke();
+      });
+      
+      ctx.restore();
+    }
+    
+    function drawBrokenLine(ctx, startPt, endPt, breakStart, breakEnd) {
+      const gapSize = 6;
+      
+      if (breakEnd) {
+        // Draw with jagged end
+        ctx.beginPath();
+        ctx.moveTo(startPt.x, startPt.y);
+        
+        // Create jagged end effect
+        const jaggedX = endPt.x - gapSize;
+        const jaggedY = endPt.y;
+        
+        ctx.lineTo(jaggedX - 2, jaggedY - 1);
+        ctx.lineTo(jaggedX + 1, jaggedY + 1);
+        ctx.lineTo(jaggedX - 1, jaggedY - 2);
+        ctx.stroke();
+      } else {
+        ctx.beginPath();
+        ctx.moveTo(startPt.x, startPt.y);
+        ctx.lineTo(endPt.x, endPt.y);
+        ctx.stroke();
+      }
+      
+      if (breakStart) {
+        // Add jagged start effect
+        ctx.save();
+        ctx.strokeStyle = ctx.strokeStyle;
+        ctx.beginPath();
+        ctx.moveTo(startPt.x + 2, startPt.y + 1);
+        ctx.lineTo(startPt.x - 1, startPt.y - 1);
+        ctx.lineTo(startPt.x + 1, startPt.y + 2);
+        ctx.stroke();
+        ctx.restore();
+      }
+    }
+    
+    function drawFreehandRuptureAnimation(ctx, stroke, anim, pts) {
+      // Similar to straight line but for freehand curves
+      drawFreehandStroke(ctx, { ...stroke, broken: false });
+    }
+    
+    function drawFreehandKnotAnimation(ctx, stroke, anim, pts) {
+      // Similar to straight line but for freehand curves
+      drawFreehandStroke(ctx, { ...stroke, broken: false });
+    }
+    
+    function drawBrokenFreehand(ctx, pts, breakStart, breakEnd) {
+      if (pts.length < 2) return;
+      
+      ctx.beginPath();
+      ctx.moveTo(pts[0].x, pts[0].y);
+      
+      for (let i = 1; i < pts.length; i++) {
+        if (i === pts.length - 1 && breakEnd) {
+          // Jagged end
+          ctx.lineTo(pts[i].x - 2, pts[i].y - 1);
+          ctx.lineTo(pts[i].x + 1, pts[i].y + 1);
+          break;
+        } else {
+          ctx.lineTo(pts[i].x, pts[i].y);
+        }
+      }
+      ctx.stroke();
+    }
+    
+    function drawKnotLoop(ctx, stroke) {
+      const center = absPoint(stroke.center);
+      const radius = stroke.radius * canvasWidth.value;
+      
+      ctx.save();
+      ctx.strokeStyle = stroke.color || '#4ea5de';
+      ctx.lineWidth = stroke.layer === 'over' ? 3 : 2;
+      
+      // Draw the loop with proper layering
+      if (stroke.layer === 'under') {
+        ctx.globalAlpha = 0.7; // Make under layers slightly transparent
+      }
+      
+      ctx.beginPath();
+      ctx.arc(center.x, center.y, radius, stroke.startAngle, stroke.endAngle);
+      ctx.stroke();
+      
+      // Add small gaps to show over/under effect
+      if (stroke.layer === 'under') {
+        ctx.save();
+        ctx.globalCompositeOperation = 'destination-out';
+        ctx.lineWidth = 1;
+        
+        // Create small breaks in the under loop
+        const breakAngle1 = stroke.startAngle + (stroke.endAngle - stroke.startAngle) * 0.3;
+        const breakAngle2 = stroke.startAngle + (stroke.endAngle - stroke.startAngle) * 0.7;
+        
+        ctx.beginPath();
+        ctx.arc(center.x, center.y, radius, breakAngle1 - 0.1, breakAngle1 + 0.1);
+        ctx.stroke();
+        
+        ctx.beginPath();
+        ctx.arc(center.x, center.y, radius, breakAngle2 - 0.1, breakAngle2 + 0.1);
+        ctx.stroke();
+        
+        ctx.restore();
+      }
+      
+      ctx.restore();
+    }
+    
+    function drawBowLoop(ctx, stroke) {
+      const center = absPoint(stroke.center);
+      const width = stroke.width * canvasWidth.value;
+      const height = stroke.height * canvasHeight.value;
+      
+      ctx.save();
+      ctx.strokeStyle = stroke.color || '#4ea5de';
+      ctx.fillStyle = stroke.color || '#4ea5de';
+      ctx.lineWidth = 1.5;
+      ctx.lineCap = 'round';
+      
+      // Draw filled bow loop with curved shape
+      ctx.beginPath();
+      
+      if (stroke.side === 'left') {
+        // Left bow loop - curved like fabric
+        ctx.moveTo(center.x + width/3, center.y - height);
+        ctx.quadraticCurveTo(center.x - width, center.y - height/2, center.x - width, center.y);
+        ctx.quadraticCurveTo(center.x - width, center.y + height/2, center.x + width/3, center.y + height);
+        ctx.quadraticCurveTo(center.x + width/2, center.y, center.x + width/3, center.y - height);
+      } else {
+        // Right bow loop - mirror of left
+        ctx.moveTo(center.x - width/3, center.y - height);
+        ctx.quadraticCurveTo(center.x + width, center.y - height/2, center.x + width, center.y);
+        ctx.quadraticCurveTo(center.x + width, center.y + height/2, center.x - width/3, center.y + height);
+        ctx.quadraticCurveTo(center.x - width/2, center.y, center.x - width/3, center.y - height);
+      }
+      
+      // Fill with slight transparency for fabric effect
+      ctx.save();
+      ctx.globalAlpha = 0.3;
+      ctx.fill();
+      ctx.restore();
+      
+      // Stroke outline
+      ctx.stroke();
+      
+      // Add fold lines to show fabric dimension
+      ctx.save();
+      ctx.globalAlpha = 0.6;
+      ctx.lineWidth = 1;
+      
+      if (stroke.side === 'left') {
+        ctx.beginPath();
+        ctx.moveTo(center.x + width/3, center.y - height/2);
+        ctx.quadraticCurveTo(center.x - width/2, center.y, center.x + width/3, center.y + height/2);
+        ctx.stroke();
+      } else {
+        ctx.beginPath();
+        ctx.moveTo(center.x - width/3, center.y - height/2);
+        ctx.quadraticCurveTo(center.x + width/2, center.y, center.x - width/3, center.y + height/2);
+        ctx.stroke();
+      }
+      ctx.restore();
+      
+      ctx.restore();
+    }
+    
+    function drawBowCenter(ctx, stroke) {
+      const center = absPoint(stroke.center);
+      const width = stroke.width * canvasWidth.value;
+      const height = stroke.height * canvasHeight.value;
+      
+      ctx.save();
+      ctx.strokeStyle = stroke.color || '#4ea5de';
+      ctx.fillStyle = stroke.color || '#4ea5de';
+      ctx.lineWidth = 1.5;
+      
+      // Draw ribbon center knot with wrapped appearance
+      ctx.beginPath();
+      // Create a rounded rectangle for the center wrap
+      const rectWidth = width * 2;
+      const rectHeight = height * 2;
+      const radius = height;
+      
+      ctx.moveTo(center.x - rectWidth/2 + radius, center.y - rectHeight/2);
+      ctx.arcTo(center.x + rectWidth/2, center.y - rectHeight/2, center.x + rectWidth/2, center.y + rectHeight/2, radius);
+      ctx.arcTo(center.x + rectWidth/2, center.y + rectHeight/2, center.x - rectWidth/2, center.y + rectHeight/2, radius);
+      ctx.arcTo(center.x - rectWidth/2, center.y + rectHeight/2, center.x - rectWidth/2, center.y - rectHeight/2, radius);
+      ctx.arcTo(center.x - rectWidth/2, center.y - rectHeight/2, center.x + rectWidth/2, center.y - rectHeight/2, radius);
+      
+      // Fill with gradient effect
+      ctx.save();
+      ctx.globalAlpha = 0.7;
+      ctx.fill();
+      ctx.restore();
+      
+      // Stroke outline
+      ctx.stroke();
+      
+      // Add vertical wrapping lines to show how ribbon is tied
+      ctx.save();
+      ctx.globalAlpha = 0.8;
+      ctx.lineWidth = 1;
+      
+      // Left wrap line
+      ctx.beginPath();
+      ctx.moveTo(center.x - rectWidth/3, center.y - rectHeight/2);
+      ctx.lineTo(center.x - rectWidth/3, center.y + rectHeight/2);
+      ctx.stroke();
+      
+      // Right wrap line
+      ctx.beginPath();
+      ctx.moveTo(center.x + rectWidth/3, center.y - rectHeight/2);
+      ctx.lineTo(center.x + rectWidth/3, center.y + rectHeight/2);
+      ctx.stroke();
+      
+      // Center crease
+      ctx.save();
+      ctx.globalAlpha = 0.4;
+      ctx.beginPath();
+      ctx.moveTo(center.x, center.y - rectHeight/2);
+      ctx.lineTo(center.x, center.y + rectHeight/2);
+      ctx.stroke();
+      ctx.restore();
+      
+      ctx.restore();
+      ctx.restore();
+    }
+    
+    function drawBowTail(ctx, stroke) {
+      const start = absPoint(stroke.start);
+      const end = absPoint(stroke.end);
+      
+      ctx.save();
+      ctx.strokeStyle = stroke.color || '#4ea5de';
+      ctx.fillStyle = stroke.color || '#4ea5de';
+      ctx.lineWidth = stroke.layer === 'under' ? 1.5 : 2;
+      ctx.lineCap = 'round';
+      
+      if (stroke.layer === 'under') {
+        ctx.globalAlpha = 0.7;
+      }
+      
+      // Create flowing ribbon tail with width
+      const tailWidth = 4;
+      const midX = (start.x + end.x) / 2;
+      const midY = (start.y + end.y) / 2;
+      const curveOffset = stroke.layer === 'under' ? 3 : -3;
+      
+      // Calculate perpendicular direction for ribbon width
+      const dx = end.x - start.x;
+      const dy = end.y - start.y;
+      const length = Math.sqrt(dx * dx + dy * dy);
+      const perpX = -dy / length * tailWidth;
+      const perpY = dx / length * tailWidth;
+      
+      // Draw filled ribbon tail
+      ctx.beginPath();
+      ctx.moveTo(start.x + perpX/2, start.y + perpY/2);
+      ctx.quadraticCurveTo(
+        midX + perpX/2, 
+        midY + curveOffset + perpY/2, 
+        end.x + perpX/2, 
+        end.y + perpY/2
+      );
+      ctx.lineTo(end.x - perpX/2, end.y - perpY/2);
+      ctx.quadraticCurveTo(
+        midX - perpX/2, 
+        midY + curveOffset - perpY/2, 
+        start.x - perpX/2, 
+        start.y - perpY/2
+      );
+      ctx.closePath();
+      
+      // Fill with transparency for ribbon effect
+      ctx.save();
+      ctx.globalAlpha = 0.2;
+      ctx.fill();
+      ctx.restore();
+      
+      // Stroke both edges
+      ctx.beginPath();
+      ctx.moveTo(start.x + perpX/2, start.y + perpY/2);
+      ctx.quadraticCurveTo(
+        midX + perpX/2, 
+        midY + curveOffset + perpY/2, 
+        end.x + perpX/2, 
+        end.y + perpY/2
+      );
+      ctx.stroke();
+      
+      ctx.beginPath();
+      ctx.moveTo(start.x - perpX/2, start.y - perpY/2);
+      ctx.quadraticCurveTo(
+        midX - perpX/2, 
+        midY + curveOffset - perpY/2, 
+        end.x - perpX/2, 
+        end.y - perpY/2
+      );
+      ctx.stroke();
+      
+      // Add center line for ribbon fold
+      ctx.save();
+      ctx.globalAlpha = 0.5;
+      ctx.lineWidth = 1;
+      ctx.beginPath();
+      ctx.moveTo(start.x, start.y);
+      ctx.quadraticCurveTo(midX, midY + curveOffset, end.x, end.y);
+      ctx.stroke();
+      ctx.restore();
+      
+      ctx.restore();
+    }
+    
+    function drawDebrisParticle(ctx, debris) {
+      const center = absPoint(debris.center);
+      const size = debris.size * canvasWidth.value;
+      
+      ctx.save();
+      ctx.fillStyle = debris.color || '#4ea5de';
+      ctx.strokeStyle = debris.color || '#4ea5de';
+      ctx.translate(center.x, center.y);
+      ctx.rotate(debris.rotation);
+      
+      // Draw small irregular debris shapes
+      const shapeType = Math.floor(debris.rotation * 3) % 3;
+      
+      if (shapeType === 0) {
+        // Small rectangle
+        ctx.fillRect(-size/2, -size/4, size, size/2);
+      } else if (shapeType === 1) {
+        // Small circle
+        ctx.beginPath();
+        ctx.arc(0, 0, size/2, 0, Math.PI * 2);
+        ctx.fill();
+      } else {
+        // Small triangle
+        ctx.beginPath();
+        ctx.moveTo(-size/2, size/2);
+        ctx.lineTo(size/2, size/2);
+        ctx.lineTo(0, -size/2);
+        ctx.closePath();
+        ctx.fill();
+      }
+      
+      ctx.restore();
+    }
+    
+    function drawFreehandKnots(ctx, stroke) {
+      if (!stroke.knots) return;
+      
+      stroke.knots.forEach(knot => {
+        const knotPt = absPoint(knot.point);
+        const knotSize = knot.size || 12;
+        
+        // Draw elegant ribbon bow for freehand strokes
+        ctx.save();
+        ctx.strokeStyle = stroke.color || '#4ea5de';
+        ctx.fillStyle = stroke.color || '#4ea5de';
+        ctx.lineWidth = 1.5;
+        ctx.lineCap = 'round';
+        
+        // Left bow wing - curved fabric shape
+        ctx.beginPath();
+        ctx.moveTo(knotPt.x - knotSize * 0.1, knotPt.y - knotSize * 0.3);
+        ctx.quadraticCurveTo(knotPt.x - knotSize * 0.5, knotPt.y - knotSize * 0.2, knotPt.x - knotSize * 0.5, knotPt.y);
+        ctx.quadraticCurveTo(knotPt.x - knotSize * 0.5, knotPt.y + knotSize * 0.2, knotPt.x - knotSize * 0.1, knotPt.y + knotSize * 0.3);
+        ctx.quadraticCurveTo(knotPt.x - knotSize * 0.05, knotPt.y, knotPt.x - knotSize * 0.1, knotPt.y - knotSize * 0.3);
+        
+        // Fill with transparency
+        ctx.save();
+        ctx.globalAlpha = 0.3;
+        ctx.fill();
+        ctx.restore();
+        ctx.stroke();
+        
+        // Right bow wing - mirror of left
+        ctx.beginPath();
+        ctx.moveTo(knotPt.x + knotSize * 0.1, knotPt.y - knotSize * 0.3);
+        ctx.quadraticCurveTo(knotPt.x + knotSize * 0.5, knotPt.y - knotSize * 0.2, knotPt.x + knotSize * 0.5, knotPt.y);
+        ctx.quadraticCurveTo(knotPt.x + knotSize * 0.5, knotPt.y + knotSize * 0.2, knotPt.x + knotSize * 0.1, knotPt.y + knotSize * 0.3);
+        ctx.quadraticCurveTo(knotPt.x + knotSize * 0.05, knotPt.y, knotPt.x + knotSize * 0.1, knotPt.y - knotSize * 0.3);
+        
+        // Fill with transparency
+        ctx.save();
+        ctx.globalAlpha = 0.3;
+        ctx.fill();
+        ctx.restore();
+        ctx.stroke();
+        
+        // Center ribbon wrap
+        const centerWidth = knotSize * 0.2;
+        const centerHeight = knotSize * 0.4;
+        
+        ctx.beginPath();
+        ctx.moveTo(knotPt.x - centerWidth, knotPt.y - centerHeight/2);
+        ctx.arcTo(knotPt.x + centerWidth, knotPt.y - centerHeight/2, knotPt.x + centerWidth, knotPt.y + centerHeight/2, centerHeight/4);
+        ctx.arcTo(knotPt.x + centerWidth, knotPt.y + centerHeight/2, knotPt.x - centerWidth, knotPt.y + centerHeight/2, centerHeight/4);
+        ctx.arcTo(knotPt.x - centerWidth, knotPt.y + centerHeight/2, knotPt.x - centerWidth, knotPt.y - centerHeight/2, centerHeight/4);
+        ctx.arcTo(knotPt.x - centerWidth, knotPt.y - centerHeight/2, knotPt.x + centerWidth, knotPt.y - centerHeight/2, centerHeight/4);
+        
+        // Fill center wrap
+        ctx.save();
+        ctx.globalAlpha = 0.7;
+        ctx.fill();
+        ctx.restore();
+        ctx.stroke();
+        
+        // Add fold lines for realism
+        ctx.save();
+        ctx.globalAlpha = 0.6;
+        ctx.lineWidth = 1;
+        
+        // Left wing fold
+        ctx.beginPath();
+        ctx.moveTo(knotPt.x - knotSize * 0.1, knotPt.y - knotSize * 0.15);
+        ctx.quadraticCurveTo(knotPt.x - knotSize * 0.25, knotPt.y, knotPt.x - knotSize * 0.1, knotPt.y + knotSize * 0.15);
+        ctx.stroke();
+        
+        // Right wing fold
+        ctx.beginPath();
+        ctx.moveTo(knotPt.x + knotSize * 0.1, knotPt.y - knotSize * 0.15);
+        ctx.quadraticCurveTo(knotPt.x + knotSize * 0.25, knotPt.y, knotPt.x + knotSize * 0.1, knotPt.y + knotSize * 0.15);
+        ctx.stroke();
+        
+        // Center wrap lines
+        ctx.beginPath();
+        ctx.moveTo(knotPt.x - centerWidth * 0.5, knotPt.y - centerHeight/2);
+        ctx.lineTo(knotPt.x - centerWidth * 0.5, knotPt.y + centerHeight/2);
+        ctx.stroke();
+        
+        ctx.beginPath();
+        ctx.moveTo(knotPt.x + centerWidth * 0.5, knotPt.y - centerHeight/2);
+        ctx.lineTo(knotPt.x + centerWidth * 0.5, knotPt.y + centerHeight/2);
+        ctx.stroke();
+        
+        ctx.restore();
+        ctx.restore();
+      });
     }
     function reRenderCanvas() {
       const ctx = drawCanvas.value?.getContext('2d');
@@ -2143,25 +3369,9 @@ export default {
     const previewImg = ref("");
     const exportMode = ref(false);
     const noteRefs = ref([]);
-    const noteHeights = ref([]);
-    function measureNoteHeights() {
-      try {
-        noteHeights.value = noteRefs.value.map((el) => (el ? Math.max(28, el.scrollHeight) : 28));
-      } catch (_) { /* no-op */ }
-    }
-    function onNoteInput(idx) {
-      try {
-        const el = noteRefs.value[idx];
-        if (el) noteHeights.value[idx] = Math.max(28, el.scrollHeight);
-      } catch (_) { /* no-op */ }
-    }
-    watch(rows, () => nextTick(measureNoteHeights));
-    watch(notes, () => nextTick(measureNoteHeights), { deep: true });
-    onMounted(() => nextTick(measureNoteHeights));
+
     async function withExportLayout(fn) {
       exportMode.value = true;
-      await nextTick();
-      measureNoteHeights();
       await nextTick();
       try {
         return await fn();
@@ -2393,24 +3603,116 @@ export default {
           }
         }
 
+        // Add Notes as Footnotes
+        let notesWithContent = [];
+        try {
+          notesWithContent = notes.map((note, index) => ({ note, rowIndex: index }))
+            .filter(({ note }) => note && note.trim().length > 0)
+            .map(({ note, rowIndex }) => ({ note: note.trim(), rowIndex }));
+        } catch (notesError) {
+          console.error("Error processing notes:", notesError);
+        }
+
+        if (notesWithContent.length > 0) {
+          // Calculate notes position based on what content was added
+          let notesY;
+          if (legendBoxH > 0) {
+            notesY = nextY + legendBoxH + gap; // After legend
+          } else if (metaBoxH > 0) {
+            notesY = nextY; // After metadata, no legend
+          } else {
+            notesY = y + h + gap; // After main image
+          }
+          
+          // Notes header
+          pdf.setFont("helvetica", "bold");
+          pdf.setFontSize(14);
+          pdf.setTextColor(20, 30, 45);
+          pdf.text("Notes", margin, notesY);
+          notesY += 20;
+          
+          // Draw separator line
+          pdf.setDrawColor(200, 208, 219);
+          pdf.line(margin, notesY - 5, pageWidth - margin, notesY - 5);
+          
+          pdf.setFont("helvetica", "normal");
+          pdf.setFontSize(11);
+          
+          notesWithContent.forEach(({ note, rowIndex }, index) => {
+            const row = rows.value[rowIndex];
+            let rowLabel = "";
+            
+            if (row) {
+              if (row.roman === "" && rowIndex === 0) {
+                rowLabel = "Front endleaves";
+              } else if (row.roman === "" && rowIndex === rows.value.length - 1) {
+                rowLabel = "Back endleaves";
+              } else if (row.roman) {
+                rowLabel = `Quire ${row.roman}`;
+              } else {
+                rowLabel = `Row ${rowIndex + 1}`;
+              }
+            } else {
+              rowLabel = `Row ${rowIndex + 1}`;
+            }
+            
+            const noteText = `${rowLabel}: ${note}`;
+            
+            // Check if we need a new page
+            if (notesY + lineH > pageHeight - margin) {
+              pdf.addPage();
+              notesY = margin + 20;
+            }
+            
+            // Split long notes across multiple lines if needed
+            const maxWidth = pageWidth - margin * 2;
+            const lines = pdf.splitTextToSize(noteText, maxWidth);
+            
+            lines.forEach((line, lineIndex) => {
+              if (notesY + lineH > pageHeight - margin) {
+                pdf.addPage();
+                notesY = margin + 20;
+              }
+              pdf.text(line, margin, notesY);
+              notesY += lineH;
+            });
+            
+            notesY += 4; // Extra spacing between notes
+          });
+        }
+
         const fileName =
           (props.title && String(props.title).trim()) || "Untitled";
+        
+        console.log("Generating PDF with filename:", fileName);
+        
         try {
           // Prefer manual link to avoid any browser quirks
           const blob = pdf.output('blob');
+          console.log("PDF blob created:", blob.size, "bytes");
+          
           const url = URL.createObjectURL(blob);
           const a = document.createElement('a');
           a.href = url;
           a.download = `${fileName}.pdf`;
           document.body.appendChild(a);
+          console.log("Triggering download...");
           a.click();
           a.remove();
           URL.revokeObjectURL(url);
-        } catch (e) {
-          try { pdf.save(`${fileName}.pdf`); } catch (_) { /* no-op */ }
+          console.log("PDF download triggered successfully");
+        } catch (downloadError) {
+          console.error("Download method failed:", downloadError);
+          try { 
+            console.log("Trying fallback method...");
+            pdf.save(`${fileName}.pdf`); 
+          } catch (fallbackError) { 
+            console.error("Fallback method also failed:", fallbackError);
+          }
         }
       } catch (e) {
         console.error("PDF export failed:", e);
+        alert("PDF export failed. Please check the console for details.");
       } finally {
         showExportPopup.value = false;
       }
@@ -2442,6 +3744,7 @@ export default {
       tooltipX,
       tooltipCm,
       onRulerMove,
+      onRulerLeave,
       getRulerRect,
       isScrollForced,
 
@@ -2472,6 +3775,17 @@ export default {
       addKnotMode,
       toggleAddKnot,
       handleElementOverlayClick,
+      handleElementOverlayMouseMove,
+      handleElementOverlayMouseLeave,
+      getClickPositionOnStroke,
+      createKnotOnLine,
+      createRuptureOnLine,
+      splitStrokeWithDebris,
+      createKnottedStraightLine,
+      drawBowLoop,
+      drawBowCenter,
+      drawBowTail,
+      animations,
       handleKnotOverlayClick,
       addKnotAtPosition,
       updateKnotPosition,
@@ -2580,8 +3894,7 @@ export default {
       previewImg,
       exportMode,
       noteRefs,
-      noteHeights,
-      onNoteInput,
+
       previewPDF,
       exportToPDF,
     };
@@ -2781,6 +4094,12 @@ export default {
   background: white;
   table-layout: fixed;
 }
+
+/* Center table in export mode */
+.export-mode .binding-table {
+  width: auto;
+  margin: 0 auto;
+}
 .binding-table th,
 .binding-table td {
   border: 1px solid #333;
@@ -2822,7 +4141,8 @@ export default {
   padding: 0;
 }
 .notes-col {
-  width: 25%;
+  width: 220px; /* Fixed width to accommodate fixed-width input */
+  min-width: 220px;
 }
 
 /* Separate top ruler that aligns from Head to Tail columns */
@@ -2916,17 +4236,40 @@ export default {
 }
 
 .notes-input {
-  width: 100%;
+  width: 200px; /* Fixed width */
+  max-width: 200px;
   padding: 4px;
   font-size: 14px;
   border: 1px solid #999;
   box-sizing: border-box;
-  height: 28px; /* base single-line; JS expands as needed */
+  height: 28px; /* Fixed height - no expansion */
   line-height: 20px;
   resize: none;
-  overflow: hidden; /* hide scrollbars; JS sets height to scrollHeight */
-  word-break: break-word;
-  overflow-wrap: anywhere;
+  overflow-x: scroll; /* Always show horizontal scrollbar */
+  overflow-y: hidden; /* No vertical scrolling */
+  white-space: nowrap; /* Keep text on one line */
+  word-break: normal;
+  overflow-wrap: normal;
+  scrollbar-width: thin; /* For Firefox */
+}
+
+/* Webkit scrollbar styling for better visibility */
+.notes-input::-webkit-scrollbar {
+  height: 6px;
+}
+
+.notes-input::-webkit-scrollbar-track {
+  background: #f1f1f1;
+  border-radius: 3px;
+}
+
+.notes-input::-webkit-scrollbar-thumb {
+  background: #888;
+  border-radius: 3px;
+}
+
+.notes-input::-webkit-scrollbar-thumb:hover {
+  background: #555;
 }
 
 .notes-export {
