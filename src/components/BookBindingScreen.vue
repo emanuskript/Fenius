@@ -60,6 +60,51 @@
       </div>
     </div>
 
+    <!-- Selection bars -->
+    <div v-if="selectingMode" class="selection-bar">
+      <span>Select items (holes or supports). Selected: {{ selectedCount }}</span>
+      <div class="selection-actions">
+        <button @click="finishSelection" class="btn">Done</button>
+        <button @click="cancelSelection" class="btn btn-ghost">Cancel</button>
+      </div>
+    </div>
+
+    <div v-else-if="postSelectMode" class="selection-bar">
+      <span>{{ selectedCount }} item(s) selected. Right‑click a selected item for group actions.</span>
+      <div class="selection-actions">
+        <button class="btn btn-ghost" @click="clearSelection">Exit</button>
+      </div>
+    </div>
+
+    <!-- Status messages for active tools -->
+    <div v-else-if="activePenId && !eraserActive" class="selection-bar">
+      <span>Pen{{ activePenId }} is active. Draw on the table to create lines.</span>
+      <div class="selection-actions">
+        <button @click="deactivateCurrentPen" class="btn btn-ghost">Deactivate Pen</button>
+      </div>
+    </div>
+
+    <div v-else-if="eraserActive" class="selection-bar">
+      <span>Eraser is active. Click and drag to erase drawn lines.</span>
+      <div class="selection-actions">
+        <button @click="toggleEraser" class="btn btn-ghost">Deactivate Eraser</button>
+      </div>
+    </div>
+
+    <div v-else-if="addKnotMode" class="selection-bar">
+      <span>Adding knots is now active. Click on the table or on drawn lines to place bow knots.</span>
+      <div class="selection-actions">
+        <button @click="toggleAddKnot" class="btn btn-ghost">Exit Knot Mode</button>
+      </div>
+    </div>
+
+    <div v-else-if="addRuptureMode" class="selection-bar">
+      <span>Adding ruptures is now active. Click on the table or on drawn lines to create breaks.</span>
+      <div class="selection-actions">
+        <button @click="toggleAddRupture" class="btn btn-ghost">Exit Rupture Mode</button>
+      </div>
+    </div>
+
     <!-- TABLE CONTAINER -->
     <div class="table-container" ref="tableContainer">
       <!-- Drawing canvas (sits ABOVE the table; only captures events when pen/eraser is active) -->
@@ -439,22 +484,6 @@
           </tr>
         </tbody>
       </table>
-    </div>
-
-    <!-- Selection bars -->
-    <div v-if="selectingMode" class="selection-bar">
-      <span>Select items (holes or supports). Selected: {{ selectedCount }}</span>
-      <div class="selection-actions">
-        <button @click="finishSelection" class="btn">Done</button>
-        <button @click="cancelSelection" class="btn btn-ghost">Cancel</button>
-      </div>
-    </div>
-
-    <div v-else-if="postSelectMode" class="selection-bar">
-      <span>{{ selectedCount }} item(s) selected. Right‑click a selected item for group actions.</span>
-      <div class="selection-actions">
-        <button class="btn btn-ghost" @click="clearSelection">Exit</button>
-      </div>
     </div>
 
     <!-- FOOTER -->
@@ -3202,6 +3231,10 @@ export default {
       eraserActive.value = !eraserActive.value;
       if (eraserActive.value) activePenId.value = null;
     }
+    function deactivateCurrentPen() {
+      activePenId.value = null;
+      eraserActive.value = false;
+    }
 
     // Canvas drawing
     const drawCanvas = ref(null);
@@ -3872,6 +3905,7 @@ export default {
       activePenId,
       eraserActive,
       toggleEraser,
+      deactivateCurrentPen,
       showPenPopup,
       penForm,
       confirmPen,
@@ -3980,14 +4014,18 @@ export default {
 
 /* Pen buttons in header */
 .pen-btn-header {
-  padding: 4px 12px;
-  font-size: 12px;
+  padding: 8px 16px;
+  font-size: 13px;
   border: 1px solid #4ea5de;
   background: transparent;
   color: #4ea5de;
   border-radius: 4px;
   cursor: pointer;
   transition: all 0.2s ease;
+  height: 36px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
 }
 
 .pen-btn-header:hover {
@@ -3996,9 +4034,11 @@ export default {
 }
 
 .pen-btn-header.active {
-  background: #4ea5de;
-  color: white;
-  box-shadow: 0 0 8px rgba(78, 165, 222, 0.4);
+  border-width: 3px;
+  border-style: solid;
+  background: rgba(78, 165, 222, 0.1);
+  box-shadow: 0 0 12px rgba(78, 165, 222, 0.6), inset 0 0 8px rgba(78, 165, 222, 0.2);
+  font-weight: bold;
 }
 
 .pen-wrap-header {
@@ -4024,27 +4064,35 @@ export default {
 
 /* Selection bars */
 .selection-bar {
-  width: 80%;
-  margin: 10px auto 0;
+  position: absolute;
+  top: 157.5px;
+  left: 50%;
+  transform: translateX(-50%);
+  width: 70%;
   background: #0f2340;
-  border: 1px solid #2c3f58;
-  border-radius: 6px;
-  padding: 8px 12px;
+  border: 2px solid #4ea5de;
+  border-radius: 4px;
+  padding: 4px 8px;
   display: flex;
   justify-content: space-between;
   align-items: center;
+  font-size: 13px;
+  min-height: 24px;
+  z-index: 1001;
+  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.3);
 }
 .selection-actions {
   display: flex;
   gap: 8px;
 }
 .btn {
-  padding: 6px 12px;
+  padding: 4px 8px;
   border: 1px solid #9fb3cc;
   background: #1f2a3a;
   color: #e7f1ff;
-  border-radius: 4px;
+  border-radius: 3px;
   cursor: pointer;
+  font-size: 12px;
 }
 .btn:hover {
   background: #2a3a52;
