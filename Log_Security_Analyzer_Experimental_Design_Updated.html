@@ -1,0 +1,387 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Log Security Analyzer — Experimental Design</title>
+    <style>
+        @page {
+            size: A4;
+            margin: 2.5cm 2cm;
+        }
+
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+
+        body {
+            font-family: 'Times New Roman', Times, serif;
+            font-size: 11pt;
+            line-height: 1.6;
+            color: #000;
+            background: #fff;
+            max-width: 21cm;
+            margin: 0 auto;
+            padding: 0;
+        }
+
+        .header {
+            text-align: center;
+            margin-bottom: 2.5em;
+            border-bottom: 2px solid #333;
+            padding-bottom: 1em;
+        }
+
+        h1 {
+            font-size: 18pt;
+            font-weight: bold;
+            margin-bottom: 0.5em;
+            color: #1a1a1a;
+            letter-spacing: 0.5px;
+        }
+
+        .subtitle {
+            font-size: 14pt;
+            font-style: italic;
+            color: #444;
+            margin-bottom: 0.3em;
+        }
+
+        .document-info {
+            font-size: 10pt;
+            color: #666;
+            margin-top: 0.5em;
+        }
+
+        h2 {
+            font-size: 14pt;
+            font-weight: bold;
+            margin: 1.5em 0 0.8em 0;
+            color: #1a1a1a;
+            border-bottom: 1px solid #ccc;
+            padding-bottom: 0.2em;
+        }
+
+        h3 {
+            font-size: 12pt;
+            font-weight: bold;
+            margin: 1.2em 0 0.6em 0;
+            color: #333;
+        }
+
+        p {
+            margin-bottom: 1em;
+            text-align: justify;
+            text-justify: inter-word;
+        }
+
+        ul, ol {
+            margin: 1em 0 1em 2em;
+        }
+
+        li {
+            margin-bottom: 0.4em;
+        }
+
+        .objective-box {
+            background: #f8f9fa;
+            border: 1px solid #dee2e6;
+            border-left: 4px solid #333;
+            padding: 1em;
+            margin: 1em 0;
+            border-radius: 0 4px 4px 0;
+        }
+
+        .objective-box strong {
+            color: #333;
+            font-weight: bold;
+        }
+
+        table {
+            width: 100%;
+            border-collapse: collapse;
+            margin: 1.5em 0;
+            font-size: 10pt;
+            box-shadow: 0 2px 4px rgba(0,0,0,0.1);
+        }
+
+        th, td {
+            border: 1px solid #ddd;
+            padding: 0.6em;
+            text-align: left;
+            vertical-align: top;
+        }
+
+        th {
+            background-color: #f8f9fa;
+            font-weight: bold;
+            color: #495057;
+        }
+
+        tr:nth-child(even) {
+            background-color: #f8f9fa;
+        }
+
+        .table-caption {
+            font-size: 10pt;
+            font-weight: bold;
+            text-align: center;
+            margin: 0.5em 0 1em 0;
+            color: #495057;
+        }
+
+        .workflow-diagram {
+            font-family: 'Courier New', Courier, monospace;
+            font-size: 9pt;
+            background: #f8f9fa;
+            border: 1px solid #dee2e6;
+            padding: 1.5em;
+            margin: 1.5em 0;
+            overflow-x: auto;
+            white-space: pre;
+            line-height: 1.4;
+        }
+
+        .section-divider {
+            border-top: 1px solid #ccc;
+            margin: 2em 0 1em 0;
+        }
+
+        strong {
+            font-weight: bold;
+            color: #1a1a1a;
+        }
+
+        em {
+            font-style: italic;
+        }
+
+        .config-list {
+            background: #fff;
+            border: 1px solid #dee2e6;
+            padding: 1em;
+            margin: 1em 0;
+            border-radius: 4px;
+        }
+
+        .config-list strong {
+            color: #333;
+        }
+
+        .metrics-section {
+            background: #f8f9fa;
+            border-left: 4px solid #333;
+            padding: 1em;
+            margin: 1em 0;
+        }
+
+        .code-inline {
+            font-family: 'Courier New', Courier, monospace;
+            background: #f1f3f4;
+            padding: 0.2em 0.4em;
+            border-radius: 3px;
+            font-size: 90%;
+        }
+
+        .definition-box {
+            background: #fff9c4;
+            border: 1px solid #e6cc80;
+            border-left: 4px solid #d4a574;
+            padding: 1em;
+            margin: 1em 0;
+            border-radius: 0 4px 4px 0;
+        }
+
+        blockquote {
+            margin: 1em 0;
+            padding: 0;
+        }
+
+        @media print {
+            body {
+                font-size: 10pt;
+            }
+            
+            h1 {
+                font-size: 16pt;
+            }
+            
+            h2 {
+                font-size: 13pt;
+                page-break-after: avoid;
+            }
+            
+            h3 {
+                font-size: 11pt;
+                page-break-after: avoid;
+            }
+            
+            .workflow-diagram {
+                page-break-inside: avoid;
+            }
+            
+            table {
+                page-break-inside: avoid;
+                font-size: 9pt;
+            }
+            
+            .objective-box,
+            .config-list,
+            .metrics-section,
+            .definition-box {
+                page-break-inside: avoid;
+            }
+        }
+    </style>
+</head>
+<body>
+    <div class="header">
+        <h1>Log Security Analyzer</h1>
+        <div class="subtitle">Experimental Design</div>
+        <div class="document-info">
+            Authors: Sadegh Keshtkar and Mohamed Basuony
+        </div>
+    </div>
+
+    <h2>1. Introduction and Objective</h2>
+    
+    <p>This setup evaluates a Log Security Analyzer that produces labels from system logs. Each dataset is divided into <strong>98% training</strong> and <strong>2% test</strong> splits; the <strong>test split is held out</strong> and <strong>not used for training</strong>.</p>
+
+    <p>The experiment varies four factors (which can also be framed as <strong>three components</strong>—Anonymizer, Log Parser, <strong>Large Language Models (LLMs)</strong>—or <strong>four components</strong>—Anonymizing, Log Parsing, LLM usage, Sampling). We explore combinations of:</p>
+    <ul>
+        <li><strong>Anonymization:</strong> <strong>ON</strong> vs <strong>OFF</strong> (applies to all supported fields)</li>
+        <li><strong>Log Parsing:</strong> <strong>Structured</strong> (two structured variants) vs <strong>Unstructured</strong></li>
+        <li><strong>LLM usage in experimentation:</strong> <strong>per process</strong>, select <strong>one</strong> model type (<strong>Reasoning/Thinker</strong>, <strong>Classifier</strong>, or <strong>Generator</strong>) to generate candidate regex and labels</li>
+        <li><strong>Sampling size:</strong> <strong>10 / 20 / 50</strong> lines <strong>per process</strong></li>
+    </ul>
+
+    <p><strong>Two-stage flow.</strong></p>
+    <ol>
+        <li><strong>Experimentation (pre-testing/model selection).</strong> For each (Anonymization × Log Parsing) combination and per process, sample logs and use <strong>one</strong> LLM type (Thinker <strong>or</strong> Classifier <strong>or</strong> Generator) to propose regex and labels; build the <strong>regular expression (regex)</strong>–label mapping on the <strong>98% training</strong> split. This phase is used to select the <strong>best LLM</strong> for evaluation.</li>
+        <li><strong>Main pipeline (evaluation).</strong> Apply the mapping to the <strong>2% held-out test</strong> split. <strong>Evaluation is independently performed by the selected best <abbr title="Large Language Model">LLM</abbr> (“Smart LLM”) and the group of administrators.</strong></li>
+    </ol>
+
+    <div class="objective-box">
+        <p><strong>Objective.</strong> Construct an <strong>offline regular expression (regex)</strong>–label mapping on the <strong>98% training</strong> split using the experimentation policy above, then <strong>validate</strong> it on the <strong>2% test</strong> split via <strong>independent review by the Smart LLM and administrators</strong>.</p>
+    </div>
+
+    <div class="section-divider"></div>
+
+    <h2>2. Components</h2>
+
+    <h3>2.1 Anonymization (ON/OFF)</h3>
+    
+    <p>Anonymization has <strong>two states</strong> that apply to <strong>all supported fields</strong>:</p>
+    <ul>
+        <li><strong>ON:</strong> remove <strong>USERNAME, IP, DOMAIN, PATH, SERVICE, TIMESTAMP</strong> before downstream processing</li>
+        <li><strong>OFF:</strong> retain all of the fields as they appear in the logs</li>
+    </ul>
+
+    <h3>2.2 Log Parsing (Structured vs Unstructured)</h3>
+    
+    <p>Log parsing determines how entries are represented for downstream steps.</p>
+    <ul>
+        <li><strong>Structured</strong>
+            <ul>
+                <li><strong>Instance, Unit, Content</strong> — three-field structure</li>
+                <li><strong>Unit, Content</strong> — two-field structure</li>
+            </ul>
+        </li>
+        <li><strong>Unstructured</strong>
+            <ul>
+                <li><strong>Raw / minimally structured lines</strong></li>
+            </ul>
+        </li>
+    </ul>
+
+    <div class="table-caption">Reference table — Log parsing</div>
+    <table>
+        <thead>
+            <tr>
+                <th>Class</th>
+                <th>Configuration</th>
+                <th>Representation</th>
+            </tr>
+        </thead>
+        <tbody>
+            <tr>
+                <td><strong>Structured</strong></td>
+                <td>Instance, Unit, Content</td>
+                <td>Three-field structure</td>
+            </tr>
+            <tr>
+                <td><strong>Structured</strong></td>
+                <td>Unit, Content</td>
+                <td>Two-field structure</td>
+            </tr>
+            <tr>
+                <td><strong>Unstructured</strong></td>
+                <td>Raw / minimal structure</td>
+                <td>Full text / plain lines</td>
+            </tr>
+        </tbody>
+    </table>
+
+    <h3>2.3 LLM Usage</h3>
+    
+    <ul>
+        <li><strong>Experimentation (per process):</strong> choose <strong>one</strong> model type—<strong>Reasoning (Thinker)</strong> <strong>or</strong> <strong>Classifier</strong> <strong>or</strong> <strong>Generator</strong>—to generate candidate regex patterns and corresponding labels from the sampled lines. This phase is used to <strong>develop the mapping</strong> and <strong>select the best LLM</strong> for evaluation</li>
+        <li><strong>Main pipeline evaluator:</strong> the <strong>Smart LLM</strong> (the selected best LLM from experimentation) is used for <strong>evaluation</strong> on the held-out test split; administrators also review</li>
+    </ul>
+
+    <h3>2.4 Sampling</h3>
+    
+    <p>For each <strong>(Anonymization state × Log Parsing class)</strong> combination and <strong>for each process</strong>, draw <strong>samples of 10, 20, or 50 lines</strong>. Run the <strong>selected</strong> LLM type (Thinker <strong>or</strong> Classifier <strong>or</strong> Generator) on these samples to generate regex and labels. Use the <strong>98% training</strong> split to <strong>construct the regular expression (regex)–label mapping offline</strong>, then <strong>apply</strong> it to the <strong>2% test</strong> split.</p>
+
+    <div class="section-divider"></div>
+
+    <h2>3. Diagram — End-to-End Workflow</h2>
+
+    <div class="workflow-diagram">Raw logs
+   │
+   ├─► Split: 98% training / 2% test (test held out)
+   │
+   ├─► Anonymization (ON/OFF)
+   │     └─► ON: remove USERNAME, IP, DOMAIN, PATH, SERVICE, TIMESTAMP
+   │         OFF: retain fields
+   │
+   ├─► Log Parsing (Structured vs Unstructured)
+   │     └─► Structured: Instance, Unit, Content  |  Unit, Content
+   │         Unstructured: raw/minimal structure
+   │
+   ├─► Sampling per process {10, 20, 50}
+   │     └─► Experimentation (per process)
+   │           └─► pick ONE: Thinker  OR  Classifier  OR  Generator
+   │                └─► Candidate regex + labels
+   │                     └─► Build regex–label mapping offline on 98% training
+   │
+   └─► Apply mapping to 2% test (main pipeline)
+         └─► Independently reviewed by Smart LLM (best LLM) and administrators</div>
+
+    <div class="section-divider"></div>
+
+    <h2>4. Evaluation</h2>
+
+    <p>In the <strong>main pipeline</strong>, outputs from the <strong>2% held-out test</strong> split are <strong>independently reviewed</strong> by the <strong>Smart LLM</strong> (the best LLM selected during experimentation) and by the <strong>administrators</strong>. Reviews assess <strong>label correctness, coverage, and utility</strong>. The <strong>Smart LLM</strong> and the <strong>administrators</strong> each receive the same labeled test outputs, together with the <strong>active anonymization and parsing settings</strong> for traceability. Reviews are conducted <strong>independently</strong>; any <strong>discrepancies between the Smart LLM's assessment and the administrators' assessment</strong> are logged and resolved by the administrators. The <strong>held-out test data and all review artifacts remain audit-only</strong> and <strong>do not feed back into training</strong> unless a separately authorized retraining cycle is initiated.</p>
+
+    <div class="section-divider"></div>
+
+    <h2>5. Conclusion</h2>
+
+    <p>This design fixes the evaluation policy to <strong>Smart LLM + administrators</strong>, while treating <strong>Anonymization (ON/OFF)</strong>, <strong>Log Parsing (Structured with two variants vs Unstructured)</strong>, <strong>per-process LLM selection during experimentation</strong>, and <strong>Sampling sizes (10/20/50)</strong> as the primary experimental factors. The <strong>regular expression (regex)–label mapping</strong> is <strong>built offline on 98% training</strong> and <strong>validated on the 2% held-out test</strong>. Independent evaluation ensures the test outputs are reviewed separately by the <strong>Smart LLM</strong> and by the <strong>administrators</strong>. "<strong>Process</strong>" is the log grouping unit used for sampling and generation (e.g., OS process, service, or a pipeline-defined unit).</p>
+
+    <div class="config-list">
+        <p><strong>Factor summary (for quick reference)</strong></p>
+        <ul>
+            <li><strong>Anonymization:</strong> {<strong>ON</strong>, <strong>OFF</strong>}</li>
+            <li><strong>Parsing:</strong> {<strong>Structured (Instance–Unit–Content)</strong>, <strong>Structured (Unit–Content)</strong>, <strong>Unstructured</strong>}</li>
+            <li><strong>Sampling (per process):</strong> {<strong>10</strong>, <strong>20</strong>, <strong>50</strong>}</li>
+            <li><strong>Experimentation LLM (per process):</strong> {<strong>Thinker</strong>, <strong>Classifier</strong>, <strong>Generator</strong>}</li>
+            <li><strong>Evaluator (test):</strong> <strong>Best LLM (“Smart LLM”) + Admins</strong></li>
+        </ul>
+    </div>
+
+</body>
+</html>
