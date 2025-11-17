@@ -16,6 +16,9 @@
         <span v-if="location">, {{ location }}</span>
         <span v-if="shelfmark">, {{ shelfmark }}</span>
         <span v-if="manuscriptDate">, {{ manuscriptDate }}</span>
+        <span v-if="rows.length">, {{ rows.length }} Quires</span>
+        <span v-if="rows[0] && rows[0].range">, {{ rows[0].range.split('-').length }} Folios/Quire</span>
+        <span v-if="totalCmNumber">, {{ totalCmNumber.toFixed(1) }} cm spine</span>
       </div>
       
       <!-- Main Pen Controls (Center) -->
@@ -115,6 +118,10 @@
         :height="canvasHeight"
         :style="{
           pointerEvents: activePenId || eraserActive ? 'auto' : 'none',
+          // Position canvas at the start of the drawable area (after quire and leaves columns)
+          left: (getDrawableOffsetPixels()) + 'px',
+          width: canvasWidth + 'px',
+          height: canvasHeight + 'px',
         }"
         @mousedown="startDraw"
         @mousemove="drawMove"
@@ -1302,7 +1309,79 @@ export default {
         size: 16 // size in pixels
       });
       
+      // Convert click position to canvas coordinates
+      const clickX = (x / 100) * canvasWidth.value;
+      const clickY = (y / 100) * canvasHeight.value;
+      const rupturRadius = 12; // detection radius around click point
+      
+      // Find strokes that pass through this rupture point and break them
+      for (const stroke of strokes.value) {
+        if (stroke.type === 'straight' && stroke.start && stroke.end) {
+          // Check if this straight line passes near the rupture point
+          if (linePassesThroughPoint(absPoint(stroke.start), absPoint(stroke.end), { x: clickX, y: clickY }, rupturRadius)) {
+            // Calculate where on the line the rupture occurs (normalized 0-1)
+            const t = getLineIntersectionParam(absPoint(stroke.start), absPoint(stroke.end), { x: clickX, y: clickY });
+            stroke.broken = true;
+            stroke.breakStart = t < 0.1; // break at start if rupture is near start
+            stroke.breakEnd = t > 0.9;   // break at end if rupture is near end
+          }
+        } else if (stroke.type === 'freehand' && stroke.points && stroke.points.length > 0) {
+          // Check if freehand path passes through the rupture point
+          const pts = stroke.points.map(absPoint);
+          for (let i = 0; i < pts.length - 1; i++) {
+            if (linePassesThroughPoint(pts[i], pts[i + 1], { x: clickX, y: clickY }, rupturRadius)) {
+              stroke.broken = true;
+              stroke.breakPoints = stroke.breakPoints || [];
+              stroke.breakPoints.push(i); // mark this segment as broken
+              break;
+            }
+          }
+        }
+      }
+      
+      reRenderCanvas();
       addRuptureMode.value = false;
+    }
+    
+    function linePassesThroughPoint(p1, p2, point, radius) {
+      // Calculate distance from point to line segment p1-p2
+      const dist = distanceToLineSegment(p1, p2, point);
+      return dist <= radius;
+    }
+    
+    function distanceToLineSegment(p1, p2, point) {
+      const dx = p2.x - p1.x;
+      const dy = p2.y - p1.y;
+      const lenSq = dx * dx + dy * dy;
+      
+      if (lenSq === 0) {
+        // p1 and p2 are the same point
+        const px = point.x - p1.x;
+        const py = point.y - p1.y;
+        return Math.sqrt(px * px + py * py);
+      }
+      
+      let t = ((point.x - p1.x) * dx + (point.y - p1.y) * dy) / lenSq;
+      t = Math.max(0, Math.min(1, t));
+      
+      const closestX = p1.x + t * dx;
+      const closestY = p1.y + t * dy;
+      
+      const px = point.x - closestX;
+      const py = point.y - closestY;
+      return Math.sqrt(px * px + py * py);
+    }
+    
+    function getLineIntersectionParam(p1, p2, point) {
+      // Returns t where 0 <= t <= 1, representing where on the line segment the closest point is
+      const dx = p2.x - p1.x;
+      const dy = p2.y - p1.y;
+      const lenSq = dx * dx + dy * dy;
+      
+      if (lenSq === 0) return 0;
+      
+      let t = ((point.x - p1.x) * dx + (point.y - p1.y) * dy) / lenSq;
+      return Math.max(0, Math.min(1, t));
     }
     
     function updateRupturePosition(id, x, y) {
@@ -2402,7 +2481,7 @@ export default {
     const penTooltip = (p) => `Color: ${p.color} • Type: ${p.type} • Style: ${p.style}`;
 
     // Vector strokes so we can recolor later
-    const strokes = ref([]); // [{ id, tool:'pen'|'eraser', type:'straight'|'freehand'|'eraser', style, color, width, points:[{x,y}], start:{x,y}, end:{x,y} }];
+    const strokes = ref([]); // [{ id, tool:'pen'|'eraser', type:'straight'|'freehand'|'eraser'|'bow-*'|'debris', style, color, ... }]
     let strokeSeq = 1;
     let currentStroke = null; // working object while drawing
 
@@ -2508,7 +2587,7 @@ export default {
       } else if (knotAnim) {
         drawFreehandKnotAnimation(ctx, s, knotAnim, pts);
       } else if (s.broken) {
-        drawBrokenFreehand(ctx, pts, s.breakStart, s.breakEnd);
+        drawBrokenFreehand(ctx, pts, s.breakStart, s.breakEnd, s.breakPoints);
       } else {
         // Normal freehand line
         ctx.beginPath();
@@ -2765,38 +2844,48 @@ export default {
     }
     
     function drawBrokenLine(ctx, startPt, endPt, breakStart, breakEnd) {
-      const gapSize = 6;
+      const gapSize = 12; // size of the gap where rupture occurs
       
       if (breakEnd) {
-        // Draw with jagged end
-        ctx.beginPath();
-        ctx.moveTo(startPt.x, startPt.y);
+        // Line broken at end - draw most of line, skip end portion
+        const endBreakDist = gapSize;
+        const dx = endPt.x - startPt.x;
+        const dy = endPt.y - startPt.y;
+        const len = Math.sqrt(dx * dx + dy * dy);
         
-        // Create jagged end effect
-        const jaggedX = endPt.x - gapSize;
-        const jaggedY = endPt.y;
+        if (len > endBreakDist) {
+          const t = (len - endBreakDist) / len;
+          const breakX = startPt.x + t * dx;
+          const breakY = startPt.y + t * dy;
+          
+          ctx.beginPath();
+          ctx.moveTo(startPt.x, startPt.y);
+          ctx.lineTo(breakX, breakY);
+          ctx.stroke();
+        }
+      } else if (breakStart) {
+        // Line broken at start - skip start portion, draw rest
+        const startBreakDist = gapSize;
+        const dx = endPt.x - startPt.x;
+        const dy = endPt.y - startPt.y;
+        const len = Math.sqrt(dx * dx + dy * dy);
         
-        ctx.lineTo(jaggedX - 2, jaggedY - 1);
-        ctx.lineTo(jaggedX + 1, jaggedY + 1);
-        ctx.lineTo(jaggedX - 1, jaggedY - 2);
-        ctx.stroke();
+        if (len > startBreakDist) {
+          const t = startBreakDist / len;
+          const breakX = startPt.x + t * dx;
+          const breakY = startPt.y + t * dy;
+          
+          ctx.beginPath();
+          ctx.moveTo(breakX, breakY);
+          ctx.lineTo(endPt.x, endPt.y);
+          ctx.stroke();
+        }
       } else {
+        // No break flags, draw normal line
         ctx.beginPath();
         ctx.moveTo(startPt.x, startPt.y);
         ctx.lineTo(endPt.x, endPt.y);
         ctx.stroke();
-      }
-      
-      if (breakStart) {
-        // Add jagged start effect
-        ctx.save();
-        ctx.strokeStyle = ctx.strokeStyle;
-        ctx.beginPath();
-        ctx.moveTo(startPt.x + 2, startPt.y + 1);
-        ctx.lineTo(startPt.x - 1, startPt.y - 1);
-        ctx.lineTo(startPt.x + 1, startPt.y + 2);
-        ctx.stroke();
-        ctx.restore();
       }
     }
     
@@ -2810,23 +2899,111 @@ export default {
       drawFreehandStroke(ctx, { ...stroke, broken: false });
     }
     
-    function drawBrokenFreehand(ctx, pts, breakStart, breakEnd) {
+    function drawBrokenFreehand(ctx, pts, breakStart, breakEnd, breakPoints) {
       if (pts.length < 2) return;
       
-      ctx.beginPath();
-      ctx.moveTo(pts[0].x, pts[0].y);
+      const gapSize = 4; // pixels of gap around rupture
       
-      for (let i = 1; i < pts.length; i++) {
-        if (i === pts.length - 1 && breakEnd) {
-          // Jagged end
-          ctx.lineTo(pts[i].x - 2, pts[i].y - 1);
-          ctx.lineTo(pts[i].x + 1, pts[i].y + 1);
-          break;
-        } else {
+      if (breakPoints && breakPoints.length > 0) {
+        // Draw freehand with gaps at specific indices
+        let currentStart = 0;
+        
+        for (const breakIdx of breakPoints.sort((a, b) => a - b)) {
+          // Draw segment before break
+          if (currentStart < breakIdx) {
+            ctx.beginPath();
+            ctx.moveTo(pts[currentStart].x, pts[currentStart].y);
+            
+            // Calculate where to stop (gapSize before break point)
+            const dx = pts[breakIdx].x - pts[breakIdx - 1].x;
+            const dy = pts[breakIdx].y - pts[breakIdx - 1].y;
+            const segLen = Math.sqrt(dx * dx + dy * dy);
+            
+            if (segLen > 0) {
+              const t = Math.max(0, 1 - (gapSize / segLen));
+              for (let i = currentStart; i < breakIdx; i++) {
+                if (i === breakIdx - 1) {
+                  // Draw up to gap
+                  const stopX = pts[i].x + t * (pts[i + 1].x - pts[i].x);
+                  const stopY = pts[i].y + t * (pts[i + 1].y - pts[i].y);
+                  ctx.lineTo(stopX, stopY);
+                } else {
+                  ctx.lineTo(pts[i].x, pts[i].y);
+                }
+              }
+            }
+            ctx.stroke();
+          }
+          
+          // Skip the gap
+          const skipFrom = Math.max(breakIdx, currentStart + 1);
+          currentStart = skipFrom + 1;
+        }
+        
+        // Draw remaining segments after last break
+        if (currentStart < pts.length) {
+          ctx.beginPath();
+          ctx.moveTo(pts[currentStart].x, pts[currentStart].y);
+          for (let i = currentStart + 1; i < pts.length; i++) {
+            ctx.lineTo(pts[i].x, pts[i].y);
+          }
+          ctx.stroke();
+        }
+      } else if (breakEnd) {
+        // Line broken at end - skip last gapSize distance
+        ctx.beginPath();
+        ctx.moveTo(pts[0].x, pts[0].y);
+        
+        for (let i = 1; i < pts.length - 1; i++) {
           ctx.lineTo(pts[i].x, pts[i].y);
         }
+        
+        // Draw up to gapSize before the end
+        if (pts.length >= 2) {
+          const lastIdx = pts.length - 1;
+          const dx = pts[lastIdx].x - pts[lastIdx - 1].x;
+          const dy = pts[lastIdx].y - pts[lastIdx - 1].y;
+          const segLen = Math.sqrt(dx * dx + dy * dy);
+          
+          if (segLen > gapSize) {
+            const t = (segLen - gapSize) / segLen;
+            const stopX = pts[lastIdx - 1].x + t * dx;
+            const stopY = pts[lastIdx - 1].y + t * dy;
+            ctx.lineTo(stopX, stopY);
+          }
+        }
+        ctx.stroke();
+      } else if (breakStart) {
+        // Line broken at start - skip first gapSize distance
+        ctx.beginPath();
+        
+        // Start from gapSize into the line
+        if (pts.length >= 2) {
+          const dx = pts[1].x - pts[0].x;
+          const dy = pts[1].y - pts[0].y;
+          const segLen = Math.sqrt(dx * dx + dy * dy);
+          
+          if (segLen > gapSize) {
+            const t = gapSize / segLen;
+            const startX = pts[0].x + t * dx;
+            const startY = pts[0].y + t * dy;
+            ctx.moveTo(startX, startY);
+          }
+        }
+        
+        for (let i = 1; i < pts.length; i++) {
+          ctx.lineTo(pts[i].x, pts[i].y);
+        }
+        ctx.stroke();
+      } else {
+        // Normal freehand line
+        ctx.beginPath();
+        ctx.moveTo(pts[0].x, pts[0].y);
+        for (let i = 1; i < pts.length; i++) {
+          ctx.lineTo(pts[i].x, pts[i].y);
+        }
+        ctx.stroke();
       }
-      ctx.stroke();
     }
     
     function drawKnotLoop(ctx, stroke) {
@@ -3240,20 +3417,53 @@ export default {
     const drawCanvas = ref(null);
     const canvasWidth = ref(0);
     const canvasHeight = ref(0);
+
+    // The drawable region (for pens) should match the distance
+    // between the Head and Tail columns, same as the top ruler.
+    function getDrawableWidth() {
+      if (tableContainer.value) {
+        // Prefer the precise Head..Tail span measured for the top ruler.
+        if (topRulerWidth.value > 0) {
+          return Math.max(1, topRulerWidth.value);
+        }
+        // Fallback: compute alignment once if not yet measured.
+        updateTopRulerAlignment();
+        if (topRulerWidth.value > 0) {
+          return Math.max(1, topRulerWidth.value);
+        }
+        // Last resort: use full container width.
+        return Math.max(1, tableContainer.value.offsetWidth);
+      }
+      return canvasWidth.value || 1;
+    }
+
+    function getDrawableOffsetPixels() {
+      // Align canvas left edge with the Head column, matching the top ruler.
+      if (tableContainer.value) {
+        if (topRulerLeft.value > 0) return topRulerLeft.value;
+        updateTopRulerAlignment();
+        return topRulerLeft.value || 0;
+      }
+      return 0;
+    }
+
     function resizeCanvas() {
       if (tableContainer.value) {
-        canvasWidth.value = tableContainer.value.offsetWidth;
+        // Keep canvas exactly in sync with the current Head–Tail span.
+        updateTopRulerAlignment();
+        canvasWidth.value = getDrawableWidth();
         canvasHeight.value = tableContainer.value.offsetHeight;
       }
       // Repaint stored strokes after resize to keep positions consistent
-      nextTick(() => { reRenderCanvas(); updateScrollability(); });
+      reRenderCanvas();
+      updateScrollability();
     }
     onMounted(() => {
-      nextTick(resizeCanvas);
+      nextTick(() => resizeCanvas());
       window.addEventListener("resize", resizeCanvas);
     });
-    watch(tableContainer, resizeCanvas);
-    watch([rows, () => rowHeight.value], () => nextTick(resizeCanvas)); // keep canvas in sync as rows change
+    watch(tableContainer, () => resizeCanvas());
+    watch([rows, () => rowHeight.value], () => nextTick(() => resizeCanvas())); // keep canvas in sync as rows change
 
     const drawing = ref(false);
     const lastPoint = ref({ x: 0, y: 0 });
@@ -3400,17 +3610,43 @@ export default {
     const showExportPopup = ref(false);
     const showPreviewPopup = ref(false);
     const previewImg = ref("");
-    const exportMode = ref(false);
+    const exportMode = ref(false); // no longer used for export layout; kept for potential UI hooks
     const noteRefs = ref([]);
 
+    // For PDF/preview we capture what the user sees on screen,
+    // but temporarily change the Notes column so that only the
+    // first row shows "View Notes Below" and all other rows are blank.
     async function withExportLayout(fn) {
-      exportMode.value = true;
-      await nextTick();
+      const root = tableContainer.value || document.querySelector(".table-container");
+      const inputs = root
+        ? Array.from(root.querySelectorAll("input.notes-input"))
+        : [];
+
+      const originalPlaceholders = [];
+      const originalValues = [];
+
+      // Temporarily override placeholders/values for export snapshot
+      inputs.forEach((input, index) => {
+        originalPlaceholders[index] = input.placeholder;
+        originalValues[index] = input.value;
+
+        if (index === 0) {
+          input.value = "";
+          input.placeholder = "View Notes Below";
+        } else {
+          input.value = "";
+          input.placeholder = "";
+        }
+      });
+
       try {
         return await fn();
       } finally {
-        exportMode.value = false;
-        await nextTick();
+        // Restore original placeholders/values
+        inputs.forEach((input, index) => {
+          input.placeholder = originalPlaceholders[index] ?? "";
+          input.value = originalValues[index] ?? "";
+        });
       }
     }
     async function previewPDF() {
@@ -3418,6 +3654,7 @@ export default {
         const target = tableContainer.value || document.querySelector(".bookbinding-screen");
         const dataUrl = await withExportLayout(async () => {
           const canvas = await html2canvas(target, { scale: 1.2, useCORS: true });
+          // Show full view (including Notes) in preview
           return canvas.toDataURL("image/jpeg", 0.72);
         });
         previewImg.value = dataUrl;
@@ -3429,11 +3666,16 @@ export default {
     async function exportToPDF() {
       try {
         const target = tableContainer.value || document.querySelector(".bookbinding-screen");
-        const snap = await withExportLayout(async () => {
-          const canvas = await html2canvas(target, { scale: 1.2, useCORS: true });
-          return { dataUrl: canvas.toDataURL("image/jpeg", 0.72), width: canvas.width, height: canvas.height };
+        const canvas = await withExportLayout(async () => {
+          return await html2canvas(target, { scale: 1.2, useCORS: true });
         });
-        const imgData = snap.dataUrl;
+
+        // Use the full canvas so geometry (including Notes column width)
+        // exactly matches what the user saw on screen.
+        const exportCanvas = canvas;
+        const imgData = exportCanvas.toDataURL("image/jpeg", 0.72);
+        const snapWidth = exportCanvas.width;
+        const snapHeight = exportCanvas.height;
 
         const pdf = new jsPDF({
           orientation: "landscape",
@@ -3454,10 +3696,33 @@ export default {
         );
         const hasPens = pens.value.length > 0;
 
+        // Count knots/ruptures from both free‑floating icons and direct line edits
+        const getLegendKnotCount = () => {
+          let count = knotEntries.length;
+          // Each 'bow-center' stroke corresponds to one knot on a straight line
+          for (const s of strokes.value) {
+            if (s.type === "bow-center") count++;
+            if (Array.isArray(s.knots)) count += s.knots.length;
+          }
+          return count;
+        };
+        const getLegendRuptureCount = () => {
+          let count = ruptureEntries.length;
+          // Each broken segment that starts after a gap represents one rupture
+          for (const s of strokes.value) {
+            if (s.broken && s.breakStart) count++;
+          }
+          return count;
+        };
+        const knotLegendCount = getLegendKnotCount();
+        const ruptureLegendCount = getLegendRuptureCount();
+
         const rowsLegend = [];
         if (hasHeadbands) rowsLegend.push({ kind: "headband" });
         if (hasSupports) rowsLegend.push({ kind: "support" });
         if (hasChangeovers) rowsLegend.push({ kind: "changeover" });
+        if (knotLegendCount > 0) rowsLegend.push({ kind: "knot", count: knotLegendCount });
+        if (ruptureLegendCount > 0) rowsLegend.push({ kind: "rupture", count: ruptureLegendCount });
 
         const headerH = 16;
         const sectionH = 14;
@@ -3479,6 +3744,23 @@ export default {
         if (props.location) metaItems.push(["City/Repository", String(props.location)]);
         if (props.shelfmark) metaItems.push(["Shelfmark", String(props.shelfmark)]);
         if (props.manuscriptDate) metaItems.push(["Date", String(props.manuscriptDate)]);
+
+        // Structural metadata from the same inputs that drive the table
+        const qCount = Math.max(0, num(props.quires, 0));
+        if (qCount > 0) metaItems.push(["Number of Quires", String(qCount)]);
+
+        const foliosPerQ = Math.max(
+          0,
+          num(props.foliosPerQuire, num(props.leavesPerQuire, 0))
+        );
+        if (foliosPerQ > 0)
+          metaItems.push(["Folios per Quire", String(foliosPerQ)]);
+
+        if (totalCmNumber.value)
+          metaItems.push([
+            "Spine Length (cm)",
+            totalCmNumber.value.toFixed(1),
+          ]);
         const metaBoxH = metaItems.length
           ? headerH + padY + metaItems.length * lineH + padY
           : 0;
@@ -3491,11 +3773,11 @@ export default {
           (legendBoxH ? legendBoxH + gap : 0);
 
         const ratio = Math.min(
-          availableWidth / Math.max(1, snap.width),
-          availableHeight / Math.max(1, snap.height)
+          availableWidth / Math.max(1, snapWidth),
+          availableHeight / Math.max(1, snapHeight)
         );
-        const w = Math.max(1, snap.width) * ratio;
-        const h = Math.max(1, snap.height) * ratio;
+        const w = Math.max(1, snapWidth) * ratio;
+        const h = Math.max(1, snapHeight) * ratio;
         const x = (pageWidth - w) / 2;
         const y = margin;
 
@@ -3594,6 +3876,45 @@ export default {
               pdf.setDrawColor(34, 34, 34);
               pdf.circle(iconX + 8, rowY - 5, 4, "FD");
               drawLabel(labelX, "Change‑over station (dot)");
+            } else if (item.kind === "knot") {
+              // Stylised knotted sewing line: short line with a bulge in the centre
+              const lineY = rowY - 4;
+              const startX = iconX;
+              const endX = iconX + 34;
+              const knotX = (startX + endX) / 2;
+
+              pdf.setDrawColor(34, 34, 34);
+              pdf.setLineWidth(1.2);
+              // Left half of line
+              pdf.line(startX, lineY, knotX - 3, lineY);
+              // Right half of line
+              pdf.line(knotX + 3, lineY, endX, lineY);
+              // Small loop/bulge to suggest a knot
+              pdf.circle(knotX, lineY, 3, "S");
+
+              drawLabel(
+                labelX,
+                `Knot on sewing line${item.count ? ` (${item.count})` : ""}`
+              );
+            } else if (item.kind === "rupture") {
+              // Stylised rupture: line with a clean break and offset ends
+              const lineY = rowY - 4;
+              const startX = iconX;
+              const endX = iconX + 34;
+              const gapLeft = startX + 12;
+              const gapRight = endX - 12;
+
+              pdf.setDrawColor(34, 34, 34);
+              pdf.setLineWidth(1.2);
+              // Left segment
+              pdf.line(startX, lineY, gapLeft, lineY);
+              // Right segment slightly shifted to suggest misalignment
+              pdf.line(gapRight, lineY + 1.5, endX, lineY + 1.5);
+
+              drawLabel(
+                labelX,
+                `Rupture in sewing line${item.count ? ` (${item.count})` : ""}`
+              );
             }
             rowY += lineH;
           }
@@ -3921,6 +4242,7 @@ export default {
       startDraw,
       drawMove,
       endDraw,
+      getDrawableOffsetPixels,
 
       // export
       showExportPopup,
@@ -4143,9 +4465,9 @@ export default {
   table-layout: fixed;
 }
 
-/* Center table in export mode */
+/* Center table in export mode without changing its width,
+   so drawn lines keep the same geometry as on screen. */
 .export-mode .binding-table {
-  width: auto;
   margin: 0 auto;
 }
 .binding-table th,
