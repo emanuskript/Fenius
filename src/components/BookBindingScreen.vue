@@ -709,11 +709,14 @@
     <!-- Export Popup -->
     <div v-if="showExportPopup" class="overlay">
       <div class="popup">
-        <h3>Save as PDF?</h3>
+        <h3>Export Diagram</h3>
         <div class="popup-actions">
-          <button class="popup-btn" @click="previewPDF">Preview</button>
-          <button class="popup-btn confirm" @click="exportToPDF">
-            Confirm
+          <button class="popup-btn" @click="previewPDF">Preview PDF</button>
+          <button class="popup-btn" @click="exportToPDF">
+            Download PDF
+          </button>
+          <button class="popup-btn confirm" @click="exportAsJSON">
+            Download JSON
           </button>
           <button class="popup-btn cancel" @click="showExportPopup = false">
             Cancel
@@ -3688,6 +3691,142 @@ export default {
         console.error("Preview failed:", e);
       }
     }
+    function buildExportJson() {
+      try {
+        const meta = {
+          title: props.title || null,
+          location: props.location || null,
+          shelfmark: props.shelfmark || null,
+          manuscriptDate: props.manuscriptDate || null,
+          quires: num(props.quires, 0),
+          foliosPerQuire: num(
+            props.foliosPerQuire,
+            num(props.leavesPerQuire, 0)
+          ),
+          frontEndleaves: num(props.frontEndleaves, 0),
+          backEndleaves: num(props.backEndleaves, 0),
+          sewingSupports: num(props.sewingSupports, 0),
+          headbands: !!props.headbands,
+          changeOver: !!props.changeOver,
+          spineLengthCm: totalCmNumber.value || 0,
+          collationStyle: props.collationStyle || null,
+          sewingType: props.sewingType || null,
+        };
+
+        const tableRows = rows.value.map((r, index) => ({
+          index,
+          roman: rowsManual[index]?.roman ?? r.roman,
+          range: rowsManual[index]?.range ?? r.range,
+          note: notes[index] ?? "",
+        }));
+
+        const headbandsExport = {
+          left: [...headbandLeftPositions],
+          right: [...headbandRightPositions],
+        };
+
+        const supportsExport = supportEntries.map((s) => ({
+          id: s.id,
+          position: s.position,
+          color: s.color,
+          type: s.type || (isDoubleSupport.value ? "double" : "single"),
+        }));
+
+        const changeOversExport = changeHolesByRow.value.map((row, rowIndex) =>
+          row.map((h) => ({
+            rowIndex,
+            uid: h.uid,
+            position: h.position,
+            color: h.color,
+          }))
+        );
+
+        const sewingHolesExport = sewingHolesByRow.value.map(
+          (row, rowIndex) =>
+            row.map((h) => ({
+              rowIndex,
+              uid: h.uid,
+              position: h.position,
+              color: h.color,
+              supportId: h.supportId ?? null,
+              role: h.role || "side",
+            }))
+        );
+
+        const knotsExport = knotEntries.map((k) => ({
+          id: k.id,
+          xPercent: k.x,
+          yPercent: k.y,
+          color: k.color,
+          size: k.size,
+        }));
+
+        const rupturesExport = ruptureEntries.map((r) => ({
+          id: r.id,
+          xPercent: r.x,
+          yPercent: r.y,
+          color: r.color,
+          size: r.size,
+        }));
+
+        const strokesExport = strokes.value.map((s) => ({
+          id: s.id,
+          tool: s.tool,
+          type: s.type,
+          style: s.style,
+          color: s.color,
+          width: s.width,
+          start: s.start || null,
+          end: s.end || null,
+          points: s.points || null,
+          broken: !!s.broken,
+          breakStart: !!s.breakStart,
+          breakEnd: !!s.breakEnd,
+          knots: s.knots || null,
+          center: s.center || null,
+          size: s.size || null,
+          layer: s.layer || null,
+        }));
+
+        return {
+          metadata: meta,
+          rows: tableRows,
+          headbands: headbandsExport,
+          supports: supportsExport,
+          changeOvers: changeOversExport,
+          sewingHoles: sewingHolesExport,
+          knots: knotsExport,
+          ruptures: rupturesExport,
+          strokes: strokesExport,
+        };
+      } catch (e) {
+        console.error("Failed to build export JSON:", e);
+        return null;
+      }
+    }
+
+    function exportAsJSON() {
+      const payload = buildExportJson();
+      if (!payload) return;
+      try {
+        const fileName =
+          (props.title && String(props.title).trim()) || "Untitled";
+        const json = JSON.stringify(payload, null, 2);
+        const blob = new Blob([json], { type: "application/json" });
+        const url = URL.createObjectURL(blob);
+        const a = document.createElement("a");
+        a.href = url;
+        a.download = `${fileName}.json`;
+        document.body.appendChild(a);
+        a.click();
+        a.remove();
+        URL.revokeObjectURL(url);
+      } catch (e) {
+        console.error("JSON export failed:", e);
+        alert("JSON export failed. Please check the console for details.");
+      }
+    }
+
     async function exportToPDF() {
       try {
         const target = tableContainer.value || document.querySelector(".bookbinding-screen");
@@ -4281,6 +4420,7 @@ export default {
 
       previewPDF,
       exportToPDF,
+      exportAsJSON,
     };
   },
 };
