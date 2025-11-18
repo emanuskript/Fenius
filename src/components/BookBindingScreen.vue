@@ -12,13 +12,12 @@
     <!-- METADATA BREADCRUMB -->
     <div class="breadcrumb">
       <div class="breadcrumb-text">
-        {{ title }}
-        <span v-if="location">, {{ location }}</span>
+        <span v-if="manuscriptDate">{{ manuscriptDate }}</span>
+        <span v-if="title">
+          <span v-if="manuscriptDate">, </span>{{ title }}
+        </span>
         <span v-if="shelfmark">, {{ shelfmark }}</span>
-        <span v-if="manuscriptDate">, {{ manuscriptDate }}</span>
-        <span v-if="rows.length">, {{ rows.length }} Quires</span>
-        <span v-if="rows[0] && rows[0].range">, {{ rows[0].range.split('-').length }} Folios/Quire</span>
-        <span v-if="totalCmNumber">, {{ totalCmNumber.toFixed(1) }} cm spine</span>
+        <span v-if="location">, {{ location }}</span>
       </div>
       
       <!-- Main Pen Controls (Center) -->
@@ -61,6 +60,13 @@
       <div class="breadcrumb-pen-controls">
         <!-- This div maintains the grid layout balance -->
       </div>
+    </div>
+
+    <!-- Initial hint: hole interactions -->
+    <div v-if="showHoleHint" class="selection-bar">
+      <span>
+        You can right‑click on any hole to select, recolor, or delete it. Hold Shift and click holes to select multiple.
+      </span>
     </div>
 
     <!-- Selection bars -->
@@ -419,7 +425,7 @@
                   onEnd: endDragFeedback,
                 }"
                 @contextmenu.prevent="openSewingMenu($event, rowIndex, sh.uid)"
-                @click.stop="onSewingHoleClick(rowIndex, sh.uid)"
+                @click.stop="onSewingHoleClick(rowIndex, sh.uid, $event)"
                 :title="
                   isSewingSelected(sewingKey(rowIndex, sh.uid))
                     ? 'Selected'
@@ -450,7 +456,7 @@
                   onEnd: endDragFeedback,
                 }"
                 @contextmenu.prevent="openHoleMenu($event, rowIndex, hole.uid)"
-                @click.stop="onHoleClick(rowIndex, hole.uid)"
+                @click.stop="onHoleClick(rowIndex, hole.uid, $event)"
                 :title="
                   isSelected(holeKey(rowIndex, hole.uid))
                     ? 'Selected'
@@ -1597,6 +1603,7 @@ export default {
   const selectedSupportIds = ref(new Set()); // supports (by id/index)
   const selectingMode = ref(false);
   const postSelectMode = ref(false);
+  const showHoleHint = ref(true);
   const selectedCount = computed(
       () => selectedKeys.value.size + selectedSewingKeys.value.size + selectedSupportIds.value.size
     );
@@ -1618,13 +1625,27 @@ export default {
     selectedSewingKeys.value = new Set();
     selectedSupportIds.value = new Set();
   };
-  function onHoleClick(rowIndex, uid) {
-    if (!selectingMode.value) return;
-    toggleSelected(holeKey(rowIndex, uid));
+  function ensureSelectingMode() {
+    if (!selectingMode.value) {
+      selectingMode.value = true;
+      postSelectMode.value = false;
+    }
   }
-  function onSewingHoleClick(rowIndex, uid) {
+  function onHoleClick(rowIndex, uid, evt) {
+    const key = holeKey(rowIndex, uid);
+    if (evt && evt.shiftKey) {
+      ensureSelectingMode();
+    }
     if (!selectingMode.value) return;
-    toggleSewingSelected(sewingKey(rowIndex, uid));
+    toggleSelected(key);
+  }
+  function onSewingHoleClick(rowIndex, uid, evt) {
+    const key = sewingKey(rowIndex, uid);
+    if (evt && evt.shiftKey) {
+      ensureSelectingMode();
+    }
+    if (!selectingMode.value) return;
+    toggleSewingSelected(key);
   }
   function onSupportClick(index) {
     if (!selectingMode.value) return;
@@ -2231,6 +2252,10 @@ export default {
     }
     onMounted(() => {
       window.addEventListener('contextmenu', onGlobalContextMenu, true);
+      // Show initial hole‑interaction hint for the first 5 seconds
+      setTimeout(() => {
+        showHoleHint.value = false;
+      }, 5000);
     });
     onUnmounted(() => {
       window.removeEventListener('contextmenu', onGlobalContextMenu, true);
@@ -2352,7 +2377,7 @@ export default {
       postSelectMode.value = false;
       clearSelected();
     }
-    function exitPostSelect() {
+  function exitPostSelect() {
       menu.visible = false;
       clearSelection();
     }
@@ -4220,6 +4245,9 @@ export default {
       cancelRecolor,
       confirmRecolor,
       recolorHeading,
+
+      // UI hints
+      showHoleHint,
 
       // pens
       pens,
