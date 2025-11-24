@@ -20,9 +20,7 @@ const routes = [
       location: route.query.location,
       shelfmark: route.query.shelfmark,
 
-      // ✅ Important: pass foliosPerQuire (what InputScreen sends)
       foliosPerQuire: Number(route.query.foliosPerQuire),
-      // keep this for older links (optional)
       leavesPerQuire: Number(route.query.leavesPerQuire),
 
       quires: Number(route.query.quires),
@@ -35,20 +33,19 @@ const routes = [
       changeOver: route.query.changeOver === 'true',
       spineLength: Number(route.query.spineLength),
 
-      // passthroughs if present
       quiresStyle: route.query.quiresStyle,
       sewingType: route.query.sewingType,
     })
   },
 
-  // 🔹 New: ruling metadata screen
+  // Ruling metadata screen
   {
     path: '/ruling-metadata',
     name: 'rulingMetadata',
     component: RulingMetadataScreen,
   },
 
-  // 🔹 New: ruling screen (takes metadata as props)
+  // Ruling screen (takes metadata as props)
   {
     path: '/ruling',
     name: 'ruling',
@@ -59,6 +56,8 @@ const routes = [
       folio: route.query.folio || '',
       widthCm: Number(route.query.widthCm) || 15,
       heightCm: Number(route.query.heightCm) || 20,
+      tool: route.query.tool || 'dry-point',
+      direction: route.query.direction || 'none',
     }),
   },
 ]

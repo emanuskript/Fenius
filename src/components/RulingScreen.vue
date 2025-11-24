@@ -11,9 +11,11 @@
         <div class="title-block">
           <h1>Manuscript pricking &amp; ruling schema</h1>
           <small class="muted">
-            {{ shelfmark || "—" }} • {{ siglum || "—" }} • folio
-            {{ folio || "—" }} • {{ widthCm }}×{{ heightCm }} cm • Zoom
-            {{ zoomPercent }}%
+            {{ shelfmark || "—" }}
+            • {{ siglum || "—" }}
+            • folio {{ folio || "—" }}
+            • {{ widthCm }}×{{ heightCm }} cm
+            • Zoom {{ zoomPercent }}%
           </small>
         </div>
         <div class="actions">
@@ -160,83 +162,8 @@
           </footer>
         </section>
 
-        <!-- RIGHT: CONTROLS -->
+        <!-- RIGHT: CONTROLS (no metadata here anymore) -->
         <aside class="column controls">
-          <!-- METADATA -->
-          <div class="card">
-            <h3>Metadata</h3>
-            <ul class="form">
-              <li>
-                <label>Manuscript shelfmark</label>
-                <input
-                  v-model="shelfmark"
-                  placeholder=""
-                  title="Library/collection shelfmark"
-                />
-              </li>
-              <li>
-                <label>Siglum / Code</label>
-                <input
-                  v-model="siglum"
-                  placeholder=""
-                  title="Other MS designation or code"
-                />
-              </li>
-              <li>
-                <label>Folio or page</label>
-                <input
-                  v-model="folio"
-                  placeholder=""
-                  title="Folio (or page) reference"
-                />
-              </li>
-              <li>
-                <label>Ruling tool</label>
-                <select v-model="tool" title="Dry-point, lead-point, or ink">
-                  <option value="dry-point">dry-point</option>
-                  <option value="lead-point">lead-point</option>
-                  <option value="ink">ink</option>
-                </select>
-              </li>
-              <li>
-                <label>Direction</label>
-                <select v-model="direction" title="Direction of ruling tool">
-                  <option value=">">&gt;</option>
-                  <option value="<">&lt;</option>
-                  <option value="none">none</option>
-                </select>
-              </li>
-              <li class="split">
-                <div>
-                  <label>Width (cm)</label>
-                  <input
-                    type="number"
-                    min="1"
-                    step="0.1"
-                    v-model.number="widthCm"
-                  />
-                </div>
-                <div>
-                  <label>Height (cm)</label>
-                  <input
-                    type="number"
-                    min="1"
-                    step="0.1"
-                    v-model.number="heightCm"
-                  />
-                </div>
-                <div class="apply">
-                  <button
-                    @click="applySize"
-                    title="Apply page size and redraw rulers"
-                  >
-                    Apply
-                  </button>
-                </div>
-              </li>
-            </ul>
-          </div>
-
           <!-- MODE -->
           <div class="card">
             <h3>Mode</h3>
@@ -422,6 +349,8 @@ const props = defineProps({
   folio: { type: String, default: "" },
   widthCm: { type: Number, default: 15 },
   heightCm: { type: Number, default: 20 },
+  tool: { type: String, default: "dry-point" },
+  direction: { type: String, default: "none" },
 });
 
 /* --------------------- Constants & helpers --------------------- */
@@ -436,8 +365,8 @@ const snapVal = (v, step) => Math.round(v / step) * step;
 const shelfmark = ref(props.shelfmark || "");
 const siglum = ref(props.siglum || "");
 const folio = ref(props.folio || "");
-const tool = ref("dry-point");
-const direction = ref("none");
+const tool = ref(props.tool || "dry-point");
+const direction = ref(props.direction || "none");
 
 const widthCm = ref(props.widthCm || 15);
 const heightCm = ref(props.heightCm || 20);
@@ -655,11 +584,6 @@ function setErase() {
 }
 
 /* --------------------- Event handlers --------------------- */
-function applySize() {
-  widthCm.value = clamp(widthCm.value || 1, 1, 1000);
-  heightCm.value = clamp(heightCm.value || 1, 1, 1000);
-  nextTickRedraw();
-}
 
 function snapPoint(cm) {
   if (!snapEnabled.value) return cm;
@@ -906,8 +830,8 @@ function restoreSchema() {
     shelfmark.value = data.meta?.shelfmark || shelfmark.value;
     siglum.value = data.meta?.siglum || siglum.value;
     folio.value = data.meta?.folio || folio.value;
-    tool.value = data.meta?.tool || "dry-point";
-    direction.value = data.meta?.direction || "none";
+    tool.value = data.meta?.tool || tool.value;
+    direction.value = data.meta?.direction || direction.value;
     widthCm.value = data.meta?.widthCm || widthCm.value;
     heightCm.value = data.meta?.heightCm || heightCm.value;
 
@@ -1004,10 +928,6 @@ function download() {
 }
 
 /* --------------------- Lifecycle & utilities --------------------- */
-function nextTickRedraw() {
-  // small async to let canvas size attrs settle
-  requestAnimationFrame(() => requestAnimationFrame(redrawAll));
-}
 
 onMounted(() => {
   redrawAll();
