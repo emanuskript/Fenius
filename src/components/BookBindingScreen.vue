@@ -12,10 +12,8 @@
     <!-- METADATA BREADCRUMB -->
     <div class="breadcrumb">
       <div class="breadcrumb-text">
-        <span v-if="manuscriptDate">{{ manuscriptDate }}</span>
-        <span v-if="title">
-          <span v-if="manuscriptDate">, </span>{{ title }}
-        </span>
+        {{ title }}
+        <span v-if="manuscriptDate">, {{ manuscriptDate }}</span>
         <span v-if="shelfmark">, {{ shelfmark }}</span>
         <span v-if="location">, {{ location }}</span>
       </div>
@@ -60,13 +58,6 @@
       <div class="breadcrumb-pen-controls">
         <!-- This div maintains the grid layout balance -->
       </div>
-    </div>
-
-    <!-- Initial hint: hole interactions -->
-    <div v-if="showHoleHint" class="selection-bar">
-      <span>
-        You can right‑click on any hole to select, recolor, or delete it. Hold Shift and click holes to select multiple.
-      </span>
     </div>
 
     <!-- Selection bars -->
@@ -425,7 +416,7 @@
                   onEnd: endDragFeedback,
                 }"
                 @contextmenu.prevent="openSewingMenu($event, rowIndex, sh.uid)"
-                @click.stop="onSewingHoleClick(rowIndex, sh.uid, $event)"
+                @click.stop="onSewingHoleClick(rowIndex, sh.uid)"
                 :title="
                   isSewingSelected(sewingKey(rowIndex, sh.uid))
                     ? 'Selected'
@@ -456,7 +447,7 @@
                   onEnd: endDragFeedback,
                 }"
                 @contextmenu.prevent="openHoleMenu($event, rowIndex, hole.uid)"
-                @click.stop="onHoleClick(rowIndex, hole.uid, $event)"
+                @click.stop="onHoleClick(rowIndex, hole.uid)"
                 :title="
                   isSelected(holeKey(rowIndex, hole.uid))
                     ? 'Selected'
@@ -709,14 +700,11 @@
     <!-- Export Popup -->
     <div v-if="showExportPopup" class="overlay">
       <div class="popup">
-        <h3>Export Diagram</h3>
+        <h3>Save as PDF?</h3>
         <div class="popup-actions">
-          <button class="popup-btn" @click="previewPDF">Preview PDF</button>
-          <button class="popup-btn" @click="exportToPDF">
-            Download PDF
-          </button>
-          <button class="popup-btn confirm" @click="exportAsJSON">
-            Download JSON
+          <button class="popup-btn" @click="previewPDF">Preview</button>
+          <button class="popup-btn confirm" @click="exportToPDF">
+            Confirm
           </button>
           <button class="popup-btn cancel" @click="showExportPopup = false">
             Cancel
@@ -1606,7 +1594,6 @@ export default {
   const selectedSupportIds = ref(new Set()); // supports (by id/index)
   const selectingMode = ref(false);
   const postSelectMode = ref(false);
-  const showHoleHint = ref(true);
   const selectedCount = computed(
       () => selectedKeys.value.size + selectedSewingKeys.value.size + selectedSupportIds.value.size
     );
@@ -1628,27 +1615,13 @@ export default {
     selectedSewingKeys.value = new Set();
     selectedSupportIds.value = new Set();
   };
-  function ensureSelectingMode() {
-    if (!selectingMode.value) {
-      selectingMode.value = true;
-      postSelectMode.value = false;
-    }
-  }
-  function onHoleClick(rowIndex, uid, evt) {
-    const key = holeKey(rowIndex, uid);
-    if (evt && evt.shiftKey) {
-      ensureSelectingMode();
-    }
+  function onHoleClick(rowIndex, uid) {
     if (!selectingMode.value) return;
-    toggleSelected(key);
+    toggleSelected(holeKey(rowIndex, uid));
   }
-  function onSewingHoleClick(rowIndex, uid, evt) {
-    const key = sewingKey(rowIndex, uid);
-    if (evt && evt.shiftKey) {
-      ensureSelectingMode();
-    }
+  function onSewingHoleClick(rowIndex, uid) {
     if (!selectingMode.value) return;
-    toggleSewingSelected(key);
+    toggleSewingSelected(sewingKey(rowIndex, uid));
   }
   function onSupportClick(index) {
     if (!selectingMode.value) return;
@@ -2255,10 +2228,6 @@ export default {
     }
     onMounted(() => {
       window.addEventListener('contextmenu', onGlobalContextMenu, true);
-      // Show initial hole‑interaction hint for the first 5 seconds
-      setTimeout(() => {
-        showHoleHint.value = false;
-      }, 5000);
     });
     onUnmounted(() => {
       window.removeEventListener('contextmenu', onGlobalContextMenu, true);
@@ -2380,7 +2349,7 @@ export default {
       postSelectMode.value = false;
       clearSelected();
     }
-  function exitPostSelect() {
+    function exitPostSelect() {
       menu.visible = false;
       clearSelection();
     }
@@ -2509,7 +2478,7 @@ export default {
     const penTooltip = (p) => `Color: ${p.color} • Type: ${p.type} • Style: ${p.style}`;
 
     // Vector strokes so we can recolor later
-    const strokes = ref([]); // [{ id, tool:'pen'|'eraser', type:'straight'|'freehand'|'eraser'|'bow-*'|'debris', style, color, ... }]
+    const strokes = ref([]); // [{ id, tool:'pen'|'eraser', type:'straight'|'freehand'|'eraser', style, color, width, points:[{x,y}], start:{x,y}, end:{x,y} }];
     let strokeSeq = 1;
     let currentStroke = null; // working object while drawing
 
@@ -3691,142 +3660,6 @@ export default {
         console.error("Preview failed:", e);
       }
     }
-    function buildExportJson() {
-      try {
-        const meta = {
-          title: props.title || null,
-          location: props.location || null,
-          shelfmark: props.shelfmark || null,
-          manuscriptDate: props.manuscriptDate || null,
-          quires: num(props.quires, 0),
-          foliosPerQuire: num(
-            props.foliosPerQuire,
-            num(props.leavesPerQuire, 0)
-          ),
-          frontEndleaves: num(props.frontEndleaves, 0),
-          backEndleaves: num(props.backEndleaves, 0),
-          sewingSupports: num(props.sewingSupports, 0),
-          headbands: !!props.headbands,
-          changeOver: !!props.changeOver,
-          spineLengthCm: totalCmNumber.value || 0,
-          collationStyle: props.collationStyle || null,
-          sewingType: props.sewingType || null,
-        };
-
-        const tableRows = rows.value.map((r, index) => ({
-          index,
-          roman: rowsManual[index]?.roman ?? r.roman,
-          range: rowsManual[index]?.range ?? r.range,
-          note: notes[index] ?? "",
-        }));
-
-        const headbandsExport = {
-          left: [...headbandLeftPositions],
-          right: [...headbandRightPositions],
-        };
-
-        const supportsExport = supportEntries.map((s) => ({
-          id: s.id,
-          position: s.position,
-          color: s.color,
-          type: s.type || (isDoubleSupport.value ? "double" : "single"),
-        }));
-
-        const changeOversExport = changeHolesByRow.value.map((row, rowIndex) =>
-          row.map((h) => ({
-            rowIndex,
-            uid: h.uid,
-            position: h.position,
-            color: h.color,
-          }))
-        );
-
-        const sewingHolesExport = sewingHolesByRow.value.map(
-          (row, rowIndex) =>
-            row.map((h) => ({
-              rowIndex,
-              uid: h.uid,
-              position: h.position,
-              color: h.color,
-              supportId: h.supportId ?? null,
-              role: h.role || "side",
-            }))
-        );
-
-        const knotsExport = knotEntries.map((k) => ({
-          id: k.id,
-          xPercent: k.x,
-          yPercent: k.y,
-          color: k.color,
-          size: k.size,
-        }));
-
-        const rupturesExport = ruptureEntries.map((r) => ({
-          id: r.id,
-          xPercent: r.x,
-          yPercent: r.y,
-          color: r.color,
-          size: r.size,
-        }));
-
-        const strokesExport = strokes.value.map((s) => ({
-          id: s.id,
-          tool: s.tool,
-          type: s.type,
-          style: s.style,
-          color: s.color,
-          width: s.width,
-          start: s.start || null,
-          end: s.end || null,
-          points: s.points || null,
-          broken: !!s.broken,
-          breakStart: !!s.breakStart,
-          breakEnd: !!s.breakEnd,
-          knots: s.knots || null,
-          center: s.center || null,
-          size: s.size || null,
-          layer: s.layer || null,
-        }));
-
-        return {
-          metadata: meta,
-          rows: tableRows,
-          headbands: headbandsExport,
-          supports: supportsExport,
-          changeOvers: changeOversExport,
-          sewingHoles: sewingHolesExport,
-          knots: knotsExport,
-          ruptures: rupturesExport,
-          strokes: strokesExport,
-        };
-      } catch (e) {
-        console.error("Failed to build export JSON:", e);
-        return null;
-      }
-    }
-
-    function exportAsJSON() {
-      const payload = buildExportJson();
-      if (!payload) return;
-      try {
-        const fileName =
-          (props.title && String(props.title).trim()) || "Untitled";
-        const json = JSON.stringify(payload, null, 2);
-        const blob = new Blob([json], { type: "application/json" });
-        const url = URL.createObjectURL(blob);
-        const a = document.createElement("a");
-        a.href = url;
-        a.download = `${fileName}.json`;
-        document.body.appendChild(a);
-        a.click();
-        a.remove();
-        URL.revokeObjectURL(url);
-      } catch (e) {
-        console.error("JSON export failed:", e);
-        alert("JSON export failed. Please check the console for details.");
-      }
-    }
-
     async function exportToPDF() {
       try {
         const target = tableContainer.value || document.querySelector(".bookbinding-screen");
@@ -3860,33 +3693,12 @@ export default {
         );
         const hasPens = pens.value.length > 0;
 
-        // Count knots/ruptures from both free‑floating icons and direct line edits
-        const getLegendKnotCount = () => {
-          let count = knotEntries.length;
-          // Each 'bow-center' stroke corresponds to one knot on a straight line
-          for (const s of strokes.value) {
-            if (s.type === "bow-center") count++;
-            if (Array.isArray(s.knots)) count += s.knots.length;
-          }
-          return count;
-        };
-        const getLegendRuptureCount = () => {
-          let count = ruptureEntries.length;
-          // Each broken segment that starts after a gap represents one rupture
-          for (const s of strokes.value) {
-            if (s.broken && s.breakStart) count++;
-          }
-          return count;
-        };
-        const knotLegendCount = getLegendKnotCount();
-        const ruptureLegendCount = getLegendRuptureCount();
-
         const rowsLegend = [];
         if (hasHeadbands) rowsLegend.push({ kind: "headband" });
         if (hasSupports) rowsLegend.push({ kind: "support" });
         if (hasChangeovers) rowsLegend.push({ kind: "changeover" });
-        if (knotLegendCount > 0) rowsLegend.push({ kind: "knot", count: knotLegendCount });
-        if (ruptureLegendCount > 0) rowsLegend.push({ kind: "rupture", count: ruptureLegendCount });
+        if (knotEntries.length > 0) rowsLegend.push({ kind: "knot", count: knotEntries.length });
+        if (ruptureEntries.length > 0) rowsLegend.push({ kind: "rupture", count: ruptureEntries.length });
 
         const headerH = 16;
         const sectionH = 14;
@@ -3908,23 +3720,14 @@ export default {
         if (props.location) metaItems.push(["City/Repository", String(props.location)]);
         if (props.shelfmark) metaItems.push(["Shelfmark", String(props.shelfmark)]);
         if (props.manuscriptDate) metaItems.push(["Date", String(props.manuscriptDate)]);
-
-        // Structural metadata from the same inputs that drive the table
-        const qCount = Math.max(0, num(props.quires, 0));
-        if (qCount > 0) metaItems.push(["Number of Quires", String(qCount)]);
-
-        const foliosPerQ = Math.max(
-          0,
-          num(props.foliosPerQuire, num(props.leavesPerQuire, 0))
-        );
-        if (foliosPerQ > 0)
-          metaItems.push(["Folios per Quire", String(foliosPerQ)]);
-
-        if (totalCmNumber.value)
-          metaItems.push([
-            "Spine Length (cm)",
-            totalCmNumber.value.toFixed(1),
-          ]);
+        if (rows.value.length > 0) metaItems.push(["Number of Quires", String(rows.value.length)]);
+        if (rows.value[0] && rows.value[0].range) {
+          const folioCounts = rows.value.map(r => (r.range.split('-').length - 1)).filter(c => c > 0);
+          if (folioCounts.length > 0) {
+            metaItems.push(["Folios per Quire", String(Math.max(...folioCounts))]);
+          }
+        }
+        if (totalCmNumber.value) metaItems.push(["Spine Length (cm)", totalCmNumber.value.toFixed(1)]);
         const metaBoxH = metaItems.length
           ? headerH + padY + metaItems.length * lineH + padY
           : 0;
@@ -4041,44 +3844,21 @@ export default {
               pdf.circle(iconX + 8, rowY - 5, 4, "FD");
               drawLabel(labelX, "Change‑over station (dot)");
             } else if (item.kind === "knot") {
-              // Stylised knotted sewing line: short line with a bulge in the centre
-              const lineY = rowY - 4;
-              const startX = iconX;
-              const endX = iconX + 34;
-              const knotX = (startX + endX) / 2;
-
-              pdf.setDrawColor(34, 34, 34);
-              pdf.setLineWidth(1.2);
-              // Left half of line
-              pdf.line(startX, lineY, knotX - 3, lineY);
-              // Right half of line
-              pdf.line(knotX + 3, lineY, endX, lineY);
-              // Small loop/bulge to suggest a knot
-              pdf.circle(knotX, lineY, 3, "S");
-
-              drawLabel(
-                labelX,
-                `Knot on sewing line${item.count ? ` (${item.count})` : ""}`
-              );
+              // Large filled circle for knots
+              pdf.setFillColor(255, 107, 71);
+              pdf.setDrawColor(200, 70, 40);
+              pdf.circle(iconX + 8, rowY - 4, 6, "FD");
+              drawLabel(labelX, `Bow/Knot (${item.count})`);
             } else if (item.kind === "rupture") {
-              // Stylised rupture: line with a clean break and offset ends
-              const lineY = rowY - 4;
-              const startX = iconX;
-              const endX = iconX + 34;
-              const gapLeft = startX + 12;
-              const gapRight = endX - 12;
-
-              pdf.setDrawColor(34, 34, 34);
-              pdf.setLineWidth(1.2);
-              // Left segment
-              pdf.line(startX, lineY, gapLeft, lineY);
-              // Right segment slightly shifted to suggest misalignment
-              pdf.line(gapRight, lineY + 1.5, endX, lineY + 1.5);
-
-              drawLabel(
-                labelX,
-                `Rupture in sewing line${item.count ? ` (${item.count})` : ""}`
-              );
+              // Large circle with X pattern for ruptures
+              pdf.setFillColor(255, 107, 71);
+              pdf.setDrawColor(200, 70, 40);
+              pdf.circle(iconX + 8, rowY - 4, 6, "FD");
+              pdf.setDrawColor(255, 255, 255);
+              pdf.setLineWidth(0.8);
+              pdf.line(iconX + 2, rowY - 10, iconX + 14, rowY + 2);
+              pdf.line(iconX + 14, rowY - 10, iconX + 2, rowY + 2);
+              drawLabel(labelX, `Sewing rupture (${item.count})`);
             }
             rowY += lineH;
           }
@@ -4385,9 +4165,6 @@ export default {
       confirmRecolor,
       recolorHeading,
 
-      // UI hints
-      showHoleHint,
-
       // pens
       pens,
       activePenId,
@@ -4420,7 +4197,6 @@ export default {
 
       previewPDF,
       exportToPDF,
-      exportAsJSON,
     };
   },
 };

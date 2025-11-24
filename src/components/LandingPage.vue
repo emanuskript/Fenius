@@ -8,7 +8,13 @@
 
     <!-- Buttons -->
     <div class="button-group">
-      <button @click="goToInputScreen" class="action-button">Create new</button>
+      <button @click="goToBookbinding" class="action-button">
+        Create New Bookbinding
+      </button>
+
+      <button @click="goToRuling" class="action-button">
+        Create New Ruling
+      </button>
 
       <label class="action-button cursor-pointer text-center">
         Import from VCEditor (JSON)
@@ -28,8 +34,12 @@ import { useRouter } from "vue-router";
 
 const router = useRouter();
 
-function goToInputScreen() {
+function goToBookbinding() {
   router.push("/input-screen");
+}
+
+function goToRuling() {
+  router.push({ name: "rulingMetadata" });
 }
 
 function handleFileUpload(event) {
