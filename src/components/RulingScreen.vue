@@ -1,393 +1,461 @@
 <template>
   <div class="ruling-page">
-    <!-- FENIUS header -->
+    <!-- Header -->
     <div class="header-bar">eManuskript Produkt</div>
     <div class="title">FENIUS</div>
 
-    <!-- Main container -->
-    <div class="ruling-container">
-      <!-- TOP BAR -->
-      <header class="topbar card">
-        <div class="title-block">
-          <h1>Manuscript pricking &amp; ruling schema</h1>
-          <small class="muted">
-            {{ shelfmark || "—" }}
-            • {{ siglum || "—" }}
-            • folio {{ folio || "—" }}
-            • {{ widthCm }}×{{ heightCm }} cm
-            • Zoom {{ zoomPercent }}%
-          </small>
-        </div>
-        <div class="actions">
-          <button @click="saveSchema" title="Save to localStorage (Ctrl/Cmd+S)">
-            Save
-          </button>
-          <button @click="restoreSchema" title="Restore from localStorage">
-            Restore
-          </button>
-          <button @click="clearSchema" title="Clear all lines &amp; prickings">
-            Reset
-          </button>
-          <button
-            class="primary"
-            @click="download"
-            title="Export as A4 PDF"
-          >
-            Export PDF
-          </button>
-        </div>
-      </header>
+    <!-- Compact metadata summary -->
+    <div class="meta-summary">
+      <div class="meta-left">
+        <span class="meta-item"><strong>Shelfmark:</strong> {{ shelfmark || "—" }}</span>
+        <span class="meta-item"><strong>Siglum:</strong> {{ siglum || "—" }}</span>
+        <span class="meta-item"><strong>Folio:</strong> {{ folio || "—" }}</span>
+      </div>
+      <div class="meta-center">
+        <span>{{ widthCm }} × {{ heightCm }} cm</span>
+        <span>• {{ tool }}</span>
+        <span>• {{ direction }}</span>
+      </div>
+      <div class="meta-right">
+        <span class="mode-pill">Mode: {{ modeLabel }}</span>
+      </div>
+    </div>
 
-      <div class="layout">
-        <!-- LEFT: CANVAS STAGE -->
-        <section class="column stage card">
-          <div class="stage-header">
-            <div class="left">
-              <label class="inline">
-                <span>Zoom</span>
-                <select
-                  v-model.number="zoom"
-                  @change="redrawAll"
-                  title="Zoom level"
-                >
-                  <option :value="0.5">50%</option>
-                  <option :value="0.75">75%</option>
-                  <option :value="1">100%</option>
-                  <option :value="1.5">150%</option>
-                  <option :value="2">200%</option>
-                </select>
-              </label>
-              <label class="inline">
-                <input
-                  type="checkbox"
-                  v-model="snapEnabled"
-                  @change="redrawAll"
-                />
-                <span>Snap</span>
-              </label>
-              <label class="inline" :class="{ disabled: !snapEnabled }">
-                <span>step</span>
-                <input
-                  id="snapStep"
-                  type="number"
-                  min="0.05"
-                  step="0.05"
-                  v-model.number="snapStepCm"
-                  :disabled="!snapEnabled"
-                  @change="redrawAll"
-                />
-                <span>cm</span>
-              </label>
-            </div>
-            <div class="right">
-              <label class="inline">
-                <input
-                  type="checkbox"
-                  v-model="showImage"
-                  @change="redrawAll"
-                />
-                <span>Image</span>
-              </label>
-              <label class="inline" :class="{ disabled: !showImage }">
-                <span>opacity</span>
-                <input
-                  type="range"
-                  min="0"
-                  max="1"
-                  step="0.05"
-                  v-model.number="imageOpacity"
-                  :disabled="!showImage"
-                  @input="redrawAll"
-                />
-              </label>
-            </div>
+    <!-- Main layout -->
+    <div class="ruling-layout">
+      <!-- LEFT SIDEBAR: basic tools -->
+      <aside class="side side-left">
+        <!-- Mode -->
+        <section class="panel">
+          <h3>Mode</h3>
+          <div class="mode-buttons">
+            <button :class="{ active: mode === 'draw' }" @click="setMode('draw')">Draw</button>
+            <button :class="{ active: mode === 'erase' }" @click="setMode('erase')">Erase</button>
+            <button :class="{ active: mode === 'select' }" @click="setMode('select')">Select</button>
           </div>
-
-          <!-- Canvas stack (zoom via CSS scale, origin top-left) -->
-          <div
-            class="canvas-wrap"
-            :style="{
-              transform: `scale(${zoom})`,
-              width: baseWidthPx + 15 + 'px',
-              height: baseHeightPx + 15 + 'px',
-            }"
-            @mousemove="moveLines"
-            @click="create_click"
-          >
-            <!-- Rulers + axes canvas (includes the 15px top/left gutters) -->
-            <canvas
-              ref="rulers"
-              :width="baseWidthPx + 15"
-              :height="baseHeightPx + 15"
-              class="layer layer-rulers"
-            ></canvas>
-
-            <!-- Background image (hidden if not shown) -->
-            <canvas
-              ref="bg"
-              :width="baseWidthPx"
-              :height="baseHeightPx"
-              class="layer layer-image"
-              :style="{
-                top: '15px',
-                left: '15px',
-                opacity: showImage ? imageOpacity : 0,
-                display: showImage ? 'block' : 'none',
-              }"
-            ></canvas>
-
-            <!-- Main drawing layer -->
-            <canvas
-              ref="draw"
-              :width="baseWidthPx"
-              :height="baseHeightPx"
-              class="layer layer-draw"
-              style="top: 15px; left: 15px"
-            ></canvas>
-
-            <!-- Crosshair guides (DOM, not canvas) -->
-            <div ref="hGuide" class="guide-h" v-show="showGuides"></div>
-            <div ref="vGuide" class="guide-v" v-show="showGuides"></div>
+          <div class="btn-row">
+            <button @click="undo" :disabled="!canUndo">Undo</button>
+            <button @click="redo" :disabled="!canRedo">Redo</button>
           </div>
-
-          <!-- Status bar -->
-          <footer class="status">
-            <div>
-              pos: {{ cursorCm.x.toFixed(2) }}cm,
-              {{ cursorCm.y.toFixed(2) }}cm
-            </div>
-            <div>mode: <b>{{ eraseMode ? "Erase" : "Draw" }}</b></div>
-            <div>zoom: {{ zoomPercent }}%</div>
-            <div>items: {{ lines.length }} lines, {{ prickings.length }} pricks</div>
-          </footer>
+          <p class="hint">
+            Click on rulers to add lines, inside the page to add prickings.
+          </p>
         </section>
 
-        <!-- RIGHT: CONTROLS (no metadata here anymore) -->
-        <aside class="column controls">
-          <!-- MODE -->
-          <div class="card">
-            <h3>Mode</h3>
-            <div class="btnrow">
-              <button :class="{ active: !eraseMode }" @click="setDraw" title="D">
-                Draw
-              </button>
-              <button :class="{ active: eraseMode }" @click="setErase" title="E">
-                Erase
-              </button>
+        <!-- Lines -->
+        <section class="panel">
+          <h3>Lines</h3>
+          <h4>Single line</h4>
+          <div class="field-row two">
+            <div>
+              <label class="field-label">start x (cm)</label>
+              <input type="number" step="0.1" v-model.number="start_x" class="number-input" />
             </div>
-            <small class="muted">
-              Click top ruler to add vertical line; left ruler for horizontal; on
-              page for a pricking.
-            </small>
+            <div>
+              <label class="field-label">end x (cm)</label>
+              <input type="number" step="0.1" v-model.number="end_x" class="number-input" />
+            </div>
+          </div>
+          <div class="field-row two">
+            <div>
+              <label class="field-label">start y (cm)</label>
+              <input type="number" step="0.1" v-model.number="start_y" class="number-input" />
+            </div>
+            <div>
+              <label class="field-label">end y (cm)</label>
+              <input type="number" step="0.1" v-model.number="end_y" class="number-input" />
+            </div>
+          </div>
+          <button class="small-btn" @click="addSingleLine">Add line</button>
+
+          <h4>Multiple horizontals</h4>
+          <div class="field-row three">
+            <div>
+              <label class="field-label">start x</label>
+              <input type="number" step="0.1" v-model.number="start_x2" class="number-input" />
+            </div>
+            <div>
+              <label class="field-label">end x</label>
+              <input type="number" step="0.1" v-model.number="end_x2" class="number-input" />
+            </div>
+            <div>
+              <label class="field-label">#</label>
+              <input type="number" min="1" step="1" v-model.number="number" class="number-input" />
+            </div>
+          </div>
+          <div class="field-row two">
+            <div>
+              <label class="field-label">start y</label>
+              <input type="number" step="0.1" v-model.number="start_y2" class="number-input" />
+            </div>
+            <div>
+              <label class="field-label">end y</label>
+              <input type="number" step="0.1" v-model.number="end_y2" class="number-input" />
+            </div>
+          </div>
+          <button class="small-btn" @click="addMultipleLines">Add series</button>
+        </section>
+
+        <!-- Prickings -->
+        <section class="panel">
+          <h3>Prickings</h3>
+          <h4>Single pricking</h4>
+          <div class="field-row two">
+            <div>
+              <label class="field-label">x (cm)</label>
+              <input type="number" step="0.1" v-model.number="hor" class="number-input" />
+            </div>
+            <div>
+              <label class="field-label">y (cm)</label>
+              <input type="number" step="0.1" v-model.number="ver" class="number-input" />
+            </div>
+          </div>
+          <button class="small-btn" @click="addSinglePricking">Add pricking</button>
+
+          <h4>Vertical group</h4>
+          <div class="field-row three">
+            <div>
+              <label class="field-label">x</label>
+              <input type="number" step="0.1" v-model.number="hor2" class="number-input" />
+            </div>
+            <div>
+              <label class="field-label">#</label>
+              <input type="number" min="1" step="1" v-model.number="number2" class="number-input" />
+            </div>
+            <div>
+              <label class="field-label">start y</label>
+              <input type="number" step="0.1" v-model.number="start_y3" class="number-input" />
+            </div>
+          </div>
+          <div class="field-row">
+            <div>
+              <label class="field-label">end y</label>
+              <input type="number" step="0.1" v-model.number="end_y3" class="number-input" />
+            </div>
+          </div>
+          <button class="small-btn" @click="addMultiplePrickings">Add group</button>
+        </section>
+      </aside>
+
+      <!-- CENTER: canvas -->
+      <main class="center">
+        <div class="stage-header">
+          <div class="inline-group">
+            <label class="inline">
+              <span>Zoom</span>
+              <select v-model.number="zoom" @change="redrawAll">
+                <option :value="0.75">75%</option>
+                <option :value="1">100%</option>
+                <option :value="1.5">150%</option>
+                <option :value="2">200%</option>
+              </select>
+            </label>
+            <label class="inline">
+              <input type="checkbox" v-model="snapEnabled" @change="redrawAll" />
+              <span>Snap</span>
+            </label>
+            <label class="inline" :class="{ disabled: !snapEnabled }">
+              <span>step</span>
+              <input
+                type="number"
+                min="0.05"
+                step="0.05"
+                v-model.number="snapStepCm"
+                :disabled="!snapEnabled"
+                @change="redrawAll"
+              />
+              <span>cm</span>
+            </label>
+          </div>
+          <div class="inline-group">
+            <label class="inline">
+              <input type="checkbox" v-model="showImage" @change="redrawAll" />
+              <span>Image</span>
+            </label>
+            <label class="inline" :class="{ disabled: !showImage }">
+              <span>opacity</span>
+              <input
+                type="range"
+                min="0"
+                max="1"
+                step="0.05"
+                v-model.number="imageOpacity"
+                :disabled="!showImage"
+                @input="redrawAll"
+              />
+            </label>
+          </div>
+        </div>
+
+        <div
+          class="canvas-wrap"
+          ref="canvasWrap"
+          :style="{
+            transform: `scale(${zoom})`,
+            width: baseWidthPxPlusGutter + 'px',
+            height: baseHeightPxPlusGutter + 'px'
+          }"
+          @mousemove="moveGuides"
+          @mouseleave="hideGuides"
+          @click="handleCanvasClick"
+        >
+          <!-- Rulers -->
+          <canvas
+            ref="rulers"
+            :width="baseWidthPxPlusGutter"
+            :height="baseHeightPxPlusGutter"
+            class="layer layer-rulers"
+          ></canvas>
+
+          <!-- Background image -->
+          <canvas
+            ref="bg"
+            :width="baseWidthPx"
+            :height="baseHeightPx"
+            class="layer layer-image"
+            :style="{
+              top: '15px',
+              left: '15px',
+              opacity: showImage ? imageOpacity : 0,
+              display: showImage ? 'block' : 'none'
+            }"
+          ></canvas>
+
+          <!-- Drawing layer -->
+          <canvas
+            ref="draw"
+            :width="baseWidthPx"
+            :height="baseHeightPx"
+            class="layer layer-draw"
+            style="top: 15px; left: 15px;"
+          ></canvas>
+
+          <!-- Guides -->
+          <div ref="hGuide" class="guide-h"></div>
+          <div ref="vGuide" class="guide-v"></div>
+        </div>
+
+        <!-- Status bar -->
+        <footer class="status-bar">
+          <div>pos: {{ cursorCm.x.toFixed(2) }} cm, {{ cursorCm.y.toFixed(2) }} cm</div>
+          <div>zoom: {{ zoomPercent }}%</div>
+          <div>lines: {{ lines.length }}</div>
+          <div>prickings: {{ prickings.length }}</div>
+        </footer>
+      </main>
+
+      <!-- RIGHT SIDEBAR: selection, image, notes, export -->
+      <aside class="side side-right">
+        <!-- Selected feature -->
+        <section class="panel">
+          <h3>Selected</h3>
+          <div v-if="selectedKind === 'line' && selectedLine">
+            <label class="field-label">Type</label>
+            <select
+              class="field-input"
+              :value="selectedLine.role"
+              @change="updateSelectedLineRole($event.target.value)"
+            >
+              <option v-for="opt in lineRoleOptions" :key="opt.value" :value="opt.value">
+                {{ opt.label }}
+              </option>
+            </select>
+
+            <label class="field-inline">
+              <input
+                type="checkbox"
+                :checked="selectedLine.hypothetical"
+                @change="updateSelectedLineHypothetical($event.target.checked)"
+              />
+              hypothetical
+            </label>
+
+            <label class="field-label">Note</label>
+            <textarea
+              class="field-textarea"
+              :value="selectedLine.note"
+              @input="updateSelectedLineNote($event.target.value)"
+            ></textarea>
           </div>
 
-          <!-- RULING -->
-          <div class="card">
-            <h3>Ruling</h3>
-            <h4>Single line</h4>
-            <ul class="form compact">
-              <li class="split-2">
-                <div>
-                  <label>start x (cm)</label>
-                  <input type="number" step="0.1" v-model.number="start_x" />
-                </div>
-                <div>
-                  <label>end x (cm)</label>
-                  <input type="number" step="0.1" v-model.number="end_x" />
-                </div>
-              </li>
-              <li class="split-2">
-                <div>
-                  <label>start y (cm)</label>
-                  <input type="number" step="0.1" v-model.number="start_y" />
-                </div>
-                <div>
-                  <label>end y (cm)</label>
-                  <input type="number" step="0.1" v-model.number="end_y" />
-                </div>
-              </li>
-              <li>
-                <button @click="addSingleLine">Create</button>
-              </li>
-            </ul>
+          <div v-else-if="selectedKind === 'pricking' && selectedPricking">
+            <label class="field-label">Type</label>
+            <select
+              class="field-input"
+              :value="selectedPricking.role"
+              @change="updateSelectedPrickingRole($event.target.value)"
+            >
+              <option v-for="opt in prickingRoleOptions" :key="opt.value" :value="opt.value">
+                {{ opt.label }}
+              </option>
+            </select>
 
-            <h4>Multiple horizontal lines</h4>
-            <ul class="form compact">
-              <li class="split-3">
-                <div>
-                  <label>start x</label>
-                  <input type="number" step="0.1" v-model.number="start_x2" />
-                </div>
-                <div>
-                  <label>end x</label>
-                  <input type="number" step="0.1" v-model.number="end_x2" />
-                </div>
-                <div>
-                  <label># lines</label>
-                  <input
-                    type="number"
-                    min="1"
-                    step="1"
-                    v-model.number="number"
-                  />
-                </div>
-              </li>
-              <li class="split-2">
-                <div>
-                  <label>start y</label>
-                  <input type="number" step="0.1" v-model.number="start_y2" />
-                </div>
-                <div>
-                  <label>end y</label>
-                  <input type="number" step="0.1" v-model.number="end_y2" />
-                </div>
-              </li>
-              <li><button @click="addMultipleLines">Create</button></li>
-            </ul>
+            <label class="field-inline">
+              <input
+                type="checkbox"
+                :checked="selectedPricking.hypothetical"
+                @change="updateSelectedPrickingHypothetical($event.target.checked)"
+              />
+              hypothetical
+            </label>
+
+            <label class="field-label">Note</label>
+            <textarea
+              class="field-textarea"
+              :value="selectedPricking.note"
+              @input="updateSelectedPrickingNote($event.target.value)"
+            ></textarea>
           </div>
 
-          <!-- PRICKING -->
-          <div class="card">
-            <h3>Pricking</h3>
-            <h4>Single pricking</h4>
-            <ul class="form compact">
-              <li class="split-2">
-                <div>
-                  <label>x (cm)</label>
-                  <input type="number" step="0.1" v-model.number="hor" />
-                </div>
-                <div>
-                  <label>y (cm)</label>
-                  <input type="number" step="0.1" v-model.number="ver" />
-                </div>
-              </li>
-              <li><button @click="addSinglePricking">Create</button></li>
-            </ul>
-
-            <h4>Pricking group (vertical)</h4>
-            <ul class="form compact">
-              <li class="split-3">
-                <div>
-                  <label>x (cm)</label>
-                  <input type="number" step="0.1" v-model.number="hor2" />
-                </div>
-                <div>
-                  <label># pricks</label>
-                  <input
-                    type="number"
-                    min="1"
-                    step="1"
-                    v-model.number="number2"
-                  />
-                </div>
-                <div>
-                  <label>start y</label>
-                  <input type="number" step="0.1" v-model.number="start_y3" />
-                </div>
-              </li>
-              <li class="split-1">
-                <div>
-                  <label>end y</label>
-                  <input type="number" step="0.1" v-model.number="end_y3" />
-                </div>
-              </li>
-              <li><button @click="addMultiplePrickings">Create</button></li>
-            </ul>
+          <div v-else class="empty-selected">
+            Click near a line or pricking in <strong>Select</strong> mode.
           </div>
+        </section>
 
-          <!-- IMAGE -->
-          <div class="card">
-            <h3>Image</h3>
-            <ul class="form compact">
-              <li>
-                <input
-                  id="file"
-                  type="file"
-                  @change="handleImageUpload"
-                  accept="image/*"
-                />
-              </li>
-              <li class="btnrow">
-                <button
-                  @click="remove_bg"
-                  :disabled="!bgImage"
-                  title="Remove background image"
-                >
-                  Remove
-                </button>
-                <button
-                  @click="fitToWidth"
-                  :disabled="!bgImage"
-                  title="Fit image to page width"
-                >
-                  Fit to width
-                </button>
-              </li>
-            </ul>
+        <!-- Image -->
+        <section class="panel">
+          <h3>Image</h3>
+          <input type="file" accept="image/*" @change="handleImageUpload" class="file-input" />
+          <div class="btn-row">
+            <button @click="removeBackground" :disabled="!bgImage">Remove</button>
+            <button @click="fitToWidth" :disabled="!bgImage">Fit to width</button>
           </div>
-        </aside>
-      </div>
+        </section>
+
+        <!-- Notes -->
+        <section class="panel">
+          <h3>Notes</h3>
+          <textarea
+            class="field-textarea"
+            v-model="globalNotes"
+            placeholder="Optional comments about ruling, damage, corrections…"
+          ></textarea>
+        </section>
+
+        <!-- Export -->
+        <section class="panel">
+          <h3>Export</h3>
+          <label class="field-inline">
+            <input type="checkbox" v-model="includeImageInPdf" />
+            include image in PDF
+          </label>
+          <label class="field-inline">
+            <input type="checkbox" v-model="includeNotesInPdf" />
+            include notes in PDF
+          </label>
+          <div class="btn-row">
+            <button @click="exportPdf">PDF</button>
+            <button @click="exportJson">JSON</button>
+          </div>
+        </section>
+      </aside>
     </div>
   </div>
 </template>
 
 <script setup>
-import {
-  ref,
-  computed,
-  onMounted,
-  onBeforeUnmount,
-  watch,
-  defineProps,
-} from "vue";
+import { ref, computed, onMounted, onBeforeUnmount, watch } from "vue";
+import { useRoute } from "vue-router";
 import jsPDF from "jspdf";
 
-/* --------------------- Props (metadata from previous screen) --------------------- */
-const props = defineProps({
-  shelfmark: { type: String, default: "" },
-  siglum: { type: String, default: "" },
-  folio: { type: String, default: "" },
-  widthCm: { type: Number, default: 15 },
-  heightCm: { type: Number, default: 20 },
-  tool: { type: String, default: "dry-point" },
-  direction: { type: String, default: "none" },
-});
+/* -------- Metadata from route -------- */
+const route = useRoute();
 
-/* --------------------- Constants & helpers --------------------- */
+const shelfmark = ref(route.query.shelfmark || "");
+const siglum = ref(route.query.siglum || "");
+const folio = ref(route.query.folio || "");
+const widthCm = ref(Number(route.query.widthCm) || 15);
+const heightCm = ref(Number(route.query.heightCm) || 20);
+const tool = ref(route.query.tool || "dry-point");
+const direction = ref(route.query.direction || "none");
+
+/* -------- Constants & helpers -------- */
+const PAGE_BASE_WIDTH_CM = 20;
 const PX_PER_CM = 37.8;
-const SCALE_FACTOR = 0.5; // keep your original “/2” look
-const PAGE_BASE_WIDTH_CM = 20; // base A4 width area drawn on canvas
+const SCALE_FACTOR = 0.6; // slightly larger base canvas
+const AUTOSAVE_KEY = "feniusRulingAutosave";
 
 const clamp = (v, lo, hi) => Math.max(lo, Math.min(hi, v));
 const snapVal = (v, step) => Math.round(v / step) * step;
 
-/* --------------------- State --------------------- */
-const shelfmark = ref(props.shelfmark || "");
-const siglum = ref(props.siglum || "");
-const folio = ref(props.folio || "");
-const tool = ref(props.tool || "dry-point");
-const direction = ref(props.direction || "none");
+let lineIdCounter = 1;
+let prickingIdCounter = 1;
 
-const widthCm = ref(props.widthCm || 15);
-const heightCm = ref(props.heightCm || 20);
+function makeLine(data) {
+  return {
+    id: data.id || "L" + lineIdCounter++,
+    x1: data.x1,
+    y1: data.y1,
+    x2: data.x2,
+    y2: data.y2,
+    role: data.role || "other",
+    hypothetical: !!data.hypothetical,
+    note: data.note || "",
+  };
+}
 
+function makePricking(data) {
+  return {
+    id: data.id || "P" + prickingIdCounter++,
+    x: data.x,
+    y: data.y,
+    role: data.role || "other",
+    hypothetical: !!data.hypothetical,
+    note: data.note || "",
+  };
+}
+
+/* -------- State -------- */
 const zoom = ref(1);
 const zoomPercent = computed(() => Math.round(zoom.value * 100));
 
 const snapEnabled = ref(true);
 const snapStepCm = ref(0.1);
-
 const showImage = ref(false);
 const imageOpacity = ref(0.6);
-const bgImage = ref(null); // HTMLImageElement
+const bgImage = ref(null);
+const bgFitMode = ref("width");
 
-const eraseMode = ref(false);
-const showGuides = ref(true);
+const mode = ref("draw"); // draw | erase | select
+const modeLabel = computed(() => {
+  if (mode.value === "erase") return "Erase";
+  if (mode.value === "select") return "Select";
+  return "Draw";
+});
 
-/* Cursor display */
 const cursorCm = ref({ x: 0, y: 0 });
 
-/* Ruling / pricking forms */
+const lines = ref([]);
+const prickings = ref([]);
+
+const selectedFeature = ref({ kind: null, id: null });
+const selectedKind = computed(() => selectedFeature.value.kind);
+const selectedLine = computed(() => {
+  if (selectedFeature.value.kind !== "line") return null;
+  return lines.value.find((l) => l.id === selectedFeature.value.id) || null;
+});
+const selectedPricking = computed(() => {
+  if (selectedFeature.value.kind !== "pricking") return null;
+  return prickings.value.find((p) => p.id === selectedFeature.value.id) || null;
+});
+
+const lineRoleOptions = [
+  { value: "text-horizontal", label: "Text line" },
+  { value: "bounding", label: "Bounding line" },
+  { value: "margin", label: "Margin guideline" },
+  { value: "column", label: "Column boundary" },
+  { value: "other", label: "Other" },
+];
+
+const prickingRoleOptions = [
+  { value: "margin", label: "Margin pricking" },
+  { value: "column", label: "Column pricking" },
+  { value: "other", label: "Other" },
+];
+
+const globalNotes = ref("");
+
+/* Manual forms */
 const start_x = ref(0);
 const start_y = ref(0);
 const end_x = ref(0);
@@ -401,90 +469,79 @@ const number = ref(2);
 
 const hor = ref(0);
 const ver = ref(0);
-
 const hor2 = ref(0);
 const start_y3 = ref(0);
 const end_y3 = ref(0);
 const number2 = ref(2);
 
-/* Shapes (model) */
-const lines = ref([]); // {x1,y1,x2,y2} in cm
-const prickings = ref([]); // {x,y} in cm
-
-/* Undo/Redo */
+/* Undo / redo */
 const undoStack = ref([]);
 const redoStack = ref([]);
+const canUndo = computed(() => undoStack.value.length > 0);
+const canRedo = computed(() => redoStack.value.length > 0);
 
-/* Canvas refs */
+/* Export options */
+const includeImageInPdf = ref(true);
+const includeNotesInPdf = ref(true);
+
+/* Canvas refs / geometry */
+const canvasWrap = ref(null);
 const rulers = ref(null);
 const bg = ref(null);
 const draw = ref(null);
 const hGuide = ref(null);
 const vGuide = ref(null);
 
-/* Background fit mode ('width' for this app) */
-const bgFitMode = ref("width");
-
-/* --------------------- Geometry --------------------- */
-const baseWidthPx = computed(() =>
-  Math.round(PAGE_BASE_WIDTH_CM * PX_PER_CM * SCALE_FACTOR)
-);
+const baseWidthPx = computed(() => Math.round(PAGE_BASE_WIDTH_CM * PX_PER_CM * SCALE_FACTOR));
 const baseHeightPx = computed(() =>
   Math.round(baseWidthPx.value * (heightCm.value / widthCm.value))
 );
+const baseWidthPxPlusGutter = computed(() => baseWidthPx.value + 15);
+const baseHeightPxPlusGutter = computed(() => baseHeightPx.value + 15);
 
 const cmToPxX = (x) => (x / widthCm.value) * baseWidthPx.value;
 const cmToPxY = (y) => (y / heightCm.value) * baseHeightPx.value;
 const pxToCmX = (px) => (px / baseWidthPx.value) * widthCm.value;
 const pxToCmY = (px) => (px / baseHeightPx.value) * heightCm.value;
 
-/* --------------------- Drawing --------------------- */
+/* -------- Drawing -------- */
 function drawRulers() {
   const c = rulers.value;
   if (!c) return;
   const ctx = c.getContext("2d");
   ctx.clearRect(0, 0, c.width, c.height);
 
-  // border lines (page area)
-  ctx.strokeStyle = "#000";
+  ctx.fillStyle = "#0b1724";
+  ctx.fillRect(0, 0, c.width, c.height);
+
+  ctx.strokeStyle = "#ffffff";
   ctx.lineWidth = 1;
   ctx.beginPath();
   ctx.rect(15, 15, baseWidthPx.value, baseHeightPx.value);
   ctx.stroke();
 
-  ctx.font = "8px Arial";
-  ctx.fillStyle = "#000";
-  ctx.strokeStyle = "#000";
+  ctx.font = "10px Arial";
+  ctx.fillStyle = "#ffffff";
 
-  // top ruler ticks (x)
+  // top ruler
   ctx.beginPath();
-  for (
-    let px = 0;
-    px <= baseWidthPx.value;
-    px += Math.round(PX_PER_CM * SCALE_FACTOR)
-  ) {
+  for (let px = 0; px <= baseWidthPx.value; px += Math.round(PX_PER_CM * SCALE_FACTOR)) {
     const cm = pxToCmX(px);
     const isMajor = Math.abs(cm - Math.round(cm)) < 1e-6;
-    const yTop = 0;
     const xPos = 15 + px;
-    ctx.moveTo(xPos, yTop + (isMajor ? 0 : 7));
+    ctx.moveTo(xPos, isMajor ? 0 : 7);
     ctx.lineTo(xPos, 14);
     if (isMajor) ctx.fillText(cm.toFixed(0), xPos + 2, 10);
   }
   ctx.stroke();
 
-  // left ruler ticks (y)
+  // left ruler
   ctx.beginPath();
-  for (
-    let py = 0;
-    py <= baseHeightPx.value;
-    py += Math.round(PX_PER_CM * SCALE_FACTOR)
-  ) {
+  for (let py = 0; py <= baseHeightPx.value; py += Math.round(PX_PER_CM * SCALE_FACTOR)) {
     const cm = pxToCmY(py);
     const isMajor = Math.abs(cm - Math.round(cm)) < 1e-6;
-    const xLeft = 0;
     const yPos = 15 + py;
-    ctx.moveTo(xLeft + (isMajor ? 0 : 7), yPos);
+    ctx.moveTo(isMajor ? 0 : 7, yPos);
     ctx.lineTo(14, yPos);
     if (isMajor) ctx.fillText(cm.toFixed(0), 2, yPos + 10);
   }
@@ -496,22 +553,18 @@ function drawBackground() {
   const ctx = c?.getContext("2d");
   if (!ctx) return;
   ctx.clearRect(0, 0, c.width, c.height);
-  if (bgImage.value && showImage.value) {
-    if (bgFitMode.value === "width") {
-      const w = c.width;
-      const ratio = bgImage.value.height / bgImage.value.width;
-      const h = Math.round(w * ratio);
-      ctx.drawImage(bgImage.value, 0, 0, w, h);
-    } else {
-      // fallback (contain)
-      const scale = Math.min(
-        c.width / bgImage.value.width,
-        c.height / bgImage.value.height
-      );
-      const w = Math.round(bgImage.value.width * scale);
-      const h = Math.round(bgImage.value.height * scale);
-      ctx.drawImage(bgImage.value, 0, 0, w, h);
-    }
+  if (!bgImage.value || !showImage.value) return;
+
+  if (bgFitMode.value === "width") {
+    const w = c.width;
+    const ratio = bgImage.value.height / bgImage.value.width;
+    const h = Math.round(w * ratio);
+    ctx.drawImage(bgImage.value, 0, 0, w, h);
+  } else {
+    const scale = Math.min(c.width / bgImage.value.width, c.height / bgImage.value.height);
+    const w = Math.round(bgImage.value.width * scale);
+    const h = Math.round(bgImage.value.height * scale);
+    ctx.drawImage(bgImage.value, 0, 0, w, h);
   }
 }
 
@@ -520,21 +573,45 @@ function drawShapes() {
   const ctx = c?.getContext("2d");
   if (!ctx) return;
   ctx.clearRect(0, 0, c.width, c.height);
-  ctx.strokeStyle = "#000";
-  ctx.fillStyle = "#000";
   ctx.lineWidth = 1;
 
   // lines
-  ctx.beginPath();
   for (const L of lines.value) {
+    const isSelected = selectedFeature.value.kind === "line" && selectedFeature.value.id === L.id;
+    let color = "#ffffff";
+    if (L.role === "text-horizontal") color = "#a8ffea";
+    else if (L.role === "margin") color = "#ffb3ff";
+    else if (L.role === "column") color = "#a8c5ff";
+    else if (L.role === "bounding") color = "#ffdd88";
+
+    ctx.save();
+    if (L.hypothetical) {
+      ctx.setLineDash([4, 3]);
+      color = "#999999";
+    }
+    ctx.strokeStyle = isSelected ? "#00ffd5" : color;
+    ctx.beginPath();
     ctx.moveTo(cmToPxX(L.x1), cmToPxY(L.y1));
     ctx.lineTo(cmToPxX(L.x2), cmToPxY(L.y2));
+    ctx.stroke();
+    ctx.restore();
   }
-  ctx.stroke();
 
   // prickings
   for (const P of prickings.value) {
-    ctx.fillRect(cmToPxX(P.x) - 2, cmToPxY(P.y) - 0.5, 5, 1); // 5px x 1px
+    const isSelected =
+      selectedFeature.value.kind === "pricking" && selectedFeature.value.id === P.id;
+
+    let color = "#ffffff";
+    if (P.role === "margin") color = "#ffb3ff";
+    if (P.role === "column") color = "#a8c5ff";
+    if (P.hypothetical) color = "#999999";
+
+    const px = cmToPxX(P.x);
+    const py = cmToPxY(P.y);
+    const ctx2 = ctx;
+    ctx2.fillStyle = isSelected ? "#00ffd5" : color;
+    ctx2.fillRect(px - 2, py - 0.5, 5, 1);
   }
 }
 
@@ -544,168 +621,102 @@ function redrawAll() {
   drawShapes();
 }
 
-/* --------------------- Actions & commands --------------------- */
-function pushUndo() {
-  undoStack.value.push(
-    JSON.stringify({ lines: lines.value, prickings: prickings.value })
-  );
-  // clear redo after new change
+/* -------- Undo / redo -------- */
+function pushUndoSnapshot() {
+  undoStack.value.push(JSON.stringify({ lines: lines.value, prickings: prickings.value }));
   redoStack.value = [];
 }
 
 function undo() {
   if (!undoStack.value.length) return;
   const prev = undoStack.value.pop();
-  redoStack.value.push(
-    JSON.stringify({ lines: lines.value, prickings: prickings.value })
-  );
+  redoStack.value.push(JSON.stringify({ lines: lines.value, prickings: prickings.value }));
   const state = JSON.parse(prev);
-  lines.value = state.lines;
-  prickings.value = state.prickings;
+  lines.value = state.lines || [];
+  prickings.value = state.prickings || [];
+  selectedFeature.value = { kind: null, id: null };
   redrawAll();
 }
+
 function redo() {
   if (!redoStack.value.length) return;
   const next = redoStack.value.pop();
-  undoStack.value.push(
-    JSON.stringify({ lines: lines.value, prickings: prickings.value })
-  );
+  undoStack.value.push(JSON.stringify({ lines: lines.value, prickings: prickings.value }));
   const state = JSON.parse(next);
-  lines.value = state.lines;
-  prickings.value = state.prickings;
+  lines.value = state.lines || [];
+  prickings.value = state.prickings || [];
+  selectedFeature.value = { kind: null, id: null };
   redrawAll();
 }
 
-function setDraw() {
-  eraseMode.value = false;
-}
-function setErase() {
-  eraseMode.value = true;
+/* -------- Modes & mouse helpers -------- */
+function setMode(m) {
+  mode.value = m;
 }
 
-/* --------------------- Event handlers --------------------- */
-
-function snapPoint(cm) {
-  if (!snapEnabled.value) return cm;
-  return snapVal(cm, snapStepCm.value);
-}
-
-/* mouse helpers (account for zoom & 15px rulers) */
 function toLocalCoords(e) {
-  const wrap = rulers.value; // has full size + rulers
+  const wrap = canvasWrap.value;
+  if (!wrap) return null;
   const rect = wrap.getBoundingClientRect();
   const x = (e.clientX - rect.left) / zoom.value;
   const y = (e.clientY - rect.top) / zoom.value;
   return { x, y };
 }
+
 function insidePage(x, y) {
-  return (
-    x >= 15 &&
-    y >= 15 &&
-    x <= 15 + baseWidthPx.value &&
-    y <= 15 + baseHeightPx.value
-  );
+  return x >= 15 && y >= 15 && x <= 15 + baseWidthPx.value && y <= 15 + baseHeightPx.value;
 }
 
-function moveLines(e) {
+function moveGuides(e) {
   const pos = toLocalCoords(e);
+  if (!pos) return;
   const x = pos.x;
   const y = pos.y;
 
-  // guides
+  const hEl = hGuide.value;
+  const vEl = vGuide.value;
+  if (!hEl || !vEl) return;
+
   if (y > 15 && y < 15 + baseHeightPx.value) {
-    hGuide.value.style.display = "block";
-    hGuide.value.style.width = baseWidthPx.value + "px";
-    hGuide.value.style.top = y + "px";
-    hGuide.value.style.left = "15px";
-  }
-  if (x > 15 && x < 15 + baseWidthPx.value) {
-    vGuide.value.style.display = "block";
-    vGuide.value.style.height = baseHeightPx.value + "px";
-    vGuide.value.style.left = x + "px";
-    vGuide.value.style.top = "15px";
+    hEl.style.display = "block";
+    hEl.style.width = baseWidthPx.value + "px";
+    hEl.style.top = y + "px";
+    hEl.style.left = "15px";
+  } else {
+    hEl.style.display = "none";
   }
 
-  // cursor cm (relative to page)
+  if (x > 15 && x < 15 + baseWidthPx.value) {
+    vEl.style.display = "block";
+    vEl.style.height = baseHeightPx.value + "px";
+    vEl.style.left = x + "px";
+    vEl.style.top = "15px";
+  } else {
+    vEl.style.display = "none";
+  }
+
   const xPagePx = clamp(x - 15, 0, baseWidthPx.value);
   const yPagePx = clamp(y - 15, 0, baseHeightPx.value);
   cursorCm.value = { x: pxToCmX(xPagePx), y: pxToCmY(yPagePx) };
 }
 
-function create_click(e) {
-  const pos = toLocalCoords(e);
-  const x = pos.x;
-  const y = pos.y;
+function hideGuides() {
+  if (hGuide.value) hGuide.value.style.display = "none";
+  if (vGuide.value) vGuide.value.style.display = "none";
+}
 
-  // clicking within top ruler (y < 15) => vertical line
-  if (!eraseMode.value && x > 15 && y > 0 && y < 15) {
-    const xCm = snapPoint(pxToCmX(x - 15));
-    pushUndo();
-    lines.value = [
-      ...lines.value,
-      { x1: xCm, y1: 0, x2: xCm, y2: heightCm.value },
-    ];
-    return redrawAll();
-  }
-
-  // clicking within left ruler (x < 15) => horizontal line
-  if (!eraseMode.value && y > 15 && x > 0 && x < 15) {
-    const yCm = snapPoint(pxToCmY(y - 15));
-    pushUndo();
-    lines.value = [
-      ...lines.value,
-      { x1: 0, y1: yCm, x2: widthCm.value, y2: yCm },
-    ];
-    return redrawAll();
-  }
-
-  // inside page area
-  if (insidePage(x, y)) {
-    const xCm = snapPoint(pxToCmX(x - 15));
-    const yCm = snapPoint(pxToCmY(y - 15));
-
-    if (!eraseMode.value) {
-      // add pricking
-      pushUndo();
-      prickings.value = [...prickings.value, { x: xCm, y: yCm }];
-      return redrawAll();
-    } else {
-      // erase nearest item (within threshold)
-      const threshCm = Math.max(widthCm.value, heightCm.value) * 0.02; // ~2%
-      let removed = false;
-
-      // try prickings
-      const pi = prickings.value.findIndex(
-        (p) => Math.hypot(p.x - xCm, p.y - yCm) <= threshCm
-      );
-      if (pi >= 0) {
-        pushUndo();
-        prickings.value.splice(pi, 1);
-        removed = true;
-      }
-
-      // try lines (distance point->segment)
-      if (!removed) {
-        const idx = lines.value.findIndex(
-          (L) => pointToSegmentDist(xCm, yCm, L) <= threshCm / 2
-        );
-        if (idx >= 0) {
-          pushUndo();
-          lines.value.splice(idx, 1);
-          removed = true;
-        }
-      }
-      if (removed) redrawAll();
-    }
-  }
+/* Snap & distance helpers */
+function snapPoint(cm) {
+  if (!snapEnabled.value) return cm;
+  return snapVal(cm, snapStepCm.value);
 }
 
 function pointToSegmentDist(x, y, L) {
   const { x1, y1, x2, y2 } = L;
-  const vx = x2 - x1;
-  const vy = y2 - y1;
-  const wx = x - x1;
-  const wy = y - y1;
+  const vx = x2 - x1,
+    vy = y2 - y1;
+  const wx = x - x1,
+    wy = y - y1;
   const c1 = vx * wx + vy * wy;
   if (c1 <= 0) return Math.hypot(x - x1, y - y1);
   const c2 = vx * vx + vy * vy;
@@ -716,64 +727,220 @@ function pointToSegmentDist(x, y, L) {
   return Math.hypot(x - px, y - py);
 }
 
-/* --------------------- Controls (forms -> shapes) --------------------- */
+/* -------- Canvas click -------- */
+function handleCanvasClick(e) {
+  const pos = toLocalCoords(e);
+  if (!pos) return;
+  const x = pos.x;
+  const y = pos.y;
+
+  const xPagePx = clamp(x - 15, 0, baseWidthPx.value);
+  const yPagePx = clamp(y - 15, 0, baseHeightPx.value);
+  const xCm = pxToCmX(xPagePx);
+  const yCm = pxToCmY(yPagePx);
+
+  // Draw mode
+  if (mode.value === "draw") {
+    // top ruler -> vertical line
+    if (x > 15 && y > 0 && y < 15) {
+      const xLineCm = snapPoint(pxToCmX(x - 15));
+      pushUndoSnapshot();
+      lines.value = [
+        ...lines.value,
+        makeLine({ x1: xLineCm, y1: 0, x2: xLineCm, y2: heightCm.value, role: "text-vertical" }),
+      ];
+      redrawAll();
+      return;
+    }
+
+    // left ruler -> horizontal line
+    if (y > 15 && x > 0 && x < 15) {
+      const yLineCm = snapPoint(pxToCmY(y - 15));
+      pushUndoSnapshot();
+      lines.value = [
+        ...lines.value,
+        makeLine({ x1: 0, y1: yLineCm, x2: widthCm.value, y2: yLineCm, role: "text-horizontal" }),
+      ];
+      redrawAll();
+      return;
+    }
+
+    // inside page -> pricking
+    if (insidePage(x, y)) {
+      pushUndoSnapshot();
+      prickings.value = [
+        ...prickings.value,
+        makePricking({ x: snapPoint(xCm), y: snapPoint(yCm), role: "margin" }),
+      ];
+      redrawAll();
+      return;
+    }
+  }
+
+  // Erase mode
+  if (mode.value === "erase" && insidePage(x, y)) {
+    const threshCm = Math.max(widthCm.value, heightCm.value) * 0.03;
+    let removed = false;
+
+    // prickings first
+    let bestPr = { idx: -1, dist: threshCm };
+    prickings.value.forEach((p, idx) => {
+      const d = Math.hypot(p.x - xCm, p.y - yCm);
+      if (d < bestPr.dist) bestPr = { idx, dist: d };
+    });
+    if (bestPr.idx >= 0) {
+      pushUndoSnapshot();
+      prickings.value.splice(bestPr.idx, 1);
+      removed = true;
+    }
+
+    // lines
+    if (!removed) {
+      let bestLn = { idx: -1, dist: threshCm / 2 };
+      lines.value.forEach((L, idx) => {
+        const d = pointToSegmentDist(xCm, yCm, L);
+        if (d < bestLn.dist) bestLn = { idx, dist: d };
+      });
+      if (bestLn.idx >= 0) {
+        pushUndoSnapshot();
+        lines.value.splice(bestLn.idx, 1);
+        removed = true;
+      }
+    }
+    if (removed) redrawAll();
+    return;
+  }
+
+  // Select mode
+  if (mode.value === "select" && insidePage(x, y)) {
+    const threshCm = Math.max(widthCm.value, heightCm.value) * 0.03;
+    let best = { kind: null, id: null, dist: threshCm };
+
+    for (const p of prickings.value) {
+      const d = Math.hypot(p.x - xCm, p.y - yCm);
+      if (d < best.dist) best = { kind: "pricking", id: p.id, dist: d };
+    }
+    for (const L of lines.value) {
+      const d = pointToSegmentDist(xCm, yCm, L);
+      if (d < best.dist) best = { kind: "line", id: L.id, dist: d };
+    }
+
+    if (best.kind) {
+      selectedFeature.value = { kind: best.kind, id: best.id };
+    } else {
+      selectedFeature.value = { kind: null, id: null };
+    }
+    redrawAll();
+  }
+}
+
+/* -------- Manual ruling / pricking -------- */
 function addSingleLine() {
-  pushUndo();
+  pushUndoSnapshot();
   lines.value = [
     ...lines.value,
-    {
+    makeLine({
       x1: snapPoint(start_x.value),
       y1: snapPoint(start_y.value),
       x2: snapPoint(end_x.value),
       y2: snapPoint(end_y.value),
-    },
+      role:
+        Math.abs(start_y.value - end_y.value) <
+        Math.abs(start_x.value - end_x.value)
+          ? "text-horizontal"
+          : "text-vertical",
+    }),
   ];
   redrawAll();
 }
+
 function addMultipleLines() {
   const n = Math.max(1, Math.floor(number.value || 1));
   const y0 = start_y2.value;
   const y1 = end_y2.value;
   const step = n === 1 ? 0 : (y1 - y0) / (n - 1);
-  pushUndo();
   const newLines = [];
   for (let i = 0; i < n; i++) {
     const y = snapPoint(y0 + i * step);
-    newLines.push({
-      x1: snapPoint(start_x2.value),
-      y1: y,
-      x2: snapPoint(end_x2.value),
-      y2: y,
-    });
+    newLines.push(
+      makeLine({
+        x1: snapPoint(start_x2.value),
+        y1: y,
+        x2: snapPoint(end_x2.value),
+        y2: y,
+        role: "text-horizontal",
+      })
+    );
   }
+  pushUndoSnapshot();
   lines.value = [...lines.value, ...newLines];
   redrawAll();
 }
 
 function addSinglePricking() {
-  pushUndo();
+  pushUndoSnapshot();
   prickings.value = [
     ...prickings.value,
-    { x: snapPoint(hor.value), y: snapPoint(ver.value) },
+    makePricking({ x: snapPoint(hor.value), y: snapPoint(ver.value), role: "margin" }),
   ];
   redrawAll();
 }
+
 function addMultiplePrickings() {
   const n = Math.max(1, Math.floor(number2.value || 1));
   const y0 = start_y3.value;
   const y1 = end_y3.value;
   const step = n === 1 ? 0 : (y1 - y0) / (n - 1);
-  pushUndo();
   const newPr = [];
   for (let i = 0; i < n; i++) {
     const y = snapPoint(y0 + i * step);
-    newPr.push({ x: snapPoint(hor2.value), y });
+    newPr.push(makePricking({ x: snapPoint(hor2.value), y, role: "margin" }));
   }
+  pushUndoSnapshot();
   prickings.value = [...prickings.value, ...newPr];
   redrawAll();
 }
 
-/* --------------------- Image handling --------------------- */
+/* -------- Selected feature updates -------- */
+function updateSelectedLineRole(val) {
+  const l = selectedLine.value;
+  if (l) {
+    l.role = val;
+    redrawAll();
+  }
+}
+function updateSelectedLineHypothetical(val) {
+  const l = selectedLine.value;
+  if (l) {
+    l.hypothetical = val;
+    redrawAll();
+  }
+}
+function updateSelectedLineNote(val) {
+  const l = selectedLine.value;
+  if (l) l.note = val;
+}
+
+function updateSelectedPrickingRole(val) {
+  const p = selectedPricking.value;
+  if (p) {
+    p.role = val;
+    redrawAll();
+  }
+}
+function updateSelectedPrickingHypothetical(val) {
+  const p = selectedPricking.value;
+  if (p) {
+    p.hypothetical = val;
+    redrawAll();
+  }
+}
+function updateSelectedPrickingNote(val) {
+  const p = selectedPricking.value;
+  if (p) p.note = val;
+}
+
+/* -------- Image handling -------- */
 function handleImageUpload(e) {
   const file = e.target.files?.[0];
   if (!file) return;
@@ -789,7 +956,7 @@ function handleImageUpload(e) {
   };
   reader.readAsDataURL(file);
 }
-function remove_bg() {
+function removeBackground() {
   bgImage.value = null;
   redrawAll();
 }
@@ -798,66 +965,75 @@ function fitToWidth() {
   redrawAll();
 }
 
-/* --------------------- Save / Restore / Clear --------------------- */
-const STORAGE_KEY = "manuscript-ruling-schema-v1";
-
-function saveSchema() {
-  const payload = {
-    meta: {
-      shelfmark: shelfmark.value,
-      siglum: siglum.value,
-      folio: folio.value,
-      tool: tool.value,
-      direction: direction.value,
-      widthCm: widthCm.value,
-      heightCm: heightCm.value,
-    },
-    shapes: { lines: lines.value, prickings: prickings.value },
-    view: {
-      zoom: zoom.value,
-      snapEnabled: snapEnabled.value,
-      snapStepCm: snapStepCm.value,
-    },
-  };
-  localStorage.setItem(STORAGE_KEY, JSON.stringify(payload));
-}
-
-function restoreSchema() {
-  const raw = localStorage.getItem(STORAGE_KEY);
-  if (!raw) return;
+/* -------- Autosave -------- */
+function saveAutosave() {
   try {
-    const data = JSON.parse(raw);
-    shelfmark.value = data.meta?.shelfmark || shelfmark.value;
-    siglum.value = data.meta?.siglum || siglum.value;
-    folio.value = data.meta?.folio || folio.value;
-    tool.value = data.meta?.tool || tool.value;
-    direction.value = data.meta?.direction || direction.value;
-    widthCm.value = data.meta?.widthCm || widthCm.value;
-    heightCm.value = data.meta?.heightCm || heightCm.value;
-
-    lines.value = data.shapes?.lines || [];
-    prickings.value = data.shapes?.prickings || [];
-
-    zoom.value = data.view?.zoom || 1;
-    snapEnabled.value = !!data.view?.snapEnabled;
-    snapStepCm.value = data.view?.snapStepCm ?? 0.1;
-
-    redrawAll();
-  } catch (_e) {
-    // Silently ignore parsing errors
+    const payload = {
+      meta: {
+        shelfmark: shelfmark.value,
+        siglum: siglum.value,
+        folio: folio.value,
+        widthCm: widthCm.value,
+        heightCm: heightCm.value,
+        tool: tool.value,
+        direction: direction.value,
+      },
+      shapes: {
+        lines: lines.value,
+        prickings: prickings.value,
+      },
+      view: {
+        zoom: zoom.value,
+        snapEnabled: snapEnabled.value,
+        snapStepCm: snapStepCm.value,
+      },
+      notes: globalNotes.value,
+    };
+    localStorage.setItem(AUTOSAVE_KEY, JSON.stringify(payload));
+  } catch {
+    // ignore
   }
 }
 
-function clearSchema() {
-  pushUndo();
-  lines.value = [];
-  prickings.value = [];
-  redrawAll();
+function restoreAutosave() {
+  const raw = localStorage.getItem(AUTOSAVE_KEY);
+  if (!raw) return;
+  try {
+    const data = JSON.parse(raw);
+    if (data.meta) {
+      shelfmark.value = data.meta.shelfmark ?? shelfmark.value;
+      siglum.value = data.meta.siglum ?? siglum.value;
+      folio.value = data.meta.folio ?? folio.value;
+      widthCm.value = data.meta.widthCm ?? widthCm.value;
+      heightCm.value = data.meta.heightCm ?? heightCm.value;
+      tool.value = data.meta.tool ?? tool.value;
+      direction.value = data.meta.direction ?? direction.value;
+    }
+    if (data.shapes) {
+      lines.value = (data.shapes.lines || []).map((L) => makeLine(L));
+      prickings.value = (data.shapes.prickings || []).map((P) => makePricking(P));
+    }
+    if (data.view) {
+      zoom.value = data.view.zoom ?? zoom.value;
+      snapEnabled.value = data.view.snapEnabled ?? snapEnabled.value;
+      snapStepCm.value = data.view.snapStepCm ?? snapStepCm.value;
+    }
+    if (data.notes) {
+      globalNotes.value = data.notes;
+    }
+  } catch {
+    // ignore
+  }
 }
 
-/* --------------------- Export PDF --------------------- */
+let autosaveTimer = null;
+watch([lines, prickings, globalNotes, zoom, snapEnabled, snapStepCm], () => {
+  clearTimeout(autosaveTimer);
+  autosaveTimer = setTimeout(saveAutosave, 500);
+}, { deep: true });
+
+/* -------- Export (with legend only in PDF) -------- */
 function width_size() {
-  // keep your classic scaling logic for A4 fit
   let width_pdf = PAGE_BASE_WIDTH_CM;
   let height_pdf = PAGE_BASE_WIDTH_CM * (heightCm.value / widthCm.value);
   while (height_pdf > 28.2857142857) {
@@ -872,78 +1048,94 @@ function height_size() {
   return height_pdf;
 }
 
-function download() {
-  // Render current draw layer + border onto a temp canvas to export
+function exportPdf() {
+  const pdf = new jsPDF("p", "cm", "a4");
+
+  let y = 2;
+  pdf.setFontSize(13);
+  pdf.text(1, y, `Shelfmark: ${shelfmark.value || ""}`); y += 0.7;
+  pdf.text(1, y, `Siglum: ${siglum.value || ""}`); y += 0.7;
+  pdf.text(1, y, `Folio: ${folio.value || ""}`); y += 0.7;
+  pdf.text(1, y, `Size: ${widthCm.value} × ${heightCm.value} cm`); y += 0.7;
+  pdf.text(1, y, `Ruling tool: ${tool.value}, direction: ${direction.value}`); y += 1;
+
+  if (includeNotesInPdf.value && globalNotes.value.trim()) {
+    pdf.setFontSize(12);
+    pdf.text(1, y, "Notes:");
+    y += 0.6;
+    const txt = pdf.splitTextToSize(globalNotes.value, 17);
+    pdf.text(1, y, txt);
+    y += (txt.length + 1) * 0.5;
+  }
+
+  // Legend (PDF only)
+  y += 0.4;
+  pdf.setFontSize(12);
+  pdf.text(1, y, "Legend:"); y += 0.6;
+  const legendLines = [
+    "- Text lines (horizontal)",
+    "- Bounding lines",
+    "- Margin and column guidelines",
+    "- Hypothetical features (dashed / grey)",
+    "- Prickings in margins"
+  ];
+  pdf.text(1, y, legendLines);
+
+  // Second page: schema
+  pdf.addPage();
   const temp = document.createElement("canvas");
   temp.width = baseWidthPx.value;
   temp.height = baseHeightPx.value;
-  const tctx = temp.getContext("2d");
+  const ctx = temp.getContext("2d");
 
-  // optional: light border, then shapes
-  tctx.strokeStyle = "#000";
-  tctx.lineWidth = 1;
-  tctx.strokeRect(0, 0, temp.width, temp.height);
+  ctx.fillStyle = "#ffffff";
+  ctx.fillRect(0, 0, temp.width, temp.height);
 
-  // draw shapes same as drawShapes()
-  tctx.beginPath();
-  for (const L of lines.value) {
-    tctx.moveTo(cmToPxX(L.x1), cmToPxY(L.y1));
-    tctx.lineTo(cmToPxX(L.x2), cmToPxY(L.y2));
-  }
-  tctx.stroke();
-  for (const P of prickings.value) {
-    tctx.fillRect(cmToPxX(P.x) - 2, cmToPxY(P.y) - 0.5, 5, 1);
-  }
+  if (includeImageInPdf.value && bg.value) ctx.drawImage(bg.value, 0, 0);
+  if (draw.value) ctx.drawImage(draw.value, 0, 0);
 
   const img = temp.toDataURL("image/png", 1.0);
+  pdf.addImage(img, "PNG", 0.5, 0.5, width_size(), height_size());
 
-  const pdf = new jsPDF("p", "cm", "a4");
-  // Metadata page
-  pdf.text(1, 29.7 * 0.25, "manuscript shelfmark:", { align: "left" });
-  pdf.text(7, 29.7 * 0.25, shelfmark.value || "", { align: "left" });
-
-  pdf.text(
-    1,
-    29.7 * 0.3,
-    "Other MS Designation, Siglum or Code:",
-    { align: "left" }
-  );
-  pdf.text(10.5, 29.7 * 0.3, siglum.value || "", { align: "left" });
-
-  pdf.text(1, 29.7 * 0.35, `folio: ${folio.value || ""}`, { align: "left" });
-  pdf.text(1, 29.7 * 0.4, `height: ${heightCm.value}`, { align: "left" });
-  pdf.text(1, 29.7 * 0.45, `width: ${widthCm.value}`, { align: "left" });
-  pdf.text(1, 29.7 * 0.5, `ruling tool: ${tool.value}`, { align: "left" });
-  pdf.text(
-    1,
-    29.7 * 0.55,
-    `direction of ruling tool: ${direction.value}`,
-    { align: "left" }
-  );
-
-  // Canvas page
-  pdf.addPage();
-  pdf.addImage(img, "png", 0.5, 0.5, width_size(), height_size());
-  pdf.save("download.pdf");
+  const filename = (shelfmark.value || "ruling-schema") + ".pdf";
+  pdf.save(filename);
 }
 
-/* --------------------- Lifecycle & utilities --------------------- */
+function exportJson() {
+  const payload = {
+    meta: {
+      shelfmark: shelfmark.value,
+      siglum: siglum.value,
+      folio: folio.value,
+      widthCm: widthCm.value,
+      heightCm: heightCm.value,
+      tool: tool.value,
+      direction: direction.value,
+    },
+    shapes: {
+      lines: lines.value,
+      prickings: prickings.value,
+    },
+    notes: globalNotes.value,
+  };
+  const blob = new Blob([JSON.stringify(payload, null, 2)], { type: "application/json" });
+  const url = URL.createObjectURL(blob);
+  const a = document.createElement("a");
+  a.href = url;
+  a.download = (shelfmark.value || "ruling-schema") + ".json";
+  a.click();
+  URL.revokeObjectURL(url);
+}
 
-onMounted(() => {
-  redrawAll();
-  window.addEventListener("keydown", onKey);
-});
-onBeforeUnmount(() => {
-  window.removeEventListener("keydown", onKey);
-});
-
+/* -------- Keyboard shortcuts -------- */
 function onKey(e) {
   // Save
   if ((e.ctrlKey || e.metaKey) && e.key.toLowerCase() === "s") {
     e.preventDefault();
-    return saveSchema();
+    saveAutosave();
+    return;
   }
-  // Undo / Redo
+  // Undo / redo
   if ((e.ctrlKey || e.metaKey) && e.key.toLowerCase() === "z") {
     e.preventDefault();
     if (e.shiftKey) return redo();
@@ -954,48 +1146,38 @@ function onKey(e) {
     return redo();
   }
   // Modes
-  if (e.key.toLowerCase() === "d") setDraw();
-  if (e.key.toLowerCase() === "e") setErase();
+  if (e.key.toLowerCase() === "d") setMode("draw");
+  if (e.key.toLowerCase() === "e") setMode("erase");
+  if (e.key.toLowerCase() === "s") setMode("select");
 }
 
-/* Autosave (debounced) */
-let saveTimer = null;
-watch(
-  [
-    lines,
-    prickings,
-    shelfmark,
-    siglum,
-    folio,
-    tool,
-    direction,
-    widthCm,
-    heightCm,
-  ],
-  () => {
-    clearTimeout(saveTimer);
-    saveTimer = setTimeout(saveSchema, 500);
-  },
-  { deep: true }
-);
+/* -------- Lifecycle -------- */
+onMounted(() => {
+  restoreAutosave();
+  redrawAll();
+  window.addEventListener("keydown", onKey);
+});
+onBeforeUnmount(() => {
+  window.removeEventListener("keydown", onKey);
+});
 </script>
 
 <style scoped>
-/* ===== Fenius wrapper look ===== */
 .ruling-page {
   display: flex;
   flex-direction: column;
   min-height: 100vh;
   height: 100vh;
   height: 100dvh;
-  overflow-y: auto;
-  -webkit-overflow-scrolling: touch;
+  overflow: hidden;
   background: linear-gradient(to bottom, #3a4b60, #112233);
+  color: #ffffff;
+  font-size: 14px;
 }
 
 .header-bar {
   background: #c0c2c3;
-  color: black;
+  color: #000;
   padding: 12px 24px;
   font-weight: 600;
   font-size: 18px;
@@ -1003,86 +1185,204 @@ watch(
 
 .title {
   text-align: center;
-  margin: 16px 0;
-  font-size: 32px;
+  margin: 10px 0 6px;
+  font-size: 28px;
   color: #a0a0a0;
 }
 
-/* Main container (aligned with bookbinding style, but wider) */
-.ruling-container {
-  max-width: 1200px;
-  margin: 24px auto 32px;
-  padding: 0 16px 32px;
+.meta-summary {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  padding: 6px 24px 8px;
+  font-size: 13px;
+  color: #dee5f2;
 }
 
-/* ===== Layout & Cards ===== */
-.layout {
-  display: grid;
-  grid-template-columns: 1.25fr 0.9fr;
-  gap: 1rem;
-  margin-top: 0.75rem;
-}
-
-.card {
-  box-shadow: 0 4px 8px rgba(0, 0, 0, 0.1);
-  border-radius: 14px;
-  background: #fff;
-  padding: 0.75rem;
-  color: #2c3e50;
-}
-
-.topbar {
+.meta-left,
+.meta-center,
+.meta-right {
   display: flex;
   align-items: center;
-  justify-content: space-between;
-  gap: 0.5rem;
+  gap: 8px;
+  flex-wrap: wrap;
 }
-.topbar .title-block h1 {
-  margin: 0;
-  font-size: 1.25rem;
-}
-.muted {
-  color: #6b7280;
+.meta-item strong {
+  font-weight: 600;
+  color: #ffffff;
 }
 
-.actions button + button {
-  margin-left: 0.5rem;
-}
-button.primary {
-  background: #2c7be5;
-  color: #fff;
+.mode-pill {
+  padding: 4px 10px;
+  border-radius: 999px;
+  border: 1px solid rgba(255, 255, 255, 0.4);
+  font-size: 13px;
 }
 
-.column.stage {
+/* Layout */
+.ruling-layout {
+  flex: 1;
+  display: grid;
+  grid-template-columns: 260px minmax(0, 1fr) 260px;
+  gap: 12px;
+  padding: 8px 12px 12px;
+  box-sizing: border-box;
+}
+
+.side {
+  padding: 4px 4px;
+}
+
+/* Panels */
+.panel {
+  margin-bottom: 10px;
+}
+.panel h3 {
+  font-size: 15px;
+  margin: 0 0 6px;
+  font-weight: 600;
+}
+.panel h4 {
+  font-size: 13px;
+  margin: 6px 0 4px;
+}
+
+/* Text */
+.hint {
+  font-size: 12px;
+  color: #cbd5f5;
+  margin-top: 6px;
+}
+
+/* Buttons & inputs */
+button {
+  font: inherit;
+  padding: 7px 12px;
+  border-radius: 999px;
+  border: 1px solid rgba(255, 255, 255, 0.5);
+  background: transparent;
+  color: #ffffff;
+  cursor: pointer;
+}
+button:hover:not(:disabled) {
+  background: rgba(255, 255, 255, 0.15);
+}
+button:disabled {
+  opacity: 0.4;
+  cursor: not-allowed;
+}
+button.active {
+  background: #ffffff;
+  color: #0b1724;
+}
+.small-btn {
+  margin-top: 6px;
+  font-size: 13px;
+  padding-inline: 12px;
+}
+.btn-row {
+  display: flex;
+  gap: 6px;
+  margin-top: 6px;
+}
+
+.mode-buttons {
+  display: flex;
+  gap: 6px;
+}
+
+/* Fields */
+.field-label {
+  font-size: 12px;
+  font-weight: 500;
+  margin-top: 4px;
+  display: block;
+}
+
+.field-input,
+.number-input,
+.field-textarea,
+select {
+  width: 100%;
+  padding: 6px 8px;
+  margin-top: 3px;
+  background: #1f2a3a;
+  border-radius: 4px;
+  border: 1px solid #666;
+  color: #ffffff;
+  font-size: 13px;
+  box-sizing: border-box;
+}
+.number-input {
+  text-align: center;
+}
+
+.field-inline {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  font-size: 13px;
+  margin-top: 6px;
+}
+
+.field-textarea {
+  resize: vertical;
+  min-height: 60px;
+}
+
+.field-row {
+  display: flex;
+  gap: 6px;
+  margin-top: 4px;
+}
+.field-row.two > * {
+  flex: 1;
+}
+.field-row.three > * {
+  flex: 1;
+}
+
+/* Center canvas */
+.center {
   display: flex;
   flex-direction: column;
-}
-.stage-header {
-  display: flex;
   align-items: center;
-  justify-content: space-between;
-  margin-bottom: 0.5rem;
 }
-.stage-header .inline {
+
+.stage-header {
+  width: 100%;
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  margin-bottom: 6px;
+}
+
+.inline-group {
   display: inline-flex;
   align-items: center;
-  gap: 0.35rem;
-  margin-right: 0.5rem;
+  gap: 10px;
 }
-.stage-header .inline input[type="number"] {
-  width: 5rem;
+.inline {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
 }
-.stage-header .inline.disabled {
+.inline input[type="number"] {
+  width: 4rem;
+}
+.inline.disabled {
   opacity: 0.5;
   pointer-events: none;
 }
 
-/* ===== Canvas stack ===== */
 .canvas-wrap {
   position: relative;
   transform-origin: 0 0;
   user-select: none;
+  background: #0b1724;
+  border-radius: 6px;
 }
+
 .layer {
   position: absolute;
   left: 0;
@@ -1104,8 +1404,9 @@ button.primary {
   left: 15px;
   width: 0;
   top: 0;
-  border-top: 1px solid #0a0a0a;
+  border-top: 1px solid #00ffd5;
   z-index: 4;
+  display: none;
 }
 .guide-v {
   position: absolute;
@@ -1113,112 +1414,38 @@ button.primary {
   top: 15px;
   height: 0;
   left: 0;
-  border-left: 1px solid #0a0a0a;
+  border-left: 1px solid #00ffd5;
   z-index: 4;
+  display: none;
 }
 
-/* ===== Status bar ===== */
-.status {
+/* Status bar */
+.status-bar {
+  width: 100%;
   display: flex;
   justify-content: space-between;
-  gap: 0.75rem;
-  padding-top: 0.5rem;
-  color: #334155;
-  font-size: 0.9rem;
+  gap: 8px;
+  font-size: 13px;
+  margin-top: 6px;
+  padding: 2px 4px 0;
+  color: #d0d6e5;
 }
 
-/* ===== Controls ===== */
-.controls {
-  display: grid;
-  gap: 0.75rem;
+/* Selected empty */
+.empty-selected {
+  font-size: 13px;
+  color: #cbd5f5;
 }
 
-h3 {
-  margin: 0 0 0.5rem 0;
-}
-h4 {
-  margin: 0.5rem 0 0.25rem 0;
-  font-size: 0.95rem;
-  color: #374151;
+/* File input */
+.file-input {
+  font-size: 13px;
+  margin-bottom: 6px;
 }
 
-.form {
-  list-style: none;
-  padding: 0;
-  margin: 0;
-  display: grid;
-  gap: 0.4rem;
-}
-.form.compact {
-  gap: 0.3rem;
-}
-.form li {
-  display: block;
-}
-label {
-  display: block;
-  font-size: 0.85rem;
-  margin-bottom: 0.15rem;
-  color: #374151;
-}
-input,
-select,
-button {
-  font: inherit;
-  padding: 0.45rem 0.55rem;
-  border-radius: 10px;
-  border: 1px solid #d1d5db;
-  outline: none;
-}
-input:focus,
-select:focus {
-  border-color: #2c7be5;
-  box-shadow: 0 0 0 2px rgba(44, 123, 229, 0.15);
-}
-
-.split {
-  display: grid;
-  grid-template-columns: 1fr 1fr auto;
-  gap: 0.5rem;
-  align-items: end;
-}
-.split-2 {
-  display: grid;
-  grid-template-columns: 1fr 1fr;
-  gap: 0.5rem;
-}
-.split-3 {
-  display: grid;
-  grid-template-columns: 1fr 1fr 1fr;
-  gap: 0.5rem;
-}
-.split-1 {
-  display: grid;
-  grid-template-columns: 1fr;
-  gap: 0.5rem;
-}
-
-.btnrow {
-  display: flex;
-  gap: 0.5rem;
-}
-button {
-  cursor: pointer;
-  background: #f3f4f6;
-}
-button:hover {
-  background: #e5e7eb;
-}
-button.active {
-  background: #2c7be5;
-  color: white;
-}
-button:disabled {
+/* Disabled helper */
+.disabled {
   opacity: 0.5;
-  cursor: not-allowed;
-}
-
-.apply button {
-  width: 100%;
+  pointer-events: none;
 }
 </style>
