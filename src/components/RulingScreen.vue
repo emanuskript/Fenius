@@ -4,17 +4,19 @@
     <div class="header-bar">eManuskript Produkt</div>
     <div class="title">FENIUS</div>
 
-    <!-- Compact metadata summary -->
+    <!-- Centered compact metadata summary -->
     <div class="meta-summary">
-      <div class="meta-left">
-        <span class="meta-item"><strong>Shelfmark:</strong> {{ shelfmark || "—" }}</span>
-        <span class="meta-item"><strong>Siglum:</strong> {{ siglum || "—" }}</span>
-        <span class="meta-item"><strong>Folio:</strong> {{ folio || "—" }}</span>
-      </div>
-      <div class="meta-center">
-        <span>{{ widthCm }} × {{ heightCm }} cm</span>
-        <span>• {{ tool }}</span>
-        <span>• {{ direction }}</span>
+      <div class="meta-main">
+        <div class="meta-row">
+          <span class="meta-item"><strong>Shelfmark:</strong> {{ shelfmark || "—" }}</span>
+          <span class="meta-item"><strong>Siglum:</strong> {{ siglum || "—" }}</span>
+          <span class="meta-item"><strong>Folio:</strong> {{ folio || "—" }}</span>
+        </div>
+        <div class="meta-row meta-row-secondary">
+          <span>{{ widthCm }} × {{ heightCm }} cm</span>
+          <span>• {{ tool }}</span>
+          <span>• {{ direction }}</span>
+        </div>
       </div>
       <div class="meta-right">
         <span class="mode-pill">Mode: {{ modeLabel }}</span>
@@ -310,6 +312,21 @@
           <div v-else class="empty-selected">
             Click near a line or pricking in <strong>Select</strong> mode.
           </div>
+
+          <!-- Selection summary / unselect -->
+          <div v-if="selectedLine || selectedPricking" class="selected-summary">
+            <div class="selected-summary-top">
+              <div class="selected-chip" :style="{ backgroundColor: selectedColor }"></div>
+              <div class="selected-text">
+                {{ selectedKind === 'line' ? 'Line' : 'Pricking' }}
+                <span class="selected-id">{{ selectedIdLabel }}</span>
+              </div>
+            </div>
+            <div class="btn-row small-row">
+              <button @click="clearSelection">Unselect</button>
+              <button @click="clearSelection">Done</button>
+            </div>
+          </div>
         </section>
 
         <!-- Image -->
@@ -354,8 +371,8 @@
 </template>
 
 <script setup>
-// Fenius Ruling Screen Component
-import { ref, reactive, computed, onMounted, onUnmounted, watch, nextTick } from "vue";
+/* eslint-disable */
+import { ref, computed, onMounted, onBeforeUnmount, watch } from "vue";
 import { useRoute } from "vue-router";
 import jsPDF from "jspdf";
 
@@ -406,6 +423,35 @@ function makePricking(data) {
   };
 }
 
+/* Color helpers for screen + PDF */
+function getLineColor(line) {
+  if (line.hypothetical) return "#808080"; // grey for reconstructed
+  switch (line.role) {
+    case "text-horizontal":
+      return "#0088ff"; // strong blue
+    case "bounding":
+      return "#ff8800"; // orange
+    case "margin":
+      return "#e645ff"; // magenta
+    case "column":
+      return "#00d0b8"; // teal
+    default:
+      return "#000000"; // black
+  }
+}
+
+function getPrickingColor(pricking) {
+  if (pricking.hypothetical) return "#808080";
+  switch (pricking.role) {
+    case "margin":
+      return "#e645ff"; // magenta
+    case "column":
+      return "#00d0b8"; // teal
+    default:
+      return "#000000";
+  }
+}
+
 /* -------- State -------- */
 const zoom = ref(1);
 const zoomPercent = computed(() => Math.round(zoom.value * 100));
@@ -438,6 +484,17 @@ const selectedLine = computed(() => {
 const selectedPricking = computed(() => {
   if (selectedFeature.value.kind !== "pricking") return null;
   return prickings.value.find((p) => p.id === selectedFeature.value.id) || null;
+});
+
+const selectedColor = computed(() => {
+  if (selectedLine.value) return getLineColor(selectedLine.value);
+  if (selectedPricking.value) return getPrickingColor(selectedPricking.value);
+  return "#4b5563";
+});
+const selectedIdLabel = computed(() => {
+  if (selectedLine.value) return selectedLine.value.id;
+  if (selectedPricking.value) return selectedPricking.value.id;
+  return "—";
 });
 
 const lineRoleOptions = [
@@ -474,6 +531,12 @@ const hor2 = ref(0);
 const start_y3 = ref(0);
 const end_y3 = ref(0);
 const number2 = ref(2);
+
+/* Ghost previews for forms */
+const ghostSingleLine = ref(null);
+const ghostMultiLines = ref([]);
+const ghostSinglePricking = ref(null);
+const ghostMultiPrickings = ref([]);
 
 /* Undo / redo */
 const undoStack = ref([]);
@@ -512,9 +575,11 @@ function drawRulers() {
   const ctx = c.getContext("2d");
   ctx.clearRect(0, 0, c.width, c.height);
 
+  // dark background behind rulers + page
   ctx.fillStyle = "#0b1724";
   ctx.fillRect(0, 0, c.width, c.height);
 
+  // page border
   ctx.strokeStyle = "#ffffff";
   ctx.lineWidth = 1;
   ctx.beginPath();
@@ -524,27 +589,46 @@ function drawRulers() {
   ctx.font = "10px Arial";
   ctx.fillStyle = "#ffffff";
 
-  // top ruler
+  const stepPx = Math.round(PX_PER_CM * SCALE_FACTOR);
+  const fiveStepPx = stepPx * 5;
+
+  // top ruler with 5cm markers
   ctx.beginPath();
-  for (let px = 0; px <= baseWidthPx.value; px += Math.round(PX_PER_CM * SCALE_FACTOR)) {
-    const cm = pxToCmX(px);
-    const isMajor = Math.abs(cm - Math.round(cm)) < 1e-6;
-    const xPos = 15 + px;
-    ctx.moveTo(xPos, isMajor ? 0 : 7);
+  // Draw 1cm ticks
+  for (let cm = 0; cm <= widthCm.value; cm += 1) {
+    const xPos = 15 + cmToPxX(cm);
+    ctx.moveTo(xPos, 7);
     ctx.lineTo(xPos, 14);
-    if (isMajor) ctx.fillText(cm.toFixed(0), xPos + 2, 10);
   }
   ctx.stroke();
 
-  // left ruler
+  // Draw 5cm ticks and labels
   ctx.beginPath();
-  for (let py = 0; py <= baseHeightPx.value; py += Math.round(PX_PER_CM * SCALE_FACTOR)) {
-    const cm = pxToCmY(py);
-    const isMajor = Math.abs(cm - Math.round(cm)) < 1e-6;
-    const yPos = 15 + py;
-    ctx.moveTo(isMajor ? 0 : 7, yPos);
+  for (let cm = 0; cm <= widthCm.value; cm += 5) {
+    const xPos = 15 + cmToPxX(cm);
+    ctx.moveTo(xPos, 0);
+    ctx.lineTo(xPos, 14);
+    ctx.fillText(String(cm), xPos + 2, 10);
+  }
+  ctx.stroke();
+
+  // left ruler with 5cm markers
+  ctx.beginPath();
+  // Draw 1cm ticks
+  for (let cm = 0; cm <= heightCm.value; cm += 1) {
+    const yPos = 15 + cmToPxY(cm);
+    ctx.moveTo(7, yPos);
     ctx.lineTo(14, yPos);
-    if (isMajor) ctx.fillText(cm.toFixed(0), 2, yPos + 10);
+  }
+  ctx.stroke();
+
+  // Draw 5cm ticks and labels
+  ctx.beginPath();
+  for (let cm = 0; cm <= heightCm.value; cm += 5) {
+    const yPos = 15 + cmToPxY(cm);
+    ctx.moveTo(0, yPos);
+    ctx.lineTo(14, yPos);
+    ctx.fillText(String(cm), 2, yPos + 10);
   }
   ctx.stroke();
 }
@@ -574,23 +658,24 @@ function drawShapes() {
   const ctx = c?.getContext("2d");
   if (!ctx) return;
   ctx.clearRect(0, 0, c.width, c.height);
-  ctx.lineWidth = 1;
 
-  // lines
+  // ----- Lines -----
+  ctx.lineWidth = 1;
   for (const L of lines.value) {
-    const isSelected = selectedFeature.value.kind === "line" && selectedFeature.value.id === L.id;
-    let color = "#ffffff";
-    if (L.role === "text-horizontal") color = "#a8ffea";
-    else if (L.role === "margin") color = "#ffb3ff";
-    else if (L.role === "column") color = "#a8c5ff";
-    else if (L.role === "bounding") color = "#ffdd88";
+    const isSelected =
+      selectedFeature.value.kind === "line" &&
+      selectedFeature.value.id === L.id;
+
+    const baseColor = getLineColor(L);
 
     ctx.save();
     if (L.hypothetical) {
       ctx.setLineDash([4, 3]);
-      color = "#999999";
+    } else {
+      ctx.setLineDash([]);
     }
-    ctx.strokeStyle = isSelected ? "#00ffd5" : color;
+
+    ctx.strokeStyle = isSelected ? "#00ffd5" : baseColor;
     ctx.beginPath();
     ctx.moveTo(cmToPxX(L.x1), cmToPxY(L.y1));
     ctx.lineTo(cmToPxX(L.x2), cmToPxY(L.y2));
@@ -598,22 +683,57 @@ function drawShapes() {
     ctx.restore();
   }
 
-  // prickings
+  // ----- Prickings -----
   for (const P of prickings.value) {
     const isSelected =
-      selectedFeature.value.kind === "pricking" && selectedFeature.value.id === P.id;
+      selectedFeature.value.kind === "pricking" &&
+      selectedFeature.value.id === P.id;
 
-    let color = "#ffffff";
-    if (P.role === "margin") color = "#ffb3ff";
-    if (P.role === "column") color = "#a8c5ff";
-    if (P.hypothetical) color = "#999999";
-
+    const baseColor = getPrickingColor(P);
     const px = cmToPxX(P.x);
     const py = cmToPxY(P.y);
-    const ctx2 = ctx;
-    ctx2.fillStyle = isSelected ? "#00ffd5" : color;
-    ctx2.fillRect(px - 2, py - 0.5, 5, 1);
+
+    ctx.fillStyle = isSelected ? "#00ffd5" : baseColor;
+    ctx.fillRect(px - 3, py - 1, 6, 2);
   }
+
+  // ----- Ghost previews -----
+  // ghost lines
+  ctx.save();
+  ctx.setLineDash([4, 4]);
+  ctx.globalAlpha = 0.6;
+  ctx.strokeStyle = "#9ca3af";
+  if (ghostSingleLine.value) {
+    const L = ghostSingleLine.value;
+    ctx.beginPath();
+    ctx.moveTo(cmToPxX(L.x1), cmToPxY(L.y1));
+    ctx.lineTo(cmToPxX(L.x2), cmToPxY(L.y2));
+    ctx.stroke();
+  }
+  for (const L of ghostMultiLines.value) {
+    ctx.beginPath();
+    ctx.moveTo(cmToPxX(L.x1), cmToPxY(L.y1));
+    ctx.lineTo(cmToPxX(L.x2), cmToPxY(L.y2));
+    ctx.stroke();
+  }
+  ctx.restore();
+
+  // ghost prickings
+  ctx.save();
+  ctx.globalAlpha = 0.6;
+  ctx.fillStyle = "#9ca3af";
+  if (ghostSinglePricking.value) {
+    const P = ghostSinglePricking.value;
+    const px = cmToPxX(P.x);
+    const py = cmToPxY(P.y);
+    ctx.fillRect(px - 3, py - 1, 6, 2);
+  }
+  for (const P of ghostMultiPrickings.value) {
+    const px = cmToPxX(P.x);
+    const py = cmToPxY(P.y);
+    ctx.fillRect(px - 3, py - 1, 6, 2);
+  }
+  ctx.restore();
 }
 
 function redrawAll() {
@@ -653,6 +773,11 @@ function redo() {
 /* -------- Modes & mouse helpers -------- */
 function setMode(m) {
   mode.value = m;
+}
+
+function clearSelection() {
+  selectedFeature.value = { kind: null, id: null };
+  redrawAll();
 }
 
 function toLocalCoords(e) {
@@ -902,6 +1027,84 @@ function addMultiplePrickings() {
   redrawAll();
 }
 
+/* -------- Ghost previews (watch form fields) -------- */
+watch([start_x, start_y, end_x, end_y], () => {
+  const x1 = start_x.value;
+  const y1 = start_y.value;
+  const x2 = end_x.value;
+  const y2 = end_y.value;
+  if (
+    Number.isFinite(x1) &&
+    Number.isFinite(y1) &&
+    Number.isFinite(x2) &&
+    Number.isFinite(y2)
+  ) {
+    ghostSingleLine.value = {
+      x1: snapPoint(x1),
+      y1: snapPoint(y1),
+      x2: snapPoint(x2),
+      y2: snapPoint(y2),
+    };
+  } else {
+    ghostSingleLine.value = null;
+  }
+  redrawAll();
+});
+
+watch([start_x2, end_x2, start_y2, end_y2, number], () => {
+  const n = Math.max(1, Math.floor(number.value || 0));
+  const y0 = start_y2.value;
+  const y1 = end_y2.value;
+  if (!Number.isFinite(y0) || !Number.isFinite(y1) || !n) {
+    ghostMultiLines.value = [];
+    redrawAll();
+    return;
+  }
+  const step = n === 1 ? 0 : (y1 - y0) / (n - 1);
+  const arr = [];
+  for (let i = 0; i < n; i++) {
+    const y = snapPoint(y0 + i * step);
+    arr.push({
+      x1: snapPoint(start_x2.value),
+      y1: y,
+      x2: snapPoint(end_x2.value),
+      y2: y,
+    });
+  }
+  ghostMultiLines.value = arr;
+  redrawAll();
+});
+
+watch([hor, ver], () => {
+  const x = hor.value;
+  const y = ver.value;
+  if (Number.isFinite(x) && Number.isFinite(y)) {
+    ghostSinglePricking.value = { x: snapPoint(x), y: snapPoint(y) };
+  } else {
+    ghostSinglePricking.value = null;
+  }
+  redrawAll();
+});
+
+watch([hor2, start_y3, end_y3, number2], () => {
+  const n = Math.max(1, Math.floor(number2.value || 0));
+  const y0 = start_y3.value;
+  const y1 = end_y3.value;
+  if (!Number.isFinite(y0) || !Number.isFinite(y1) || !n) {
+    ghostMultiPrickings.value = [];
+    redrawAll();
+    return;
+  }
+  const step = n === 1 ? 0 : (y1 - y0) / (n - 1);
+  const arr = [];
+  for (let i = 0; i < n; i++) {
+    const y = snapPoint(y0 + i * step);
+    arr.push({ x: snapPoint(hor2.value), y });
+  }
+  ghostMultiPrickings.value = arr;
+  redrawAll();
+});
+
 /* -------- Selected feature updates -------- */
 function updateSelectedLineRole(val) {
   const l = selectedLine.value;
@@ -1028,12 +1231,16 @@ function restoreAutosave() {
 }
 
 let autosaveTimer = null;
-watch([lines, prickings, globalNotes, zoom, snapEnabled, snapStepCm], () => {
-  clearTimeout(autosaveTimer);
-  autosaveTimer = setTimeout(saveAutosave, 500);
-}, { deep: true });
+watch(
+  [lines, prickings, globalNotes, zoom, snapEnabled, snapStepCm],
+  () => {
+    clearTimeout(autosaveTimer);
+    autosaveTimer = setTimeout(saveAutosave, 500);
+  },
+  { deep: true }
+);
 
-/* -------- Export (with legend only in PDF) -------- */
+/* -------- Export (with legend, strong colors & feature notes) -------- */
 function width_size() {
   let width_pdf = PAGE_BASE_WIDTH_CM;
   let height_pdf = PAGE_BASE_WIDTH_CM * (heightCm.value / widthCm.value);
@@ -1043,57 +1250,181 @@ function width_size() {
   }
   return width_pdf;
 }
+
 function height_size() {
   let height_pdf = PAGE_BASE_WIDTH_CM * (heightCm.value / widthCm.value);
   while (height_pdf > 28.2857142857) height_pdf /= 1.2;
   return height_pdf;
 }
 
+// helper for jsPDF colors
+function hexToRgb(hex) {
+  const m = /^#?([a-f\d]{2})([a-f\d]{2})([a-f\d]{2})$/i.exec(hex);
+  if (!m) return { r: 0, g: 0, b: 0 };
+  return {
+    r: parseInt(m[1], 16),
+    g: parseInt(m[2], 16),
+    b: parseInt(m[3], 16),
+  };
+}
+
+// render schema into temp canvas for PDF (thicker, saturated)
+function renderSchemaToCanvasForPdf(ctx, includeImage) {
+  const w = baseWidthPx.value;
+  const h = baseHeightPx.value;
+
+  ctx.clearRect(0, 0, w, h);
+  ctx.fillStyle = "#ffffff";
+  ctx.fillRect(0, 0, w, h);
+
+  ctx.strokeStyle = "#000000";
+  ctx.lineWidth = 1;
+  ctx.strokeRect(0, 0, w, h);
+
+  if (includeImage && bg.value) {
+    ctx.drawImage(bg.value, 0, 0, w, h);
+  }
+
+  // Lines (thicker)
+  for (const L of lines.value) {
+    const color = getLineColor(L);
+    ctx.save();
+    ctx.beginPath();
+    ctx.lineWidth = L.hypothetical ? 1 : 2;
+    ctx.strokeStyle = color;
+    if (L.hypothetical) {
+      ctx.setLineDash([6, 4]);
+    } else {
+      ctx.setLineDash([]);
+    }
+    ctx.moveTo(cmToPxX(L.x1), cmToPxY(L.y1));
+    ctx.lineTo(cmToPxX(L.x2), cmToPxY(L.y2));
+    ctx.stroke();
+    ctx.restore();
+  }
+
+  // Prickings (thicker)
+  for (const P of prickings.value) {
+    const color = getPrickingColor(P);
+    const px = cmToPxX(P.x);
+    const py = cmToPxY(P.y);
+    ctx.fillStyle = color;
+    ctx.fillRect(px - 3, py - 1, 6, 2);
+  }
+}
+
 function exportPdf() {
   const pdf = new jsPDF("p", "cm", "a4");
-
   let y = 2;
+
+  // ---------- METADATA ----------
   pdf.setFontSize(13);
+  pdf.setTextColor(0, 0, 0);
   pdf.text(1, y, `Shelfmark: ${shelfmark.value || ""}`); y += 0.7;
   pdf.text(1, y, `Siglum: ${siglum.value || ""}`); y += 0.7;
   pdf.text(1, y, `Folio: ${folio.value || ""}`); y += 0.7;
   pdf.text(1, y, `Size: ${widthCm.value} × ${heightCm.value} cm`); y += 0.7;
   pdf.text(1, y, `Ruling tool: ${tool.value}, direction: ${direction.value}`); y += 1;
 
-  if (includeNotesInPdf.value && globalNotes.value.trim()) {
-    pdf.setFontSize(12);
-    pdf.text(1, y, "Notes:");
-    y += 0.6;
-    const txt = pdf.splitTextToSize(globalNotes.value, 17);
-    pdf.text(1, y, txt);
-    y += (txt.length + 1) * 0.5;
+  const pageHeight = 29.7;
+  const marginBottom = 1.5;
+  const maxY = pageHeight - marginBottom;
+
+  function ensureSpace(needed) {
+    if (y + needed > maxY) {
+      pdf.addPage();
+      y = 2;
+    }
   }
 
-  // Legend (PDF only)
-  y += 0.4;
-  pdf.setFontSize(12);
-  pdf.text(1, y, "Legend:"); y += 0.6;
-  const legendLines = [
-    "- Text lines (horizontal)",
-    "- Bounding lines",
-    "- Margin and column guidelines",
-    "- Hypothetical features (dashed / grey)",
-    "- Prickings in margins"
-  ];
-  pdf.text(1, y, legendLines);
+  // ---------- GLOBAL NOTES ----------
+  if (includeNotesInPdf.value && globalNotes.value.trim()) {
+    pdf.setFontSize(12);
+    ensureSpace(2);
+    pdf.text(1, y, "Notes:");
+    y += 0.6;
 
-  // Second page: schema
+    const wrapped = pdf.splitTextToSize(globalNotes.value, 17);
+    ensureSpace(wrapped.length * 0.5 + 0.5);
+    pdf.text(1, y, wrapped);
+    y += wrapped.length * 0.5 + 0.7;
+  }
+
+  // ---------- FEATURE NOTES ----------
+  const featureNotes = [];
+  lines.value.forEach((L, idx) => {
+    if (L.note && L.note.trim()) {
+      featureNotes.push({
+        kind: "Line",
+        id: L.id || `L${idx + 1}`,
+        role: L.role || "other",
+        note: L.note.trim(),
+      });
+    }
+  });
+  prickings.value.forEach((P, idx) => {
+    if (P.note && P.note.trim()) {
+      featureNotes.push({
+        kind: "Pricking",
+        id: P.id || `P${idx + 1}`,
+        role: P.role || "other",
+        note: P.note.trim(),
+      });
+    }
+  });
+
+  if (featureNotes.length) {
+    pdf.setFontSize(12);
+    ensureSpace(1);
+    pdf.text(1, y, "Feature notes:");
+    y += 0.6;
+    pdf.setFontSize(11);
+
+    for (const fn of featureNotes) {
+      const prefix = `${fn.kind} ${fn.id} (${fn.role}): `;
+      const text = prefix + fn.note;
+      const wrapped = pdf.splitTextToSize(text, 17);
+      ensureSpace(wrapped.length * 0.5 + 0.6);
+      pdf.text(1, y, wrapped);
+      y += wrapped.length * 0.5 + 0.4;
+    }
+  }
+
+  // ---------- COLOR LEGEND ----------
+  ensureSpace(4);
+  pdf.setFontSize(12);
+  pdf.setTextColor(0, 0, 0);
+  pdf.text(1, y, "Legend:");
+  y += 0.6;
+
+  const legendEntries = [
+    { label: "Text lines (horizontal)",        color: "#0088ff" },
+    { label: "Bounding lines",                color: "#ff8800" },
+    { label: "Margin guidelines / prickings", color: "#e645ff" },
+    { label: "Column boundaries / prickings", color: "#00d0b8" },
+    { label: "Hypothetical (reconstructed)",  color: "#808080" },
+  ];
+
+  pdf.setLineWidth(0.06);
+  for (const entry of legendEntries) {
+    ensureSpace(0.8);
+    const { r, g, b } = hexToRgb(entry.color);
+    pdf.setDrawColor(r, g, b);
+    pdf.line(1, y, 3, y);               // colored sample
+    pdf.setTextColor(0, 0, 0);
+    pdf.text(3.4, y + 0.1, entry.label);
+    y += 0.7;
+  }
+  pdf.setDrawColor(0, 0, 0);
+
+  // ---------- SECOND PAGE: SCHEMA ----------
   pdf.addPage();
   const temp = document.createElement("canvas");
   temp.width = baseWidthPx.value;
   temp.height = baseHeightPx.value;
   const ctx = temp.getContext("2d");
 
-  ctx.fillStyle = "#ffffff";
-  ctx.fillRect(0, 0, temp.width, temp.height);
-
-  if (includeImageInPdf.value && bg.value) ctx.drawImage(bg.value, 0, 0);
-  if (draw.value) ctx.drawImage(draw.value, 0, 0);
+  renderSchemaToCanvasForPdf(ctx, includeImageInPdf.value);
 
   const img = temp.toDataURL("image/png", 1.0);
   pdf.addImage(img, "PNG", 0.5, 0.5, width_size(), height_size());
@@ -1130,7 +1461,7 @@ function exportJson() {
 
 /* -------- Keyboard shortcuts -------- */
 function onKey(e) {
-  // Save
+  // Save (to autosave)
   if ((e.ctrlKey || e.metaKey) && e.key.toLowerCase() === "s") {
     e.preventDefault();
     saveAutosave();
@@ -1186,31 +1517,48 @@ onBeforeUnmount(() => {
 
 .title {
   text-align: center;
-  margin: 10px 0 6px;
+  margin: 10px 0 4px;
   font-size: 28px;
   color: #a0a0a0;
 }
 
+/* Meta summary directly under FENIUS */
 .meta-summary {
   display: flex;
-  justify-content: space-between;
   align-items: center;
-  padding: 6px 24px 8px;
+  justify-content: space-between;
+  padding: 4px 24px 8px;
   font-size: 13px;
   color: #dee5f2;
+  gap: 12px;
 }
 
-.meta-left,
-.meta-center,
-.meta-right {
-  display: flex;
-  align-items: center;
-  gap: 8px;
-  flex-wrap: wrap;
+.meta-main {
+  flex: 1;
+  text-align: center;
 }
+
+.meta-row {
+  display: flex;
+  justify-content: center;
+  flex-wrap: wrap;
+  gap: 8px;
+}
+
+.meta-row-secondary {
+  margin-top: 2px;
+  opacity: 0.9;
+}
+
 .meta-item strong {
   font-weight: 600;
   color: #ffffff;
+}
+
+.meta-right {
+  display: flex;
+  justify-content: flex-end;
+  align-items: center;
 }
 
 .mode-pill {
@@ -1224,25 +1572,47 @@ onBeforeUnmount(() => {
 .ruling-layout {
   flex: 1;
   display: grid;
-  grid-template-columns: 260px minmax(0, 1fr) 260px;
+  grid-template-columns: 280px minmax(0, 1fr) 280px;
   gap: 12px;
   padding: 8px 12px 12px;
   box-sizing: border-box;
 }
 
+/* Sidebars */
 .side {
-  padding: 4px 4px;
+  padding: 8px;
+  background: #1b2738;
+  border-radius: 12px;
+  overflow-y: auto;
+  max-height: calc(100vh - 170px);
+}
+
+.side::-webkit-scrollbar {
+  width: 6px;
+}
+.side::-webkit-scrollbar-track {
+  background: transparent;
+}
+.side::-webkit-scrollbar-thumb {
+  background: rgba(148, 163, 184, 0.6);
+  border-radius: 999px;
 }
 
 /* Panels */
 .panel {
   margin-bottom: 10px;
+  background: rgba(15, 23, 42, 0.9);
+  border-radius: 10px;
+  padding: 8px;
+  border: 1px solid rgba(148, 163, 184, 0.45);
 }
+
 .panel h3 {
   font-size: 15px;
   margin: 0 0 6px;
   font-weight: 600;
 }
+
 .panel h4 {
   font-size: 13px;
   margin: 6px 0 4px;
@@ -1260,21 +1630,23 @@ button {
   font: inherit;
   padding: 7px 12px;
   border-radius: 999px;
-  border: 1px solid rgba(255, 255, 255, 0.5);
-  background: transparent;
+  border: 1px solid #4b5563;
+  background: #243b5a;
   color: #ffffff;
   cursor: pointer;
+  transition: background 0.15s ease, border-color 0.15s ease, color 0.15s ease;
 }
 button:hover:not(:disabled) {
-  background: rgba(255, 255, 255, 0.15);
+  background: #365778;
 }
 button:disabled {
   opacity: 0.4;
   cursor: not-allowed;
 }
 button.active {
-  background: #ffffff;
-  color: #0b1724;
+  background: #f97316;
+  border-color: #f97316;
+  color: #111827;
 }
 .small-btn {
   margin-top: 6px;
@@ -1285,6 +1657,9 @@ button.active {
   display: flex;
   gap: 6px;
   margin-top: 6px;
+}
+.btn-row.small-row {
+  justify-content: flex-start;
 }
 
 .mode-buttons {
@@ -1308,8 +1683,8 @@ select {
   padding: 6px 8px;
   margin-top: 3px;
   background: #1f2a3a;
-  border-radius: 4px;
-  border: 1px solid #666;
+  border-radius: 6px;
+  border: 1px solid #4b5563;
   color: #ffffff;
   font-size: 13px;
   box-sizing: border-box;
@@ -1436,6 +1811,39 @@ select {
 .empty-selected {
   font-size: 13px;
   color: #cbd5f5;
+}
+
+/* Selection summary */
+.selected-summary {
+  margin-top: 8px;
+  padding-top: 6px;
+  border-top: 1px solid rgba(148, 163, 184, 0.4);
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+
+.selected-summary-top {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.selected-chip {
+  width: 26px;
+  height: 6px;
+  border-radius: 999px;
+  background: #9ca3af;
+}
+
+.selected-text {
+  font-size: 12px;
+  color: #e5e7eb;
+}
+
+.selected-id {
+  font-weight: 600;
+  margin-left: 4px;
 }
 
 /* File input */
