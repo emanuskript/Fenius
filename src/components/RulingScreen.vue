@@ -8,6 +8,7 @@
     <div class="meta-summary">
       <div class="meta-main">
         <div class="meta-row">
+          <span class="meta-item"><strong>City/Repository:</strong> {{ cityRepository || "—" }}</span>
           <span class="meta-item"><strong>Shelfmark:</strong> {{ shelfmark || "—" }}</span>
           <span class="meta-item"><strong>Siglum:</strong> {{ siglum || "—" }}</span>
           <span class="meta-item"><strong>Folio:</strong> {{ folio || "—" }}</span>
@@ -15,7 +16,7 @@
         <div class="meta-row meta-row-secondary">
           <span>{{ widthCm }} × {{ heightCm }} cm</span>
           <span>• {{ tool }}</span>
-          <span>• {{ direction }}</span>
+          <span>• {{ directionLabel }}</span>
         </div>
       </div>
       <div class="meta-right">
@@ -50,8 +51,8 @@
         <!-- Lines -->
         <section class="panel">
           <h3>Lines</h3>
-          <h4>Single line</h4>
-          <div class="field-row two">
+          <h4>Single horizontal line</h4>
+          <div class="field-row three">
             <div>
               <label class="field-label">start x (cm)</label>
               <input type="number" step="0.1" v-model.number="start_x" class="number-input" />
@@ -60,15 +61,9 @@
               <label class="field-label">end x (cm)</label>
               <input type="number" step="0.1" v-model.number="end_x" class="number-input" />
             </div>
-          </div>
-          <div class="field-row two">
             <div>
-              <label class="field-label">start y (cm)</label>
+              <label class="field-label">y (cm)</label>
               <input type="number" step="0.1" v-model.number="start_y" class="number-input" />
-            </div>
-            <div>
-              <label class="field-label">end y (cm)</label>
-              <input type="number" step="0.1" v-model.number="end_y" class="number-input" />
             </div>
           </div>
           <button class="small-btn" @click="addSingleLine">Add line</button>
@@ -382,6 +377,7 @@ import jsPDF from "jspdf";
 /* -------- Metadata from route -------- */
 const route = useRoute();
 
+const cityRepository = ref(route.query.cityRepository || "");
 const shelfmark = ref(route.query.shelfmark || "");
 const siglum = ref(route.query.siglum || "");
 const folio = ref(route.query.folio || "");
@@ -473,6 +469,12 @@ const modeLabel = computed(() => {
   if (mode.value === "erase") return "Erase";
   if (mode.value === "select") return "Select";
   return "Draw";
+});
+
+const directionLabel = computed(() => {
+  if (direction.value === ">") return "> applied from above";
+  if (direction.value === "<") return "< applied from below";
+  return direction.value;
 });
 
 const cursorCm = ref({ x: 0, y: 0 });
@@ -986,12 +988,8 @@ function addSingleLine() {
       x1: snapPoint(start_x.value),
       y1: snapPoint(start_y.value),
       x2: snapPoint(end_x.value),
-      y2: snapPoint(end_y.value),
-      role:
-        Math.abs(start_y.value - end_y.value) <
-        Math.abs(start_x.value - end_x.value)
-          ? "text-horizontal"
-          : "text-vertical",
+      y2: snapPoint(start_y.value), // Use same y value for horizontal line
+      role: "text-horizontal",
     }),
   ];
   redrawAll();
@@ -1191,6 +1189,7 @@ function saveAutosave() {
   try {
     const payload = {
       meta: {
+        cityRepository: cityRepository.value,
         shelfmark: shelfmark.value,
         siglum: siglum.value,
         folio: folio.value,
@@ -1222,6 +1221,7 @@ function restoreAutosave() {
   try {
     const data = JSON.parse(raw);
     if (data.meta) {
+      cityRepository.value = data.meta.cityRepository ?? cityRepository.value;
       shelfmark.value = data.meta.shelfmark ?? shelfmark.value;
       siglum.value = data.meta.siglum ?? siglum.value;
       folio.value = data.meta.folio ?? folio.value;
@@ -1246,16 +1246,6 @@ function restoreAutosave() {
     // ignore
   }
 }
-
-let autosaveTimer = null;
-watch(
-  [lines, prickings, globalNotes, zoom, snapEnabled, snapStepCm],
-  () => {
-    clearTimeout(autosaveTimer);
-    autosaveTimer = setTimeout(saveAutosave, 500);
-  },
-  { deep: true }
-);
 
 /* -------- Export (with legend, strong colors & feature notes) -------- */
 function width_size() {
@@ -1453,6 +1443,7 @@ function exportPdf() {
 function exportJson() {
   const payload = {
     meta: {
+      cityRepository: cityRepository.value,
       shelfmark: shelfmark.value,
       siglum: siglum.value,
       folio: folio.value,
@@ -1502,7 +1493,6 @@ function onKey(e) {
 
 /* -------- Lifecycle -------- */
 onMounted(() => {
-  restoreAutosave();
   redrawAll();
   window.addEventListener("keydown", onKey);
 });
@@ -1543,15 +1533,15 @@ onBeforeUnmount(() => {
 .meta-summary {
   display: flex;
   align-items: center;
-  justify-content: space-between;
+  justify-content: center;
   padding: 4px 24px 8px;
   font-size: 13px;
   color: #dee5f2;
   gap: 12px;
+  position: relative;
 }
 
 .meta-main {
-  flex: 1;
   text-align: center;
 }
 
@@ -1573,6 +1563,8 @@ onBeforeUnmount(() => {
 }
 
 .meta-right {
+  position: absolute;
+  right: 24px;
   display: flex;
   justify-content: flex-end;
   align-items: center;

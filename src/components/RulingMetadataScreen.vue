@@ -11,26 +11,42 @@
       <!-- Top metadata row -->
       <div class="metadata">
         <div class="meta-group">
-          <label class="field-label">Manuscript Shelfmark *</label>
+          <label class="field-label">City/Repository *</label>
+          <input
+            v-model="cityRepository"
+            type="text"
+            required
+            class="field-input"
+            placeholder="e.g. Graz, UB"
+          />
+
+          <label class="field-label mt">Shelfmark *</label>
           <input
             v-model="shelfmark"
             type="text"
             required
             class="field-input"
-            placeholder="e.g. Graz, UB, Ms. 123"
+            placeholder="e.g. Ms. 123"
           />
 
-          <label class="field-label mt">Siglum / Code</label>
+          <label class="field-label mt">Ruling tool</label>
+          <select v-model="tool" class="field-input">
+            <option value="dry-point">dry-point</option>
+            <option value="lead-point">lead-point</option>
+            <option value="ink">ink</option>
+          </select>
+        </div>
+
+        <div class="meta-group">
+          <label class="field-label">Siglum/ID Number</label>
           <input
             v-model="siglum"
             type="text"
             class="field-input"
             placeholder="Optional siglum or catalogue code"
           />
-        </div>
 
-        <div class="meta-group">
-          <label class="field-label">Folio / Page *</label>
+          <label class="field-label mt">Folio / Page *</label>
           <input
             v-model="folio"
             type="text"
@@ -61,25 +77,14 @@
         </div>
       </div>
 
-      <!-- Secondary metadata row: ruling tool / direction -->
-      <div class="metadata secondary">
-        <div class="meta-group">
-          <label class="field-label">Ruling tool</label>
-          <select v-model="tool" class="field-input">
-            <option value="dry-point">dry-point</option>
-            <option value="lead-point">lead-point</option>
-            <option value="ink">ink</option>
-          </select>
-        </div>
-
-        <div class="meta-group">
-          <label class="field-label">Direction</label>
-          <select v-model="direction" class="field-input">
-            <option value="none">none</option>
-            <option value=">">&gt;</option>
-            <option value="<">&lt;</option>
-          </select>
-        </div>
+      <!-- Direction (centered) -->
+      <div class="direction-centered">
+        <label class="field-label">Direction</label>
+        <select v-model="direction" class="field-input">
+          <option value="none">none</option>
+          <option value=">">&gt; applied from above</option>
+          <option value="<">&lt; applied from below</option>
+        </select>
       </div>
 
       <div class="separator"></div>
@@ -107,13 +112,14 @@
 </template>
 
 <script setup>
-import { ref, computed, onMounted, watch } from "vue";
+import { ref, computed, onMounted } from "vue";
 import { useRouter, useRoute } from "vue-router";
 
 const router = useRouter();
 const route = useRoute();
 
 // Local state
+const cityRepository = ref("");
 const shelfmark = ref("");
 const siglum = ref("");
 const folio = ref("");
@@ -122,11 +128,10 @@ const heightCm = ref(20);
 const tool = ref("dry-point");
 const direction = ref("none");
 
-const STORAGE_KEY = "feniusRulingMetadata";
-
-// Prefill from query or localStorage
+// Prefill from query
 onMounted(() => {
   // from route (e.g. coming back from ruling)
+  cityRepository.value = route.query.cityRepository || "";
   shelfmark.value = route.query.shelfmark || "";
   siglum.value = route.query.siglum || "";
   folio.value = route.query.folio || "";
@@ -134,52 +139,12 @@ onMounted(() => {
   heightCm.value = Number(route.query.heightCm) || 20;
   tool.value = route.query.tool || "dry-point";
   direction.value = route.query.direction || "none";
-
-  // from localStorage
-  try {
-    const saved = localStorage.getItem(STORAGE_KEY);
-    if (saved) {
-      const s = JSON.parse(saved);
-      shelfmark.value = s.shelfmark ?? shelfmark.value;
-      siglum.value = s.siglum ?? siglum.value;
-      folio.value = s.folio ?? folio.value;
-      widthCm.value = s.widthCm ?? widthCm.value;
-      heightCm.value = s.heightCm ?? heightCm.value;
-      tool.value = s.tool ?? tool.value;
-      direction.value = s.direction ?? direction.value;
-    }
-  } catch (_) {
-    // ignore
-  }
 });
 
-// Persist metadata
-watch(
-  [shelfmark, siglum, folio, widthCm, heightCm, tool, direction],
-  () => {
-    try {
-      localStorage.setItem(
-        STORAGE_KEY,
-        JSON.stringify({
-          shelfmark: shelfmark.value,
-          siglum: siglum.value,
-          folio: folio.value,
-          widthCm: widthCm.value,
-          heightCm: heightCm.value,
-          tool: tool.value,
-          direction: direction.value,
-        })
-      );
-    } catch (_) {
-      // ignore
-    }
-  },
-  { deep: false }
-);
-
-// Required fields: shelfmark, folio, width, height
+// Required fields: cityRepository, shelfmark, folio, width, height
 const canContinue = computed(
   () =>
+    cityRepository.value.trim() !== "" &&
     shelfmark.value.trim() !== "" &&
     folio.value.trim() !== "" &&
     widthCm.value > 0 &&
@@ -190,6 +155,7 @@ function goToRuling() {
   router.push({
     name: "ruling",
     query: {
+      cityRepository: cityRepository.value,
       shelfmark: shelfmark.value,
       siglum: siglum.value,
       folio: folio.value,
@@ -242,8 +208,14 @@ function goToRuling() {
   gap: 64px;
 }
 
-.metadata.secondary {
+.direction-centered {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
   margin-top: 24px;
+  max-width: 300px;
+  margin-left: auto;
+  margin-right: auto;
 }
 
 .meta-group {
@@ -285,6 +257,7 @@ function goToRuling() {
   font-size: 14px;
   color: #d0d4dd;
   line-height: 1.4;
+  text-align: center;
 }
 
 .size-row {
