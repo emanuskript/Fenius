@@ -39,6 +39,9 @@
             <button @click="undo" :disabled="!canUndo">Undo</button>
             <button @click="redo" :disabled="!canRedo">Redo</button>
           </div>
+          <div class="btn-row">
+            <button @click="clearAll" class="btn-danger">Clear All</button>
+          </div>
           <p class="hint">
             Click on rulers to add lines, inside the page to add prickings.
           </p>
@@ -429,6 +432,8 @@ function getLineColor(line) {
   switch (line.role) {
     case "text-horizontal":
       return "#0088ff"; // strong blue
+    case "text-vertical":
+      return "#00d0ff"; // cyan
     case "bounding":
       return "#ff8800"; // orange
     case "margin":
@@ -767,6 +772,18 @@ function redo() {
   lines.value = state.lines || [];
   prickings.value = state.prickings || [];
   selectedFeature.value = { kind: null, id: null };
+  redrawAll();
+}
+
+function clearAll() {
+  if (!confirm('Clear all lines and prickings? This cannot be undone.')) return;
+  lines.value = [];
+  prickings.value = [];
+  selectedFeature.value = { kind: null, id: null };
+  undoStack.value = [];
+  redoStack.value = [];
+  globalNotes.value = "";
+  localStorage.removeItem(AUTOSAVE_KEY);
   redrawAll();
 }
 
@@ -1647,6 +1664,14 @@ button.active {
   background: #f97316;
   border-color: #f97316;
   color: #111827;
+}
+button.btn-danger {
+  background: #dc2626;
+  border-color: #dc2626;
+}
+button.btn-danger:hover:not(:disabled) {
+  background: #b91c1c;
+  border-color: #b91c1c;
 }
 .small-btn {
   margin-top: 6px;
