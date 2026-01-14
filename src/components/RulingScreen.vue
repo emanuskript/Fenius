@@ -335,6 +335,55 @@
             <button @click="removeBackground" :disabled="!bgImage">Remove</button>
             <button @click="fitToWidth" :disabled="!bgImage">Fit to width</button>
           </div>
+          
+          <div v-if="bgImage" class="image-controls">
+            <h4>Adjust Image</h4>
+            <div class="field-row">
+              <div>
+                <label class="field-label">Scale</label>
+                <input 
+                  type="range" 
+                  min="0.1" 
+                  max="3" 
+                  step="0.01" 
+                  v-model.number="bgScale" 
+                  @input="redrawAll"
+                  :disabled="bgLocked"
+                />
+                <span class="range-value">{{ bgScale.toFixed(2) }}</span>
+              </div>
+            </div>
+            <div class="field-row two">
+              <div>
+                <label class="field-label">Offset X</label>
+                <input 
+                  type="number" 
+                  step="1" 
+                  v-model.number="bgOffsetX" 
+                  @input="redrawAll"
+                  class="number-input"
+                  :disabled="bgLocked"
+                />
+              </div>
+              <div>
+                <label class="field-label">Offset Y</label>
+                <input 
+                  type="number" 
+                  step="1" 
+                  v-model.number="bgOffsetY" 
+                  @input="redrawAll"
+                  class="number-input"
+                  :disabled="bgLocked"
+                />
+              </div>
+            </div>
+            <div class="btn-row">
+              <button @click="resetImageTransform" :disabled="bgLocked">Reset</button>
+              <button @click="bgLocked = !bgLocked" :class="{ active: bgLocked }">
+                {{ bgLocked ? 'Unlock' : 'Lock' }}
+              </button>
+            </div>
+          </div>
         </section>
 
         <!-- Notes -->
@@ -463,6 +512,10 @@ const showImage = ref(false);
 const imageOpacity = ref(0.6);
 const bgImage = ref(null);
 const bgFitMode = ref("width");
+const bgScale = ref(1.0);
+const bgOffsetX = ref(0);
+const bgOffsetY = ref(0);
+const bgLocked = ref(false);
 
 const mode = ref("draw"); // draw | erase | select
 const modeLabel = computed(() => {
@@ -647,17 +700,20 @@ function drawBackground() {
   ctx.clearRect(0, 0, c.width, c.height);
   if (!bgImage.value || !showImage.value) return;
 
+  let baseScale;
   if (bgFitMode.value === "width") {
-    const w = c.width;
-    const ratio = bgImage.value.height / bgImage.value.width;
-    const h = Math.round(w * ratio);
-    ctx.drawImage(bgImage.value, 0, 0, w, h);
+    baseScale = c.width / bgImage.value.width;
   } else {
-    const scale = Math.min(c.width / bgImage.value.width, c.height / bgImage.value.height);
-    const w = Math.round(bgImage.value.width * scale);
-    const h = Math.round(bgImage.value.height * scale);
-    ctx.drawImage(bgImage.value, 0, 0, w, h);
+    baseScale = Math.min(c.width / bgImage.value.width, c.height / bgImage.value.height);
   }
+
+  const finalScale = baseScale * bgScale.value;
+  const w = Math.round(bgImage.value.width * finalScale);
+  const h = Math.round(bgImage.value.height * finalScale);
+  const x = bgOffsetX.value;
+  const y = bgOffsetY.value;
+
+  ctx.drawImage(bgImage.value, x, y, w, h);
 }
 
 function drawShapes() {
@@ -992,6 +1048,7 @@ function addSingleLine() {
       role: "text-horizontal",
     }),
   ];
+  ghostSingleLine.value = null;
   redrawAll();
 }
 
@@ -1015,6 +1072,7 @@ function addMultipleLines() {
   }
   pushUndoSnapshot();
   lines.value = [...lines.value, ...newLines];
+  ghostMultiLines.value = [];
   redrawAll();
 }
 
@@ -1024,6 +1082,7 @@ function addSinglePricking() {
     ...prickings.value,
     makePricking({ x: snapPoint(hor.value), y: snapPoint(ver.value), role: "margin" }),
   ];
+  ghostSinglePricking.value = null;
   redrawAll();
 }
 
@@ -1039,26 +1098,25 @@ function addMultiplePrickings() {
   }
   pushUndoSnapshot();
   prickings.value = [...prickings.value, ...newPr];
+  ghostMultiPrickings.value = [];
   redrawAll();
 }
 
 /* -------- Ghost previews (watch form fields) -------- */
-watch([start_x, start_y, end_x, end_y], () => {
+watch([start_x, start_y, end_x], () => {
   const x1 = start_x.value;
-  const y1 = start_y.value;
+  const y = start_y.value;
   const x2 = end_x.value;
-  const y2 = end_y.value;
   if (
     Number.isFinite(x1) &&
-    Number.isFinite(y1) &&
-    Number.isFinite(x2) &&
-    Number.isFinite(y2)
+    Number.isFinite(y) &&
+    Number.isFinite(x2)
   ) {
     ghostSingleLine.value = {
       x1: snapPoint(x1),
-      y1: snapPoint(y1),
+      y1: snapPoint(y),
       x2: snapPoint(x2),
-      y2: snapPoint(y2),
+      y2: snapPoint(y), // Use same y for both endpoints (horizontal line)
     };
   } else {
     ghostSingleLine.value = null;
@@ -1181,6 +1239,16 @@ function removeBackground() {
 }
 function fitToWidth() {
   bgFitMode.value = "width";
+  bgScale.value = 1.0;
+  bgOffsetX.value = 0;
+  bgOffsetY.value = 0;
+  redrawAll();
+}
+
+function resetImageTransform() {
+  bgScale.value = 1.0;
+  bgOffsetX.value = 0;
+  bgOffsetY.value = 0;
   redrawAll();
 }
 
@@ -1800,6 +1868,7 @@ select {
   border-top: 1px solid #00ffd5;
   z-index: 4;
   display: none;
+  pointer-events: none;
 }
 .guide-v {
   position: absolute;
@@ -1810,6 +1879,7 @@ select {
   border-left: 1px solid #00ffd5;
   z-index: 4;
   display: none;
+  pointer-events: none;
 }
 
 /* Status bar */
@@ -1867,6 +1937,29 @@ select {
 .file-input {
   font-size: 13px;
   margin-bottom: 6px;
+}
+
+/* Image controls */
+.image-controls {
+  margin-top: 12px;
+  padding-top: 12px;
+  border-top: 1px solid #2d3748;
+}
+.image-controls h4 {
+  font-size: 13px;
+  margin: 0 0 8px 0;
+  color: #cbd5e0;
+}
+.range-value {
+  display: inline-block;
+  margin-left: 8px;
+  font-size: 12px;
+  color: #a0aec0;
+  min-width: 40px;
+}
+input[type="range"] {
+  width: 100%;
+  max-width: 150px;
 }
 
 /* Disabled helper */
