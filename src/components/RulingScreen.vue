@@ -96,6 +96,34 @@
           <button class="small-btn" @click="addMultipleLines">Add series</button>
         </section>
 
+        <!-- Circles -->
+        <section class="panel">
+          <h3>Circles/Ovals</h3>
+          <h4>Single circle</h4>
+          <div class="field-row two">
+            <div>
+              <label class="field-label">center x (cm)</label>
+              <input type="number" step="0.1" v-model.number="circle_x" class="number-input" />
+            </div>
+            <div>
+              <label class="field-label">center y (cm)</label>
+              <input type="number" step="0.1" v-model.number="circle_y" class="number-input" />
+            </div>
+          </div>
+          <div class="field-row two">
+            <div>
+              <label class="field-label">radius x (cm)</label>
+              <input type="number" step="0.1" v-model.number="circle_rx" class="number-input" />
+            </div>
+            <div>
+              <label class="field-label">radius y (cm)</label>
+              <input type="number" step="0.1" v-model.number="circle_ry" class="number-input" />
+            </div>
+          </div>
+          <button class="small-btn" @click="addSingleCircle">Add circle</button>
+          <p class="hint">Equal radii = circle, different = oval</p>
+        </section>
+
         <!-- Prickings -->
         <section class="panel">
           <h3>Prickings</h3>
@@ -115,21 +143,21 @@
           <h4>Vertical group</h4>
           <div class="field-row three">
             <div>
-              <label class="field-label">x</label>
+              <label class="field-label">x (cm)</label>
               <input type="number" step="0.1" v-model.number="hor2" class="number-input" />
             </div>
             <div>
               <label class="field-label">#</label>
               <input type="number" min="1" step="1" v-model.number="number2" class="number-input" />
             </div>
+          </div>
+          <div class="field-row two">
             <div>
-              <label class="field-label">start y</label>
+              <label class="field-label">start y (cm)</label>
               <input type="number" step="0.1" v-model.number="start_y3" class="number-input" />
             </div>
-          </div>
-          <div class="field-row">
             <div>
-              <label class="field-label">end y</label>
+              <label class="field-label">end y (cm)</label>
               <input type="number" step="0.1" v-model.number="end_y3" class="number-input" />
             </div>
           </div>
@@ -241,6 +269,7 @@
           <div>zoom: {{ zoomPercent }}%</div>
           <div>lines: {{ lines.length }}</div>
           <div>prickings: {{ prickings.length }}</div>
+          <div>circles: {{ circles.length }}</div>
         </footer>
       </main>
 
@@ -250,6 +279,67 @@
         <section class="panel">
           <h3>Selected</h3>
           <div v-if="selectedKind === 'line' && selectedLine">
+            <label class="field-label">Coordinates (cm)</label>
+            <div class="field-row two">
+              <div>
+                <label class="field-label-small">x1</label>
+                <input 
+                  type="number" 
+                  step="0.1" 
+                  :value="selectedLine.x1"
+                  @input="updateSelectedLineCoord('x1', $event.target.value)"
+                  class="number-input"
+                />
+              </div>
+              <div>
+                <label class="field-label-small">y1</label>
+                <input 
+                  type="number" 
+                  step="0.1" 
+                  :value="selectedLine.y1"
+                  @input="updateSelectedLineCoord('y1', $event.target.value)"
+                  class="number-input"
+                />
+              </div>
+            </div>
+            <div class="field-row two">
+              <div>
+                <label class="field-label-small">x2</label>
+                <input 
+                  type="number" 
+                  step="0.1" 
+                  :value="selectedLine.x2"
+                  @input="updateSelectedLineCoord('x2', $event.target.value)"
+                  class="number-input"
+                />
+              </div>
+              <div>
+                <label class="field-label-small">y2</label>
+                <input 
+                  type="number" 
+                  step="0.1" 
+                  :value="selectedLine.y2"
+                  @input="updateSelectedLineCoord('y2', $event.target.value)"
+                  class="number-input"
+                />
+              </div>
+            </div>
+
+            <label class="field-label">Quick adjust</label>
+            <div class="adjust-buttons">
+              <button class="adjust-btn" @click="shortenLineLeft">← Shorten</button>
+              <button class="adjust-btn" @click="shortenLineRight">Shorten →</button>
+              <button class="adjust-btn" @click="shortenLineTop">↑ Shorten</button>
+              <button class="adjust-btn" @click="shortenLineBottom">Shorten ↓</button>
+            </div>
+            <div class="adjust-buttons">
+              <button class="adjust-btn" @click="extendLineLeft">← Extend</button>
+              <button class="adjust-btn" @click="extendLineRight">Extend →</button>
+              <button class="adjust-btn" @click="extendLineTop">↑ Extend</button>
+              <button class="adjust-btn" @click="extendLineBottom">Extend ↓</button>
+            </div>
+            <p class="hint">Each click adjusts by {{ snapStepCm }} cm</p>
+
             <label class="field-label">Type</label>
             <select
               class="field-input"
@@ -279,6 +369,30 @@
           </div>
 
           <div v-else-if="selectedKind === 'pricking' && selectedPricking">
+            <label class="field-label">Position (cm)</label>
+            <div class="field-row two">
+              <div>
+                <label class="field-label-small">x</label>
+                <input 
+                  type="number" 
+                  step="0.1" 
+                  :value="selectedPricking.x"
+                  @input="updateSelectedPrickingCoord('x', $event.target.value)"
+                  class="number-input"
+                />
+              </div>
+              <div>
+                <label class="field-label-small">y</label>
+                <input 
+                  type="number" 
+                  step="0.1" 
+                  :value="selectedPricking.y"
+                  @input="updateSelectedPrickingCoord('y', $event.target.value)"
+                  class="number-input"
+                />
+              </div>
+            </div>
+
             <label class="field-label">Type</label>
             <select
               class="field-input"
@@ -307,16 +421,46 @@
             ></textarea>
           </div>
 
+          <div v-else-if="selectedKind === 'circle' && selectedCircle">
+            <label class="field-label">Center (cm)</label>
+            <div class="field-row two">
+              <span>x: {{ selectedCircle.cx.toFixed(2) }}</span>
+              <span>y: {{ selectedCircle.cy.toFixed(2) }}</span>
+            </div>
+
+            <label class="field-label">Radius (cm)</label>
+            <div class="field-row two">
+              <span>rx: {{ selectedCircle.rx.toFixed(2) }}</span>
+              <span>ry: {{ selectedCircle.ry.toFixed(2) }}</span>
+            </div>
+
+            <label class="field-inline">
+              <input
+                type="checkbox"
+                :checked="selectedCircle.hypothetical"
+                @change="updateSelectedCircleHypothetical($event.target.checked)"
+              />
+              hypothetical
+            </label>
+
+            <label class="field-label">Note</label>
+            <textarea
+              class="field-textarea"
+              :value="selectedCircle.note"
+              @input="updateSelectedCircleNote($event.target.value)"
+            ></textarea>
+          </div>
+
           <div v-else class="empty-selected">
-            Click near a line or pricking in <strong>Select</strong> mode.
+            Click near a line, pricking, or circle in <strong>Select</strong> mode.
           </div>
 
           <!-- Selection summary / unselect -->
-          <div v-if="selectedLine || selectedPricking" class="selected-summary">
+          <div v-if="selectedLine || selectedPricking || selectedCircle" class="selected-summary">
             <div class="selected-summary-top">
               <div class="selected-chip" :style="{ backgroundColor: selectedColor }"></div>
               <div class="selected-text">
-                {{ selectedKind === 'line' ? 'Line' : 'Pricking' }}
+                {{ selectedKind === 'line' ? 'Line' : selectedKind === 'pricking' ? 'Pricking' : 'Circle' }}
                 <span class="selected-id">{{ selectedIdLabel }}</span>
               </div>
             </div>
@@ -446,6 +590,7 @@ const snapVal = (v, step) => Math.round(v / step) * step;
 
 let lineIdCounter = 1;
 let prickingIdCounter = 1;
+let circleIdCounter = 1;
 
 function makeLine(data) {
   return {
@@ -466,6 +611,18 @@ function makePricking(data) {
     x: data.x,
     y: data.y,
     role: data.role || "other",
+    hypothetical: !!data.hypothetical,
+    note: data.note || "",
+  };
+}
+
+function makeCircle(data) {
+  return {
+    id: data.id || "C" + circleIdCounter++,
+    cx: data.cx,
+    cy: data.cy,
+    rx: data.rx,
+    ry: data.ry,
     hypothetical: !!data.hypothetical,
     note: data.note || "",
   };
@@ -534,6 +691,7 @@ const cursorCm = ref({ x: 0, y: 0 });
 
 const lines = ref([]);
 const prickings = ref([]);
+const circles = ref([]);
 
 const selectedFeature = ref({ kind: null, id: null });
 const selectedKind = computed(() => selectedFeature.value.kind);
@@ -545,15 +703,21 @@ const selectedPricking = computed(() => {
   if (selectedFeature.value.kind !== "pricking") return null;
   return prickings.value.find((p) => p.id === selectedFeature.value.id) || null;
 });
+const selectedCircle = computed(() => {
+  if (selectedFeature.value.kind !== "circle") return null;
+  return circles.value.find((c) => c.id === selectedFeature.value.id) || null;
+});
 
 const selectedColor = computed(() => {
   if (selectedLine.value) return getLineColor(selectedLine.value);
   if (selectedPricking.value) return getPrickingColor(selectedPricking.value);
+  if (selectedCircle.value) return "#ff0088"; // pink for circles
   return "#4b5563";
 });
 const selectedIdLabel = computed(() => {
   if (selectedLine.value) return selectedLine.value.id;
   if (selectedPricking.value) return selectedPricking.value.id;
+  if (selectedCircle.value) return selectedCircle.value.id;
   return "—";
 });
 
@@ -592,8 +756,15 @@ const start_y3 = ref(0);
 const end_y3 = ref(0);
 const number2 = ref(2);
 
+/* Circle form fields */
+const circle_x = ref(null);
+const circle_y = ref(null);
+const circle_rx = ref(null);
+const circle_ry = ref(null);
+
 /* Ghost previews for forms */
 const ghostSingleLine = ref(null);
+const ghostSingleCircle = ref(null);
 const ghostMultiLines = ref([]);
 const ghostSinglePricking = ref(null);
 const ghostMultiPrickings = ref([]);
@@ -760,6 +931,35 @@ function drawShapes() {
     ctx.fillRect(px - 3, py - 1, 6, 2);
   }
 
+  // ----- Circles -----
+  ctx.lineWidth = 1.5;
+  for (const C of circles.value) {
+    const isSelected =
+      selectedFeature.value.kind === "circle" &&
+      selectedFeature.value.id === C.id;
+
+    ctx.save();
+    if (C.hypothetical) {
+      ctx.setLineDash([4, 3]);
+    } else {
+      ctx.setLineDash([]);
+    }
+
+    ctx.strokeStyle = isSelected ? "#00ffd5" : "#ff0088"; // pink
+    ctx.beginPath();
+    ctx.ellipse(
+      cmToPxX(C.cx),
+      cmToPxY(C.cy),
+      cmToPxX(C.rx),
+      cmToPxY(C.ry),
+      0,
+      0,
+      2 * Math.PI
+    );
+    ctx.stroke();
+    ctx.restore();
+  }
+
   // ----- Ghost previews -----
   // ghost lines
   ctx.save();
@@ -797,6 +997,28 @@ function drawShapes() {
     ctx.fillRect(px - 3, py - 1, 6, 2);
   }
   ctx.restore();
+
+  // ghost circles
+  ctx.save();
+  ctx.setLineDash([4, 4]);
+  ctx.globalAlpha = 0.6;
+  ctx.strokeStyle = "#9ca3af";
+  ctx.lineWidth = 1.5;
+  if (ghostSingleCircle.value) {
+    const C = ghostSingleCircle.value;
+    ctx.beginPath();
+    ctx.ellipse(
+      cmToPxX(C.cx),
+      cmToPxY(C.cy),
+      cmToPxX(C.rx),
+      cmToPxY(C.ry),
+      0,
+      0,
+      2 * Math.PI
+    );
+    ctx.stroke();
+  }
+  ctx.restore();
 }
 
 function redrawAll() {
@@ -807,17 +1029,18 @@ function redrawAll() {
 
 /* -------- Undo / redo -------- */
 function pushUndoSnapshot() {
-  undoStack.value.push(JSON.stringify({ lines: lines.value, prickings: prickings.value }));
+  undoStack.value.push(JSON.stringify({ lines: lines.value, prickings: prickings.value, circles: circles.value }));
   redoStack.value = [];
 }
 
 function undo() {
   if (!undoStack.value.length) return;
   const prev = undoStack.value.pop();
-  redoStack.value.push(JSON.stringify({ lines: lines.value, prickings: prickings.value }));
+  redoStack.value.push(JSON.stringify({ lines: lines.value, prickings: prickings.value, circles: circles.value }));
   const state = JSON.parse(prev);
   lines.value = state.lines || [];
   prickings.value = state.prickings || [];
+  circles.value = state.circles || [];
   selectedFeature.value = { kind: null, id: null };
   redrawAll();
 }
@@ -825,10 +1048,11 @@ function undo() {
 function redo() {
   if (!redoStack.value.length) return;
   const next = redoStack.value.pop();
-  undoStack.value.push(JSON.stringify({ lines: lines.value, prickings: prickings.value }));
+  undoStack.value.push(JSON.stringify({ lines: lines.value, prickings: prickings.value, circles: circles.value }));
   const state = JSON.parse(next);
   lines.value = state.lines || [];
   prickings.value = state.prickings || [];
+  circles.value = state.circles || [];
   selectedFeature.value = { kind: null, id: null };
   redrawAll();
 }
@@ -837,6 +1061,7 @@ function clearAll() {
   if (!confirm('Clear all lines and prickings? This cannot be undone.')) return;
   lines.value = [];
   prickings.value = [];
+  circles.value = [];
   selectedFeature.value = { kind: null, id: null };
   undoStack.value = [];
   redoStack.value = [];
@@ -928,6 +1153,23 @@ function pointToSegmentDist(x, y, L) {
   return Math.hypot(x - px, y - py);
 }
 
+function pointToEllipseDist(x, y, C) {
+  // Approximate distance from point to ellipse perimeter
+  const dx = x - C.cx;
+  const dy = y - C.cy;
+  const distFromCenter = Math.hypot(dx, dy);
+  
+  // Angle from center to point
+  const angle = Math.atan2(dy, dx);
+  
+  // Point on ellipse at this angle
+  const ex = C.cx + C.rx * Math.cos(angle);
+  const ey = C.cy + C.ry * Math.sin(angle);
+  
+  // Distance from point to ellipse perimeter
+  return Math.abs(distFromCenter - Math.hypot(ex - C.cx, ey - C.cy));
+}
+
 /* -------- Canvas click -------- */
 function handleCanvasClick(e) {
   const pos = toLocalCoords(e);
@@ -1008,6 +1250,20 @@ function handleCanvasClick(e) {
         removed = true;
       }
     }
+
+    // circles
+    if (!removed) {
+      let bestCi = { idx: -1, dist: threshCm / 2 };
+      circles.value.forEach((C, idx) => {
+        const d = pointToEllipseDist(xCm, yCm, C);
+        if (d < bestCi.dist) bestCi = { idx, dist: d };
+      });
+      if (bestCi.idx >= 0) {
+        pushUndoSnapshot();
+        circles.value.splice(bestCi.idx, 1);
+        removed = true;
+      }
+    }
     if (removed) redrawAll();
     return;
   }
@@ -1024,6 +1280,10 @@ function handleCanvasClick(e) {
     for (const L of lines.value) {
       const d = pointToSegmentDist(xCm, yCm, L);
       if (d < best.dist) best = { kind: "line", id: L.id, dist: d };
+    }
+    for (const C of circles.value) {
+      const d = pointToEllipseDist(xCm, yCm, C);
+      if (d < best.dist) best = { kind: "circle", id: C.id, dist: d };
     }
 
     if (best.kind) {
@@ -1099,6 +1359,21 @@ function addMultiplePrickings() {
   pushUndoSnapshot();
   prickings.value = [...prickings.value, ...newPr];
   ghostMultiPrickings.value = [];
+  redrawAll();
+}
+
+function addSingleCircle() {
+  pushUndoSnapshot();
+  circles.value = [
+    ...circles.value,
+    makeCircle({
+      cx: snapPoint(circle_x.value),
+      cy: snapPoint(circle_y.value),
+      rx: snapPoint(circle_rx.value),
+      ry: snapPoint(circle_ry.value),
+    }),
+  ];
+  ghostSingleCircle.value = null;
   redrawAll();
 }
 
@@ -1178,7 +1453,99 @@ watch([hor2, start_y3, end_y3, number2], () => {
   redrawAll();
 });
 
+watch([circle_x, circle_y, circle_rx, circle_ry], () => {
+  const cx = circle_x.value;
+  const cy = circle_y.value;
+  const rx = circle_rx.value;
+  const ry = circle_ry.value;
+  if (
+    Number.isFinite(cx) &&
+    Number.isFinite(cy) &&
+    Number.isFinite(rx) && rx > 0 &&
+    Number.isFinite(ry) && ry > 0
+  ) {
+    ghostSingleCircle.value = {
+      cx: snapPoint(cx),
+      cy: snapPoint(cy),
+      rx: snapPoint(rx),
+      ry: snapPoint(ry),
+    };
+  } else {
+    ghostSingleCircle.value = null;
+  }
+  redrawAll();
+});
+
 /* -------- Selected feature updates -------- */
+function updateSelectedLineCoord(coord, val) {
+  const l = selectedLine.value;
+  if (l) {
+    const num = parseFloat(val);
+    if (Number.isFinite(num)) {
+      l[coord] = num;
+      redrawAll();
+    }
+  }
+}
+
+// Quick adjust functions for lines
+function shortenLineLeft() {
+  const l = selectedLine.value;
+  if (l) {
+    l.x1 = Math.min(l.x1 + snapStepCm.value, l.x2);
+    redrawAll();
+  }
+}
+function shortenLineRight() {
+  const l = selectedLine.value;
+  if (l) {
+    l.x2 = Math.max(l.x2 - snapStepCm.value, l.x1);
+    redrawAll();
+  }
+}
+function shortenLineTop() {
+  const l = selectedLine.value;
+  if (l) {
+    l.y1 = Math.min(l.y1 + snapStepCm.value, l.y2);
+    redrawAll();
+  }
+}
+function shortenLineBottom() {
+  const l = selectedLine.value;
+  if (l) {
+    l.y2 = Math.max(l.y2 - snapStepCm.value, l.y1);
+    redrawAll();
+  }
+}
+function extendLineLeft() {
+  const l = selectedLine.value;
+  if (l) {
+    l.x1 = Math.max(l.x1 - snapStepCm.value, 0);
+    redrawAll();
+  }
+}
+function extendLineRight() {
+  const l = selectedLine.value;
+  if (l) {
+    l.x2 = Math.min(l.x2 + snapStepCm.value, widthCm.value);
+    redrawAll();
+  }
+}
+function extendLineTop() {
+  const l = selectedLine.value;
+  if (l) {
+    l.y1 = Math.max(l.y1 - snapStepCm.value, 0);
+    redrawAll();
+  }
+}
+function extendLineBottom() {
+  const l = selectedLine.value;
+  if (l) {
+    l.y2 = Math.min(l.y2 + snapStepCm.value, heightCm.value);
+    redrawAll();
+  }
+}
+
 function updateSelectedLineRole(val) {
   const l = selectedLine.value;
   if (l) {
@@ -1198,6 +1565,16 @@ function updateSelectedLineNote(val) {
   if (l) l.note = val;
 }
 
+function updateSelectedPrickingCoord(coord, val) {
+  const p = selectedPricking.value;
+  if (p) {
+    const num = parseFloat(val);
+    if (Number.isFinite(num)) {
+      p[coord] = num;
+      redrawAll();
+    }
+  }
+}
 function updateSelectedPrickingRole(val) {
   const p = selectedPricking.value;
   if (p) {
@@ -1215,6 +1592,18 @@ function updateSelectedPrickingHypothetical(val) {
 function updateSelectedPrickingNote(val) {
   const p = selectedPricking.value;
   if (p) p.note = val;
+}
+
+function updateSelectedCircleHypothetical(val) {
+  const c = selectedCircle.value;
+  if (c) {
+    c.hypothetical = val;
+    redrawAll();
+  }
+}
+function updateSelectedCircleNote(val) {
+  const c = selectedCircle.value;
+  if (c) c.note = val;
 }
 
 /* -------- Image handling -------- */
@@ -1269,6 +1658,7 @@ function saveAutosave() {
       shapes: {
         lines: lines.value,
         prickings: prickings.value,
+        circles: circles.value,
       },
       view: {
         zoom: zoom.value,
@@ -1301,6 +1691,7 @@ function restoreAutosave() {
     if (data.shapes) {
       lines.value = (data.shapes.lines || []).map((L) => makeLine(L));
       prickings.value = (data.shapes.prickings || []).map((P) => makePricking(P));
+      circles.value = (data.shapes.circles || []).map((C) => makeCircle(C));
     }
     if (data.view) {
       zoom.value = data.view.zoom ?? zoom.value;
@@ -1447,6 +1838,16 @@ function exportPdf() {
       });
     }
   });
+  circles.value.forEach((C, idx) => {
+    if (C.note && C.note.trim()) {
+      featureNotes.push({
+        kind: "Circle",
+        id: C.id || `C${idx + 1}`,
+        role: "compass",
+        note: C.note.trim(),
+      });
+    }
+  });
 
   if (featureNotes.length) {
     pdf.setFontSize(12);
@@ -1477,6 +1878,7 @@ function exportPdf() {
     { label: "Bounding lines",                color: "#ff8800" },
     { label: "Margin guidelines / prickings", color: "#e645ff" },
     { label: "Column boundaries / prickings", color: "#00d0b8" },
+    { label: "Circles (compass impressions)", color: "#ff0088" },
     { label: "Hypothetical (reconstructed)",  color: "#808080" },
   ];
 
@@ -1523,6 +1925,7 @@ function exportJson() {
     shapes: {
       lines: lines.value,
       prickings: prickings.value,
+      circles: circles.value,
     },
     notes: globalNotes.value,
   };
@@ -1747,6 +2150,19 @@ button.btn-danger:hover:not(:disabled) {
   justify-content: flex-start;
 }
 
+/* Adjust buttons */
+.adjust-buttons {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 4px;
+  margin-top: 6px;
+}
+.adjust-btn {
+  font-size: 12px;
+  padding: 6px 8px;
+  border-radius: 6px;
+}
+
 .mode-buttons {
   display: flex;
   gap: 6px;
@@ -1758,6 +2174,13 @@ button.btn-danger:hover:not(:disabled) {
   font-weight: 500;
   margin-top: 4px;
   display: block;
+}
+.field-label-small {
+  font-size: 11px;
+  font-weight: 500;
+  display: block;
+  margin-bottom: 2px;
+  color: #cbd5e0;
 }
 
 .field-input,
