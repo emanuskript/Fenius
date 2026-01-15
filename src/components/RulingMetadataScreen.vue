@@ -55,6 +55,14 @@
             placeholder="e.g. 12r or p. 24"
           />
 
+          <label class="field-label mt">Quire(s)</label>
+          <input
+            v-model="quire"
+            type="text"
+            class="field-input"
+            placeholder="e.g. III or 3"
+          />
+
           <label class="field-label mt">Page Size (in cm) *</label>
           <div class="size-row">
             <input
@@ -123,6 +131,7 @@ const cityRepository = ref("");
 const shelfmark = ref("");
 const siglum = ref("");
 const folio = ref("");
+const quire = ref("");
 const widthCm = ref(15);
 const heightCm = ref(20);
 const tool = ref("dry-point");
@@ -135,6 +144,7 @@ onMounted(() => {
   shelfmark.value = route.query.shelfmark || "";
   siglum.value = route.query.siglum || "";
   folio.value = route.query.folio || "";
+  quire.value = route.query.quire || "";
   widthCm.value = Number(route.query.widthCm) || 15;
   heightCm.value = Number(route.query.heightCm) || 20;
   tool.value = route.query.tool || "dry-point";
@@ -159,6 +169,7 @@ function goToRuling() {
       shelfmark: shelfmark.value,
       siglum: siglum.value,
       folio: folio.value,
+      quire: quire.value,
       widthCm: widthCm.value,
       heightCm: heightCm.value,
       tool: tool.value,

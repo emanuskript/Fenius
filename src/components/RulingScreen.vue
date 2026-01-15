@@ -12,6 +12,7 @@
           <span class="meta-item"><strong>Shelfmark:</strong> {{ shelfmark || "—" }}</span>
           <span class="meta-item"><strong>Siglum:</strong> {{ siglum || "—" }}</span>
           <span class="meta-item"><strong>Folio:</strong> {{ folio || "—" }}</span>
+          <span class="meta-item" v-if="quire"><strong>Quire:</strong> {{ quire }}</span>
         </div>
         <div class="meta-row meta-row-secondary">
           <span>{{ widthCm }} × {{ heightCm }} cm</span>
@@ -30,7 +31,12 @@
       <aside class="side side-left">
         <!-- Mode -->
         <section class="panel">
-          <h3>Mode</h3>
+          <h3>
+            Mode
+            <span class="help-icon" title="Choose your interaction mode">
+              <span class="tooltip">Draw: Add lines/prickings by clicking rulers or using forms. Erase: Click features to delete them. Select: Click features to view/edit properties.</span>
+            </span>
+          </h3>
           <div class="mode-buttons">
             <button :class="{ active: mode === 'draw' }" @click="setMode('draw')">Draw</button>
             <button :class="{ active: mode === 'erase' }" @click="setMode('erase')">Erase</button>
@@ -50,8 +56,18 @@
 
         <!-- Lines -->
         <section class="panel">
-          <h3>Lines</h3>
-          <h4>Single horizontal line</h4>
+          <h3>
+            Lines
+            <span class="help-icon" title="Draw ruling lines on the page">
+              <span class="tooltip">Draw horizontal or vertical ruling lines by entering coordinates or clicking on the rulers.</span>
+            </span>
+          </h3>
+          <h4>
+            Single horizontal line
+            <span class="help-icon" title="Draw a single horizontal line">
+              <span class="tooltip">Enter start x, end x, and y coordinate. The line will be drawn horizontally at the specified y value.</span>
+            </span>
+          </h4>
           <div class="field-row three">
             <div>
               <label class="field-label">start x (cm)</label>
@@ -68,7 +84,12 @@
           </div>
           <button class="small-btn" @click="addSingleLine">Add line</button>
 
-          <h4>Multiple horizontals</h4>
+          <h4>
+            Multiple horizontals
+            <span class="help-icon" title="Draw multiple evenly-spaced horizontal lines">
+              <span class="tooltip">Create a series of evenly-spaced horizontal lines. Enter start/end x coordinates, number of lines (#), and the y-range they should span.</span>
+            </span>
+          </h4>
           <div class="field-row three">
             <div>
               <label class="field-label">start x</label>
@@ -98,8 +119,18 @@
 
         <!-- Circles -->
         <section class="panel">
-          <h3>Circles/Ovals</h3>
-          <h4>Single circle</h4>
+          <h3>
+            Circles/Ovals
+            <span class="help-icon" title="Mark compass impressions">
+              <span class="tooltip">Draw circles or ovals to mark compass impressions. Equal radii create a circle, different radii create an oval.</span>
+            </span>
+          </h3>
+          <h4>
+            Single circle
+            <span class="help-icon" title="Draw a circle or oval">
+              <span class="tooltip">Enter center position (x, y) and radii. Use equal rx and ry for a perfect circle, or different values for an oval.</span>
+            </span>
+          </h4>
           <div class="field-row two">
             <div>
               <label class="field-label">center x (cm)</label>
@@ -126,8 +157,24 @@
 
         <!-- Prickings -->
         <section class="panel">
-          <h3>Prickings</h3>
-          <h4>Single pricking</h4>
+          <h3>
+            Prickings
+            <span class="help-icon" title="Mark pricking holes">
+              <span class="tooltip">Add pricking marks by entering coordinates or clicking inside the page area in Draw mode.</span>
+            </span>
+          </h3>
+          <label class="field-label">Pricking type</label>
+          <select v-model="prickingType" class="field-input">
+            <option value="pierced">Pierced</option>
+            <option value="slit">Slit</option>
+            <option value="other">Other</option>
+          </select>
+          <h4>
+            Single pricking
+            <span class="help-icon" title="Add a single pricking mark">
+              <span class="tooltip">Enter x and y coordinates to place a single pricking mark.</span>
+            </span>
+          </h4>
           <div class="field-row two">
             <div>
               <label class="field-label">x (cm)</label>
@@ -140,7 +187,12 @@
           </div>
           <button class="small-btn" @click="addSinglePricking">Add pricking</button>
 
-          <h4>Vertical group</h4>
+          <h4>
+            Vertical group
+            <span class="help-icon" title="Add multiple prickings in a vertical line">
+              <span class="tooltip">Create a series of evenly-spaced prickings along a vertical line. Enter x position, number of prickings (#), and the y-range.</span>
+            </span>
+          </h4>
           <div class="field-row three">
             <div>
               <label class="field-label">x (cm)</label>
@@ -238,12 +290,14 @@
           <!-- Background image -->
           <canvas
             ref="bg"
-            :width="baseWidthPx"
-            :height="baseHeightPx"
+            :width="bgCanvasWidth"
+            :height="bgCanvasHeight"
             class="layer layer-image"
             :style="{
               top: '15px',
               left: '15px',
+              width: baseWidthPx + 'px',
+              height: baseHeightPx + 'px',
               opacity: showImage ? imageOpacity : 0,
               display: showImage ? 'block' : 'none'
             }"
@@ -404,6 +458,17 @@
               </option>
             </select>
 
+            <label class="field-label">Pricking Type</label>
+            <select
+              class="field-input"
+              :value="selectedPricking.prickingType || 'pierced'"
+              @change="updateSelectedPrickingType($event.target.value)"
+            >
+              <option value="pierced">Pierced</option>
+              <option value="slit">Slit</option>
+              <option value="other">Other</option>
+            </select>
+
             <label class="field-inline">
               <input
                 type="checkbox"
@@ -543,6 +608,17 @@
         <!-- Export -->
         <section class="panel">
           <h3>Export</h3>
+          <button @click="showExportModal = true" class="export-btn">Export</button>
+        </section>
+      </aside>
+    </div>
+
+    <!-- Export Modal -->
+    <div v-if="showExportModal" class="modal-overlay" @click="showExportModal = false">
+      <div class="modal-content" @click.stop>
+        <h2>Export Options</h2>
+        
+        <div class="export-options">
           <label class="field-inline">
             <input type="checkbox" v-model="includeImageInPdf" />
             include image in PDF
@@ -551,12 +627,33 @@
             <input type="checkbox" v-model="includeNotesInPdf" />
             include notes in PDF
           </label>
-          <div class="btn-row">
-            <button @click="exportPdf">PDF</button>
-            <button @click="exportJson">JSON</button>
-          </div>
-        </section>
-      </aside>
+          <label class="field-inline">
+            <input type="checkbox" v-model="includeImageInImage" />
+            include image in PNG/TIFF
+          </label>
+        </div>
+
+        <div class="export-buttons">
+          <button @click="exportPdf(); showExportModal = false;" class="export-option-btn">
+            <strong>PDF</strong>
+            <span>with details & legend</span>
+          </button>
+          <button @click="exportPng(); showExportModal = false;" class="export-option-btn">
+            <strong>PNG</strong>
+            <span>image only</span>
+          </button>
+          <button @click="exportTiff(); showExportModal = false;" class="export-option-btn">
+            <strong>TIFF</strong>
+            <span>image only</span>
+          </button>
+          <button @click="exportJson(); showExportModal = false;" class="export-option-btn">
+            <strong>JSON</strong>
+            <span>data export</span>
+          </button>
+        </div>
+
+        <button @click="showExportModal = false" class="modal-close-btn">Close</button>
+      </div>
     </div>
   </div>
 </template>
@@ -574,6 +671,7 @@ const cityRepository = ref(route.query.cityRepository || "");
 const shelfmark = ref(route.query.shelfmark || "");
 const siglum = ref(route.query.siglum || "");
 const folio = ref(route.query.folio || "");
+const quire = ref(route.query.quire || "");
 const widthCm = ref(Number(route.query.widthCm) || 15);
 const heightCm = ref(Number(route.query.heightCm) || 20);
 const tool = ref(route.query.tool || "dry-point");
@@ -583,6 +681,7 @@ const direction = ref(route.query.direction || "none");
 const PAGE_BASE_WIDTH_CM = 20;
 const PX_PER_CM = 37.8;
 const SCALE_FACTOR = 0.6; // slightly larger base canvas
+const IMAGE_DPI_SCALE = 2; // Higher resolution for image quality
 const AUTOSAVE_KEY = "feniusRulingAutosave";
 
 const clamp = (v, lo, hi) => Math.max(lo, Math.min(hi, v));
@@ -611,6 +710,7 @@ function makePricking(data) {
     x: data.x,
     y: data.y,
     role: data.role || "other",
+    prickingType: data.prickingType || "pierced",
     hypothetical: !!data.hypothetical,
     note: data.note || "",
   };
@@ -649,6 +749,8 @@ function getLineColor(line) {
 
 function getPrickingColor(pricking) {
   if (pricking.hypothetical) return "#808080";
+  // Different color for "other" type prickings
+  if (pricking.prickingType === "other") return "#ffa500"; // orange for "other"
   switch (pricking.role) {
     case "margin":
       return "#e645ff"; // magenta
@@ -756,6 +858,9 @@ const start_y3 = ref(0);
 const end_y3 = ref(0);
 const number2 = ref(2);
 
+/* Pricking type */
+const prickingType = ref("pierced");
+
 /* Circle form fields */
 const circle_x = ref(null);
 const circle_y = ref(null);
@@ -778,6 +883,8 @@ const canRedo = computed(() => redoStack.value.length > 0);
 /* Export options */
 const includeImageInPdf = ref(true);
 const includeNotesInPdf = ref(true);
+const includeImageInImage = ref(true);
+const showExportModal = ref(false);
 
 /* Canvas refs / geometry */
 const canvasWrap = ref(null);
@@ -793,6 +900,10 @@ const baseHeightPx = computed(() =>
 );
 const baseWidthPxPlusGutter = computed(() => baseWidthPx.value + 15);
 const baseHeightPxPlusGutter = computed(() => baseHeightPx.value + 15);
+
+// High-res dimensions for background image canvas
+const bgCanvasWidth = computed(() => baseWidthPx.value * IMAGE_DPI_SCALE);
+const bgCanvasHeight = computed(() => baseHeightPx.value * IMAGE_DPI_SCALE);
 
 const cmToPxX = (x) => (x / widthCm.value) * baseWidthPx.value;
 const cmToPxY = (y) => (y / heightCm.value) * baseHeightPx.value;
@@ -871,18 +982,25 @@ function drawBackground() {
   ctx.clearRect(0, 0, c.width, c.height);
   if (!bgImage.value || !showImage.value) return;
 
+  // High-quality image rendering
+  ctx.imageSmoothingEnabled = true;
+  ctx.imageSmoothingQuality = 'high';
+
+  // Scale for high-DPI canvas
+  const dpiScale = IMAGE_DPI_SCALE;
+  
   let baseScale;
   if (bgFitMode.value === "width") {
-    baseScale = c.width / bgImage.value.width;
+    baseScale = (c.width / dpiScale) / bgImage.value.width;
   } else {
-    baseScale = Math.min(c.width / bgImage.value.width, c.height / bgImage.value.height);
+    baseScale = Math.min((c.width / dpiScale) / bgImage.value.width, (c.height / dpiScale) / bgImage.value.height);
   }
 
-  const finalScale = baseScale * bgScale.value;
+  const finalScale = baseScale * bgScale.value * dpiScale;
   const w = Math.round(bgImage.value.width * finalScale);
   const h = Math.round(bgImage.value.height * finalScale);
-  const x = bgOffsetX.value;
-  const y = bgOffsetY.value;
+  const x = bgOffsetX.value * dpiScale;
+  const y = bgOffsetY.value * dpiScale;
 
   ctx.drawImage(bgImage.value, x, y, w, h);
 }
@@ -927,8 +1045,29 @@ function drawShapes() {
     const px = cmToPxX(P.x);
     const py = cmToPxY(P.y);
 
-    ctx.fillStyle = isSelected ? "#00ffd5" : baseColor;
-    ctx.fillRect(px - 3, py - 1, 6, 2);
+    const color = isSelected ? "#00ffd5" : baseColor;
+    
+    // Draw different shapes based on pricking type
+    if (P.prickingType === "slit") {
+      // Slit: vertical line
+      ctx.strokeStyle = color;
+      ctx.lineWidth = 2;
+      ctx.beginPath();
+      ctx.moveTo(px, py - 4);
+      ctx.lineTo(px, py + 4);
+      ctx.stroke();
+      ctx.lineWidth = 1;
+    } else if (P.prickingType === "pierced" || !P.prickingType) {
+      // Pierced: circle (default)
+      ctx.fillStyle = color;
+      ctx.beginPath();
+      ctx.arc(px, py, 3, 0, 2 * Math.PI);
+      ctx.fill();
+    } else {
+      // Other: rectangle
+      ctx.fillStyle = color;
+      ctx.fillRect(px - 3, py - 1, 6, 2);
+    }
   }
 
   // ----- Circles -----
@@ -985,16 +1124,40 @@ function drawShapes() {
   ctx.save();
   ctx.globalAlpha = 0.6;
   ctx.fillStyle = "#9ca3af";
+  ctx.strokeStyle = "#9ca3af";
+  ctx.lineWidth = 2;
   if (ghostSinglePricking.value) {
     const P = ghostSinglePricking.value;
     const px = cmToPxX(P.x);
     const py = cmToPxY(P.y);
-    ctx.fillRect(px - 3, py - 1, 6, 2);
+    if (prickingType.value === 'slit') {
+      ctx.beginPath();
+      ctx.moveTo(px, py - 4);
+      ctx.lineTo(px, py + 4);
+      ctx.stroke();
+    } else if (prickingType.value === 'pierced') {
+      ctx.beginPath();
+      ctx.arc(px, py, 3, 0, 2 * Math.PI);
+      ctx.fill();
+    } else {
+      ctx.fillRect(px - 3, py - 1, 6, 2);
+    }
   }
   for (const P of ghostMultiPrickings.value) {
     const px = cmToPxX(P.x);
     const py = cmToPxY(P.y);
-    ctx.fillRect(px - 3, py - 1, 6, 2);
+    if (prickingType.value === 'slit') {
+      ctx.beginPath();
+      ctx.moveTo(px, py - 4);
+      ctx.lineTo(px, py + 4);
+      ctx.stroke();
+    } else if (prickingType.value === 'pierced') {
+      ctx.beginPath();
+      ctx.arc(px, py, 3, 0, 2 * Math.PI);
+      ctx.fill();
+    } else {
+      ctx.fillRect(px - 3, py - 1, 6, 2);
+    }
   }
   ctx.restore();
 
@@ -1213,7 +1376,7 @@ function handleCanvasClick(e) {
       pushUndoSnapshot();
       prickings.value = [
         ...prickings.value,
-        makePricking({ x: snapPoint(xCm), y: snapPoint(yCm), role: "margin" }),
+        makePricking({ x: snapPoint(xCm), y: snapPoint(yCm), role: "margin", prickingType: prickingType.value }),
       ];
       redrawAll();
       return;
@@ -1340,7 +1503,7 @@ function addSinglePricking() {
   pushUndoSnapshot();
   prickings.value = [
     ...prickings.value,
-    makePricking({ x: snapPoint(hor.value), y: snapPoint(ver.value), role: "margin" }),
+    makePricking({ x: snapPoint(hor.value), y: snapPoint(ver.value), role: "margin", prickingType: prickingType.value }),
   ];
   ghostSinglePricking.value = null;
   redrawAll();
@@ -1354,7 +1517,7 @@ function addMultiplePrickings() {
   const newPr = [];
   for (let i = 0; i < n; i++) {
     const y = snapPoint(y0 + i * step);
-    newPr.push(makePricking({ x: snapPoint(hor2.value), y, role: "margin" }));
+    newPr.push(makePricking({ x: snapPoint(hor2.value), y, role: "margin", prickingType: prickingType.value }));
   }
   pushUndoSnapshot();
   prickings.value = [...prickings.value, ...newPr];
@@ -1582,6 +1745,13 @@ function updateSelectedPrickingRole(val) {
     redrawAll();
   }
 }
+function updateSelectedPrickingType(val) {
+  const p = selectedPricking.value;
+  if (p) {
+    p.prickingType = val;
+    redrawAll();
+  }
+}
 function updateSelectedPrickingHypothetical(val) {
   const p = selectedPricking.value;
   if (p) {
@@ -1650,6 +1820,7 @@ function saveAutosave() {
         shelfmark: shelfmark.value,
         siglum: siglum.value,
         folio: folio.value,
+        quire: quire.value,
         widthCm: widthCm.value,
         heightCm: heightCm.value,
         tool: tool.value,
@@ -1683,6 +1854,7 @@ function restoreAutosave() {
       shelfmark.value = data.meta.shelfmark ?? shelfmark.value;
       siglum.value = data.meta.siglum ?? siglum.value;
       folio.value = data.meta.folio ?? folio.value;
+      quire.value = data.meta.quire ?? quire.value;
       widthCm.value = data.meta.widthCm ?? widthCm.value;
       heightCm.value = data.meta.heightCm ?? heightCm.value;
       tool.value = data.meta.tool ?? tool.value;
@@ -1774,8 +1946,52 @@ function renderSchemaToCanvasForPdf(ctx, includeImage) {
     const color = getPrickingColor(P);
     const px = cmToPxX(P.x);
     const py = cmToPxY(P.y);
-    ctx.fillStyle = color;
-    ctx.fillRect(px - 3, py - 1, 6, 2);
+    
+    // Draw different shapes based on pricking type
+    if (P.prickingType === "slit") {
+      // Slit: vertical line
+      ctx.strokeStyle = color;
+      ctx.lineWidth = 2;
+      ctx.beginPath();
+      ctx.moveTo(px, py - 4);
+      ctx.lineTo(px, py + 4);
+      ctx.stroke();
+      ctx.lineWidth = 1;
+    } else if (P.prickingType === "pierced" || !P.prickingType) {
+      // Pierced: circle (default)
+      ctx.fillStyle = color;
+      ctx.beginPath();
+      ctx.arc(px, py, 3, 0, 2 * Math.PI);
+      ctx.fill();
+    } else {
+      // Other: rectangle
+      ctx.fillStyle = color;
+      ctx.fillRect(px - 3, py - 1, 6, 2);
+    }
+  }
+
+  // Circles (compass impressions)
+  ctx.lineWidth = 2;
+  for (const C of circles.value) {
+    ctx.save();
+    ctx.strokeStyle = "#ff0088"; // pink
+    if (C.hypothetical) {
+      ctx.setLineDash([6, 4]);
+    } else {
+      ctx.setLineDash([]);
+    }
+    ctx.beginPath();
+    ctx.ellipse(
+      cmToPxX(C.cx),
+      cmToPxY(C.cy),
+      cmToPxX(C.rx),
+      cmToPxY(C.ry),
+      0,
+      0,
+      2 * Math.PI
+    );
+    ctx.stroke();
+    ctx.restore();
   }
 }
 
@@ -1789,6 +2005,9 @@ function exportPdf() {
   pdf.text(1, y, `Shelfmark: ${shelfmark.value || ""}`); y += 0.7;
   pdf.text(1, y, `Siglum: ${siglum.value || ""}`); y += 0.7;
   pdf.text(1, y, `Folio: ${folio.value || ""}`); y += 0.7;
+  if (quire.value) {
+    pdf.text(1, y, `Quire: ${quire.value}`); y += 0.7;
+  }
   pdf.text(1, y, `Size: ${widthCm.value} × ${heightCm.value} cm`); y += 0.7;
   pdf.text(1, y, `Ruling tool: ${tool.value}, direction: ${direction.value}`); y += 1;
 
@@ -1882,12 +2101,42 @@ function exportPdf() {
     { label: "Hypothetical (reconstructed)",  color: "#808080" },
   ];
 
+  // Add pricking type legend entries if those types exist
+  const hasPiercedPricking = prickings.value.some(p => !p.prickingType || p.prickingType === 'pierced');
+  const hasSlitPricking = prickings.value.some(p => p.prickingType === 'slit');
+  const hasOtherPricking = prickings.value.some(p => p.prickingType === 'other');
+
+  if (hasPiercedPricking) {
+    legendEntries.push({ label: "Pierced pricking (circle)", color: "#ffa500", shape: 'pierced' });
+  }
+  if (hasSlitPricking) {
+    legendEntries.push({ label: "Slit pricking (vertical line)", color: null, shape: 'slit' });
+  }
+  if (hasOtherPricking) {
+    legendEntries.push({ label: "Other pricking (rectangle)", color: null, shape: 'other' });
+  }
+
   pdf.setLineWidth(0.06);
   for (const entry of legendEntries) {
     ensureSpace(0.8);
-    const { r, g, b } = hexToRgb(entry.color);
-    pdf.setDrawColor(r, g, b);
-    pdf.line(1, y, 3, y);               // colored sample
+    if (entry.shape) {
+      // Draw pricking type shape
+      pdf.setDrawColor(0, 0, 0);
+      if (entry.shape === 'pierced') {
+        const { r, g, b } = hexToRgb(entry.color);
+        pdf.setFillColor(r, g, b);
+        pdf.circle(1.075, y, 0.075, 'F');
+      } else if (entry.shape === 'slit') {
+        pdf.line(1.075, y - 0.1, 1.075, y + 0.1);
+      } else if (entry.shape === 'other') {
+        pdf.rect(1, y - 0.05, 0.15, 0.05, 'F');
+      }
+    } else {
+      // Draw colored line
+      const { r, g, b } = hexToRgb(entry.color);
+      pdf.setDrawColor(r, g, b);
+      pdf.line(1, y, 3, y);
+    }
     pdf.setTextColor(0, 0, 0);
     pdf.text(3.4, y + 0.1, entry.label);
     y += 0.7;
@@ -1917,6 +2166,7 @@ function exportJson() {
       shelfmark: shelfmark.value,
       siglum: siglum.value,
       folio: folio.value,
+      quire: quire.value,
       widthCm: widthCm.value,
       heightCm: heightCm.value,
       tool: tool.value,
@@ -1936,6 +2186,45 @@ function exportJson() {
   a.download = (shelfmark.value || "ruling-schema") + ".json";
   a.click();
   URL.revokeObjectURL(url);
+}
+
+function exportPng() {
+  const temp = document.createElement("canvas");
+  temp.width = baseWidthPx.value;
+  temp.height = baseHeightPx.value;
+  const ctx = temp.getContext("2d");
+
+  renderSchemaToCanvasForPdf(ctx, includeImageInImage.value);
+
+  temp.toBlob((blob) => {
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement("a");
+    a.href = url;
+    a.download = (shelfmark.value || "ruling-schema") + ".png";
+    a.click();
+    URL.revokeObjectURL(url);
+  }, "image/png", 1.0);
+}
+
+function exportTiff() {
+  // Note: Modern browsers don't natively support TIFF export
+  // We'll export as high-quality PNG with .tif extension
+  // For true TIFF, a library like tiff.js would be needed
+  const temp = document.createElement("canvas");
+  temp.width = baseWidthPx.value;
+  temp.height = baseHeightPx.value;
+  const ctx = temp.getContext("2d");
+
+  renderSchemaToCanvasForPdf(ctx, includeImageInImage.value);
+
+  temp.toBlob((blob) => {
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement("a");
+    a.href = url;
+    a.download = (shelfmark.value || "ruling-schema") + ".tif";
+    a.click();
+    URL.revokeObjectURL(url);
+  }, "image/png", 1.0);
 }
 
 /* -------- Keyboard shortcuts -------- */
@@ -1966,10 +2255,27 @@ function onKey(e) {
 onMounted(() => {
   redrawAll();
   window.addEventListener("keydown", onKey);
+  setupTooltips();
 });
 onBeforeUnmount(() => {
   window.removeEventListener("keydown", onKey);
 });
+
+/* -------- Tooltip positioning -------- */
+function setupTooltips() {
+  // Position tooltips on hover to ensure they appear correctly with fixed positioning
+  document.querySelectorAll('.help-icon').forEach(icon => {
+    icon.addEventListener('mouseenter', (e) => {
+      const tooltip = icon.querySelector('.tooltip');
+      if (!tooltip) return;
+      
+      const rect = icon.getBoundingClientRect();
+      tooltip.style.top = rect.top + rect.height / 2 + 'px';
+      tooltip.style.left = rect.right + 'px';
+      tooltip.style.transform = 'translateY(-50%)';
+    });
+  });
+}
 </script>
 
 <style scoped>
@@ -2091,11 +2397,77 @@ onBeforeUnmount(() => {
   font-size: 15px;
   margin: 0 0 6px;
   font-weight: 600;
+  display: flex;
+  align-items: center;
+  gap: 6px;
 }
 
 .panel h4 {
   font-size: 13px;
   margin: 6px 0 4px;
+  display: flex;
+  align-items: center;
+  gap: 6px;
+}
+
+/* Help tooltips */
+.help-icon {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 16px;
+  height: 16px;
+  border-radius: 50%;
+  background: rgba(59, 130, 246, 0.2);
+  border: 1px solid rgba(59, 130, 246, 0.5);
+  color: #60a5fa;
+  font-size: 11px;
+  font-weight: 700;
+  cursor: help;
+  position: relative;
+  flex-shrink: 0;
+  overflow: visible;
+}
+
+.help-icon::before {
+  content: '?';
+}
+
+.help-icon .tooltip {
+  visibility: hidden;
+  opacity: 0;
+  position: fixed;
+  background: #1e293b;
+  color: #f1f5f9;
+  padding: 8px 12px;
+  border-radius: 8px;
+  font-size: 12px;
+  font-weight: 400;
+  white-space: normal;
+  width: 220px;
+  text-align: left;
+  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.5);
+  border: 1px solid rgba(148, 163, 184, 0.3);
+  z-index: 10000;
+  pointer-events: none;
+  transition: opacity 0.2s ease, visibility 0.2s ease;
+  line-height: 1.4;
+  margin-left: 8px;
+}
+
+.help-icon .tooltip::after {
+  content: '';
+  position: absolute;
+  top: 50%;
+  right: 100%;
+  transform: translateY(-50%);
+  border: 6px solid transparent;
+  border-right-color: #1e293b;
+}
+
+.help-icon:hover .tooltip {
+  visibility: visible;
+  opacity: 1;
 }
 
 /* Text */
@@ -2389,5 +2761,117 @@ input[type="range"] {
 .disabled {
   opacity: 0.5;
   pointer-events: none;
+}
+
+/* Export Modal */
+.modal-overlay {
+  position: fixed;
+  top: 0;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  background: rgba(0, 0, 0, 0.75);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  z-index: 10000;
+}
+
+.modal-content {
+  background: #1a202c;
+  border: 1px solid #2d3748;
+  border-radius: 8px;
+  padding: 24px;
+  max-width: 400px;
+  width: 90%;
+  max-height: 80vh;
+  overflow-y: auto;
+  box-shadow: 0 20px 50px rgba(0, 0, 0, 0.5);
+}
+
+.modal-content h2 {
+  margin: 0 0 20px 0;
+  font-size: 20px;
+  color: #e5e7eb;
+  text-align: center;
+}
+
+.export-options {
+  margin-bottom: 20px;
+  padding-bottom: 16px;
+  border-bottom: 1px solid #2d3748;
+}
+
+.export-buttons {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+  margin-bottom: 16px;
+}
+
+.export-option-btn {
+  padding: 14px 16px;
+  background: #2d3748;
+  color: #e5e7eb;
+  border: 1px solid #4a5568;
+  border-radius: 6px;
+  cursor: pointer;
+  font-size: 14px;
+  transition: all 0.2s;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 4px;
+  text-align: center;
+}
+
+.export-option-btn:hover {
+  background: #4a5568;
+  border-color: #718096;
+}
+
+.export-option-btn strong {
+  font-size: 16px;
+  color: #fff;
+}
+
+.export-option-btn span {
+  font-size: 12px;
+  color: #a0aec0;
+}
+
+.modal-close-btn {
+  width: 100%;
+  padding: 10px;
+  background: transparent;
+  color: #a0aec0;
+  border: 1px solid #4a5568;
+  border-radius: 6px;
+  cursor: pointer;
+  font-size: 14px;
+  transition: all 0.2s;
+}
+
+.modal-close-btn:hover {
+  background: #2d3748;
+  color: #e5e7eb;
+}
+
+.export-btn {
+  width: 100%;
+  padding: 10px;
+  margin-top: 8px;
+  background: #3182ce;
+  color: white;
+  border: none;
+  border-radius: 6px;
+  cursor: pointer;
+  font-size: 14px;
+  font-weight: 600;
+  transition: all 0.2s;
+}
+
+.export-btn:hover {
+  background: #2c5aa0;
 }
 </style>
