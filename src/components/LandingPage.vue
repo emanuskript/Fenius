@@ -6,33 +6,53 @@
     <!-- Title -->
     <div class="title">FENIUS</div>
 
-    <!-- Buttons -->
+    <!-- Main App Buttons -->
     <div class="button-group">
-      <button @click="goToBookbinding" class="action-button">
-        Create New Bookbinding
-      </button>
-
       <button @click="goToRuling" class="action-button">
-        Create New Ruling
+        Create a ruling scheme
       </button>
 
-      <label class="action-button cursor-pointer text-center">
-        Import from VCEditor (JSON)
-        <input
-          type="file"
-          accept=".json"
-          class="hidden"
-          @change="handleFileUpload"
-        />
-      </label>
+      <div class="spine-container">
+        <button @click="toggleSpineOptions" class="action-button">
+          Visualise a book spine
+        </button>
+        
+        <!-- Sub-options for Visualise a book spine -->
+        <transition name="slide-pop">
+          <div v-if="showSpineOptions" class="sub-options">
+            <button @click="goToBookbinding" class="sub-button">
+              Create New
+            </button>
+            <label class="sub-button cursor-pointer">
+              Import from VCEditor (JSON)
+              <input
+                type="file"
+                accept=".json"
+                class="hidden"
+                @change="handleFileUpload"
+              />
+            </label>
+          </div>
+        </transition>
+      </div>
+
+      <button @click="goToBookbinding" class="action-button">
+        Build a bookbinding
+      </button>
     </div>
   </div>
 </template>
 
 <script setup>
+import { ref } from "vue";
 import { useRouter } from "vue-router";
 
 const router = useRouter();
+const showSpineOptions = ref(false);
+
+function toggleSpineOptions() {
+  showSpineOptions.value = !showSpineOptions.value;
+}
 
 function goToBookbinding() {
   router.push("/input-screen");
@@ -132,13 +152,83 @@ function handleFileUpload(event) {
   color: black;
 }
 
-.action-button input[type="file"] {
+.spine-container {
+  position: relative;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 100%;
+}
+
+.sub-options {
+  position: absolute;
+  left: calc(50% + 220px);
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+  width: 300px;
+}
+
+.sub-button {
+  width: 100%;
+  padding: 12px 0;
+  border: 1px solid rgba(255, 255, 255, 0.6);
+  color: white;
+  font-size: 1rem;
+  text-align: center;
+  background: rgba(255, 255, 255, 0.05);
+  transition: background-color 0.2s, color 0.2s;
+  cursor: pointer;
+}
+
+.sub-button:hover {
+  background-color: rgba(255, 255, 255, 0.2);
+  border-color: white;
+}
+
+/* Slide-pop animation */
+.slide-pop-enter-active {
+  animation: slidePopIn 0.4s cubic-bezier(0.34, 1.56, 0.64, 1);
+}
+
+.slide-pop-leave-active {
+  animation: slidePopOut 0.3s cubic-bezier(0.4, 0, 1, 1);
+}
+
+@keyframes slidePopIn {
+  0% {
+    opacity: 0;
+    transform: translateX(-40px) scale(0.8);
+  }
+  100% {
+    opacity: 1;
+    transform: translateX(0) scale(1);
+  }
+}
+
+@keyframes slidePopOut {
+  0% {
+    opacity: 1;
+    transform: translateX(0) scale(1);
+  }
+  100% {
+    opacity: 0;
+    transform: translateX(-40px) scale(0.8);
+  }
+}
+
+.action-button input[type="file"],
+.sub-button input[type="file"] {
   display: none !important;
   visibility: hidden !important;
   position: absolute !important;
   width: 0 !important;
   height: 0 !important;
   opacity: 0 !important;
+}
+
+.cursor-pointer {
+  cursor: pointer;
 }
 </style>
 

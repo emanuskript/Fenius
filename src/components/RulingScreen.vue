@@ -246,6 +246,10 @@
               />
               <span>cm</span>
             </label>
+            <label class="inline">
+              <input type="checkbox" v-model="showIntersectionMeasurements" @change="redrawAll" />
+              <span>Show intersection measurements</span>
+            </label>
           </div>
           <div class="inline-group">
             <label class="inline">
@@ -405,6 +409,23 @@
               </option>
             </select>
 
+            <label class="field-label">Custom Color</label>
+            <div class="color-picker-row">
+              <input
+                type="color"
+                :value="selectedLine.customColor || getLineColor(selectedLine)"
+                @input="updateSelectedLineColor($event.target.value)"
+                class="color-input"
+              />
+              <button
+                v-if="selectedLine.customColor"
+                @click="clearSelectedLineColor"
+                class="clear-color-btn"
+              >
+                Reset
+              </button>
+            </div>
+
             <label class="field-inline">
               <input
                 type="checkbox"
@@ -468,6 +489,23 @@
               <option value="slit">Slit</option>
               <option value="other">Other</option>
             </select>
+
+            <label class="field-label">Custom Color</label>
+            <div class="color-picker-row">
+              <input
+                type="color"
+                :value="selectedPricking.customColor || getPrickingColor(selectedPricking)"
+                @input="updateSelectedPrickingColor($event.target.value)"
+                class="color-input"
+              />
+              <button
+                v-if="selectedPricking.customColor"
+                @click="clearSelectedPrickingColor"
+                class="clear-color-btn"
+              >
+                Reset
+              </button>
+            </div>
 
             <label class="field-inline">
               <input
@@ -730,6 +768,7 @@ function makeCircle(data) {
 
 /* Color helpers for screen + PDF */
 function getLineColor(line) {
+  if (line.customColor) return line.customColor;
   if (line.hypothetical) return "#808080"; // grey for reconstructed
   switch (line.role) {
     case "text-horizontal":
@@ -748,6 +787,7 @@ function getLineColor(line) {
 }
 
 function getPrickingColor(pricking) {
+  if (pricking.customColor) return pricking.customColor;
   if (pricking.hypothetical) return "#808080";
   // Different color for "other" type prickings
   if (pricking.prickingType === "other") return "#ffa500"; // orange for "other"
@@ -767,6 +807,7 @@ const zoomPercent = computed(() => Math.round(zoom.value * 100));
 
 const snapEnabled = ref(true);
 const snapStepCm = ref(0.1);
+const showIntersectionMeasurements = ref(false);
 const showImage = ref(false);
 const imageOpacity = ref(0.6);
 const bgImage = ref(null);
@@ -1182,6 +1223,33 @@ function drawShapes() {
     ctx.stroke();
   }
   ctx.restore();
+
+  // ----- Intersection Measurements -----
+  if (showIntersectionMeasurements.value) {
+    const intersections = getIntersections();
+    ctx.save();
+    ctx.font = "12px Arial";
+    ctx.lineWidth = 3;
+    
+    intersections.forEach(point => {
+      const px = cmToPxX(point.x);
+      const py = cmToPxY(point.y);
+      
+      // Draw a small circle at intersection
+      ctx.beginPath();
+      ctx.arc(px, py, 4, 0, 2 * Math.PI);
+      ctx.fillStyle = "#ff0000";
+      ctx.fill();
+      
+      // Draw measurement text with white outline
+      const text = `(${point.x.toFixed(2)}, ${point.y.toFixed(2)})`;
+      ctx.strokeStyle = "#ffffff";
+      ctx.strokeText(text, px + 6, py - 6);
+      ctx.fillStyle = "#ff0000";
+      ctx.fillText(text, px + 6, py - 6);
+    });
+    ctx.restore();
+  }
 }
 
 function redrawAll() {
@@ -1298,6 +1366,43 @@ function hideGuides() {
 function snapPoint(cm) {
   if (!snapEnabled.value) return cm;
   return snapVal(cm, snapStepCm.value);
+}
+
+// Calculate intersection point between two line segments
+function getLineIntersection(line1, line2) {
+  const x1 = line1.x1, y1 = line1.y1, x2 = line1.x2, y2 = line1.y2;
+  const x3 = line2.x1, y3 = line2.y1, x4 = line2.x2, y4 = line2.y2;
+  
+  const denom = (x1 - x2) * (y3 - y4) - (y1 - y2) * (x3 - x4);
+  if (Math.abs(denom) < 0.0001) return null; // Lines are parallel
+  
+  const t = ((x1 - x3) * (y3 - y4) - (y1 - y3) * (x3 - x4)) / denom;
+  const u = -((x1 - x2) * (y1 - y3) - (y1 - y2) * (x1 - x3)) / denom;
+  
+  if (t >= 0 && t <= 1 && u >= 0 && u <= 1) {
+    return {
+      x: x1 + t * (x2 - x1),
+      y: y1 + t * (y2 - y1)
+    };
+  }
+  return null;
+}
+
+// Get all intersection points from lines
+function getIntersections() {
+  const intersections = [];
+  const linesArray = lines.value;
+  
+  for (let i = 0; i < linesArray.length; i++) {
+    for (let j = i + 1; j < linesArray.length; j++) {
+      const intersection = getLineIntersection(linesArray[i], linesArray[j]);
+      if (intersection) {
+        intersections.push(intersection);
+      }
+    }
+  }
+  
+  return intersections;
 }
 
 function pointToSegmentDist(x, y, L) {
@@ -1716,6 +1821,20 @@ function updateSelectedLineRole(val) {
     redrawAll();
   }
 }
+function updateSelectedLineColor(val) {
+  const l = selectedLine.value;
+  if (l) {
+    l.customColor = val;
+    redrawAll();
+  }
+}
+function clearSelectedLineColor() {
+  const l = selectedLine.value;
+  if (l) {
+    delete l.customColor;
+    redrawAll();
+  }
+}
 function updateSelectedLineHypothetical(val) {
   const l = selectedLine.value;
   if (l) {
@@ -1749,6 +1868,20 @@ function updateSelectedPrickingType(val) {
   const p = selectedPricking.value;
   if (p) {
     p.prickingType = val;
+    redrawAll();
+  }
+}
+function updateSelectedPrickingColor(val) {
+  const p = selectedPricking.value;
+  if (p) {
+    p.customColor = val;
+    redrawAll();
+  }
+}
+function clearSelectedPrickingColor() {
+  const p = selectedPricking.value;
+  if (p) {
+    delete p.customColor;
     redrawAll();
   }
 }
@@ -1993,6 +2126,33 @@ function renderSchemaToCanvasForPdf(ctx, includeImage) {
     ctx.stroke();
     ctx.restore();
   }
+
+  // Intersection Measurements (if enabled)
+  if (showIntersectionMeasurements.value) {
+    const intersections = getIntersections();
+    ctx.save();
+    ctx.font = "14px Arial";
+    ctx.lineWidth = 4;
+    
+    intersections.forEach(point => {
+      const px = cmToPxX(point.x);
+      const py = cmToPxY(point.y);
+      
+      // Draw a small circle at intersection
+      ctx.beginPath();
+      ctx.arc(px, py, 5, 0, 2 * Math.PI);
+      ctx.fillStyle = "#ff0000";
+      ctx.fill();
+      
+      // Draw measurement text with white outline
+      const text = `(${point.x.toFixed(2)}, ${point.y.toFixed(2)})`;
+      ctx.strokeStyle = "#ffffff";
+      ctx.strokeText(text, px + 8, py - 8);
+      ctx.fillStyle = "#ff0000";
+      ctx.fillText(text, px + 8, py - 8);
+    });
+    ctx.restore();
+  }
 }
 
 function exportPdf() {
@@ -2009,7 +2169,14 @@ function exportPdf() {
     pdf.text(1, y, `Quire: ${quire.value}`); y += 0.7;
   }
   pdf.text(1, y, `Size: ${widthCm.value} × ${heightCm.value} cm`); y += 0.7;
-  pdf.text(1, y, `Ruling tool: ${tool.value}, direction: ${direction.value}`); y += 1;
+  pdf.text(1, y, `Ruling tool: ${tool.value}, direction: ${direction.value}`); y += 0.7;
+  
+  if (showIntersectionMeasurements.value) {
+    const intersections = getIntersections();
+    pdf.text(1, y, `Line intersections: ${intersections.length}`); y += 0.7;
+  }
+  
+  y += 0.3;
 
   const pageHeight = 29.7;
   const marginBottom = 1.5;
@@ -2146,11 +2313,69 @@ function exportPdf() {
   // ---------- SECOND PAGE: SCHEMA ----------
   pdf.addPage();
   const temp = document.createElement("canvas");
-  temp.width = baseWidthPx.value;
-  temp.height = baseHeightPx.value;
+  temp.width = baseWidthPx.value + 15;
+  temp.height = baseHeightPx.value + 15;
   const ctx = temp.getContext("2d");
 
+  // Draw ruler background
+  ctx.fillStyle = "#0b1724";
+  ctx.fillRect(0, 0, temp.width, temp.height);
+
+  // Draw rulers
+  ctx.strokeStyle = "#ffffff";
+  ctx.fillStyle = "#ffffff";
+  ctx.font = "10px Arial";
+  ctx.lineWidth = 1;
+
+  const stepPx = Math.round(PX_PER_CM * SCALE_FACTOR);
+
+  // Top ruler
+  ctx.beginPath();
+  // 1cm ticks
+  for (let cm = 0; cm <= widthCm.value; cm += 1) {
+    const xPos = 15 + cmToPxX(cm);
+    ctx.moveTo(xPos, 7);
+    ctx.lineTo(xPos, 14);
+  }
+  ctx.stroke();
+
+  // 5cm ticks and labels
+  ctx.beginPath();
+  for (let cm = 0; cm <= widthCm.value; cm += 5) {
+    const xPos = 15 + cmToPxX(cm);
+    ctx.moveTo(xPos, 0);
+    ctx.lineTo(xPos, 14);
+    ctx.fillText(String(cm), xPos + 2, 10);
+  }
+  ctx.stroke();
+
+  // Left ruler
+  ctx.beginPath();
+  // 1cm ticks
+  for (let cm = 0; cm <= heightCm.value; cm += 1) {
+    const yPos = 15 + cmToPxY(cm);
+    ctx.moveTo(7, yPos);
+    ctx.lineTo(14, yPos);
+  }
+  ctx.stroke();
+
+  // 5cm ticks and labels
+  ctx.beginPath();
+  for (let cm = 0; cm <= heightCm.value; cm += 5) {
+    const yPos = 15 + cmToPxY(cm);
+    ctx.moveTo(0, yPos);
+    ctx.lineTo(14, yPos);
+    ctx.fillText(String(cm), 2, yPos + 10);
+  }
+  ctx.stroke();
+
+  // Save context and translate for content
+  ctx.save();
+  ctx.translate(15, 15);
+  
   renderSchemaToCanvasForPdf(ctx, includeImageInPdf.value);
+  
+  ctx.restore();
 
   const img = temp.toDataURL("image/png", 1.0);
   pdf.addImage(img, "PNG", 0.5, 0.5, width_size(), height_size());
@@ -2873,5 +3098,37 @@ input[type="range"] {
 
 .export-btn:hover {
   background: #2c5aa0;
+}
+
+/* Color Picker */
+.color-picker-row {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  margin-top: 4px;
+}
+
+.color-input {
+  width: 60px;
+  height: 35px;
+  border: 1px solid #4a5568;
+  border-radius: 4px;
+  cursor: pointer;
+  background: transparent;
+}
+
+.clear-color-btn {
+  padding: 6px 12px;
+  background: #2d3748;
+  color: #e5e7eb;
+  border: 1px solid #4a5568;
+  border-radius: 4px;
+  cursor: pointer;
+  font-size: 12px;
+  transition: all 0.2s;
+}
+
+.clear-color-btn:hover {
+  background: #4a5568;
 }
 </style>
