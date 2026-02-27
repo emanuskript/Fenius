@@ -1,11 +1,5 @@
 <template>
   <div class="ruling-meta-page">
-    <!-- Header -->
-    <div class="header-bar">eManuskript Produkt</div>
-
-    <!-- Title -->
-    <div class="title">FENIUS</div>
-
     <!-- Centered form container -->
     <div class="form-container">
       <!-- Top metadata row -->
@@ -183,6 +177,7 @@ function goToRuling() {
 .ruling-meta-page {
   display: flex;
   flex-direction: column;
+  justify-content: center;
   min-height: 100vh;
   height: 100vh;
   height: 100dvh;
@@ -190,25 +185,12 @@ function goToRuling() {
   -webkit-overflow-scrolling: touch;
   background: linear-gradient(to bottom, #3a4b60, #112233);
   color: white;
-}
-
-.header-bar {
-  background: #c0c2c3;
-  color: black;
-  padding: 12px 24px;
-  font-weight: 600;
-  font-size: 18px;
-}
-
-.title {
-  text-align: center;
-  margin: 16px 0;
-  font-size: 32px;
-  color: #a0a0a0;
+  box-sizing: border-box;
+  padding: 24px 0;
 }
 
 .form-container {
-  margin: 0 auto;
+  margin: auto;
   max-width: 800px;
   width: calc(100% - 32px);
   padding: 32px 0 48px;

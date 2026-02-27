@@ -1,10 +1,8 @@
 <template>
   <div class="landing-page">
-    <!-- Header -->
-    <div class="header-bar">eManuskript Produkt</div>
-
-    <!-- Title -->
-    <div class="title">FENIUS</div>
+    <div class="brand-row">
+      <img src="@/assets/logo.png" alt="Fenius logo" class="brand-logo" />
+    </div>
 
     <!-- Main App Buttons -->
     <div class="button-group">
@@ -111,19 +109,21 @@ function handleFileUpload(event) {
   color: white;
 }
 
-.header-bar {
-  background-color: #c0c2c3;
-  color: black;
-  font-size: 1.125rem; /* ~18px */
-  font-weight: 600;
-  padding: 8px 16px;
+.brand-row {
+  position: absolute;
+  top: 6px;
+  left: 0;
+  right: 0;
+  display: flex;
+  justify-content: center;
+  z-index: 1;
+  pointer-events: none;
 }
 
-.title {
-  text-align: center;
-  color: #a0a0a0;
-  font-size: 2rem; /* ~32px */
-  margin-top: 12px;
+.brand-logo {
+  width: 260px;
+  height: auto;
+  display: block;
 }
 
 .button-group {
@@ -133,7 +133,7 @@ function handleFileUpload(event) {
   justify-content: center;
   gap: 24px;
   flex-grow: 1;
-  margin: 0;
+  margin: 10px 0 0;
 }
 
 .action-button {

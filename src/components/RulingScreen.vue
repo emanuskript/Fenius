@@ -1,9 +1,5 @@
 <template>
   <div class="ruling-page">
-    <!-- Header -->
-    <div class="header-bar">eManuskript Produkt</div>
-    <div class="title">FENIUS</div>
-
     <!-- Centered compact metadata summary -->
     <div class="meta-summary">
       <div class="meta-main">
@@ -2510,28 +2506,14 @@ function setupTooltips() {
   min-height: 100vh;
   height: 100vh;
   height: 100dvh;
-  overflow: hidden;
+  overflow-y: auto;
+  overflow-x: hidden;
   background: linear-gradient(to bottom, #3a4b60, #112233);
   color: #ffffff;
   font-size: 14px;
 }
 
-.header-bar {
-  background: #c0c2c3;
-  color: #000;
-  padding: 12px 24px;
-  font-weight: 600;
-  font-size: 18px;
-}
-
-.title {
-  text-align: center;
-  margin: 10px 0 4px;
-  font-size: 28px;
-  color: #a0a0a0;
-}
-
-/* Meta summary directly under FENIUS */
+/* Meta summary */
 .meta-summary {
   display: flex;
   align-items: center;
@@ -2587,6 +2569,7 @@ function setupTooltips() {
   gap: 12px;
   padding: 8px 12px 12px;
   box-sizing: border-box;
+  min-height: 0;
 }
 
 /* Sidebars */
@@ -2595,7 +2578,8 @@ function setupTooltips() {
   background: #1b2738;
   border-radius: 12px;
   overflow-y: auto;
-  max-height: calc(100vh - 170px);
+  max-height: 100%;
+  min-height: 0;
 }
 
 .side::-webkit-scrollbar {
@@ -2828,6 +2812,7 @@ select {
   display: flex;
   flex-direction: column;
   align-items: center;
+  min-height: 0;
 }
 
 .stage-header {

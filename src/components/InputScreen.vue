@@ -1,11 +1,5 @@
 <template>
   <div class="input-page">
-    <!-- Header -->
-    <div class="header-bar">eManuskript Produkt</div>
-
-    <!-- Title -->
-    <div class="title">FENIUS</div>
-
     <!-- Centered form container -->
     <div class="form-container">
       <!-- Top metadata row -->
@@ -385,6 +379,7 @@ function onContinue() {
 .input-page {
   display: flex;
   flex-direction: column;
+  justify-content: center;
   /* Use viewport height and enable internal scrolling */
   min-height: 100vh; /* baseline */
   height: 100vh;     /* fallback */
@@ -393,22 +388,12 @@ function onContinue() {
   -webkit-overflow-scrolling: touch;
   background: linear-gradient(to bottom, #3a4b60, #112233);
   color: white;
+  box-sizing: border-box;
+  padding: 24px 0;
 }
-.header-bar {
-  background: #c0c2c3;
-  color: black;
-  padding: 12px 24px;
-  font-weight: 600;
-  font-size: 18px;
-}
-.title {
-  text-align: center;
-  margin: 16px 0;
-  font-size: 32px;
-  color: #a0a0a0;
-}
+
 .form-container {
-  margin: 0 auto;
+  margin: auto;
   max-width: 800px;
   width: calc(100% - 32px); /* responsive on narrow viewports */
   padding: 32px 0 48px;

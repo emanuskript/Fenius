@@ -2,12 +2,8 @@
   <div class="bookbinding-screen" ref="rootEl" :class="{ 'force-scroll': isScrollForced, 'export-mode': exportMode }">
     <!-- HEADER BAR -->
     <div class="header-bar">
-      <span class="product-label">eManuskript Produkt</span>
       <button class="return-btn" @click="$router.back()">↩ return</button>
     </div>
-
-    <!-- TITLE BAR -->
-    <div class="title-bar">FENIUS</div>
 
     <!-- METADATA BREADCRUMB -->
     <div class="breadcrumb">
@@ -4228,7 +4224,7 @@ export default {
 }
 .header-bar {
   display: flex;
-  justify-content: space-between;
+  justify-content: flex-end;
   align-items: center;
   background: #c0c2c3;
   color: black;
@@ -4241,13 +4237,6 @@ export default {
   border: none;
   cursor: pointer;
   font-size: 16px;
-}
-.title-bar {
-  background: #0f2340;
-  color: #a0a0a0;
-  text-align: center;
-  padding: 12px 0;
-  font-size: 32px;
 }
 .breadcrumb {
   background: #1f2a3a;
