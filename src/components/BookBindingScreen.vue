@@ -3,6 +3,9 @@
     <!-- HEADER BAR -->
     <div class="header-bar">
       <button class="return-btn" @click="$router.back()">↩ return</button>
+      <button class="return-btn book-paths-open-btn" @click="openBookPathsWizard">
+        Book Paths
+      </button>
     </div>
 
     <!-- METADATA BREADCRUMB -->
@@ -27,7 +30,7 @@
               class="pen-btn-header"
               :class="{ active: activePenId === pen.id && !eraserActive }"
               @click="togglePen(pen.id)"
-              :style="{ borderColor: pen.color, color: pen.color }"
+              :style="{ borderColor: pen.color }"
               :title="penTooltip(pen)"
             >
               Pen{{ pen.id }}
@@ -98,6 +101,22 @@
       <span>Adding ruptures is now active. Click on the table or on drawn lines to create breaks.</span>
       <div class="selection-actions">
         <button @click="toggleAddRupture" class="btn btn-ghost">Exit Rupture Mode</button>
+      </div>
+    </div>
+
+    <div v-if="bookPathsSummary" class="book-paths-summary">
+      <button class="btn" @click="showBookPathsSummary = !showBookPathsSummary">
+        Book Paths Summary {{ showBookPathsSummary ? "▲" : "▼" }}
+      </button>
+      <div v-if="showBookPathsSummary" class="book-paths-summary-body">
+        <p><strong>Style:</strong> {{ bookPathsSummary.style || "Not set" }}</p>
+        <ul>
+          <li v-for="(step, idx) in bookPathsSummary.steps" :key="`${step.nodeId}-${idx}`">
+            {{ idx + 1 }}. {{ resolveBookPathNodeTitle(step.nodeId) }} — {{ step.choiceLabel }}
+          </li>
+        </ul>
+        <p><strong>Derived:</strong></p>
+        <pre class="book-paths-derived">{{ formatBookPathsDerived(bookPathsSummary) }}</pre>
       </div>
     </div>
 
@@ -738,6 +757,14 @@
         </div>
       </div>
     </div>
+
+    <BookPathsWizard
+      v-if="showBookPathsWizard"
+      :initial-context="bookPathsContext"
+      @close="closeBookPathsWizard"
+      @finish="handleBookPathsFinish"
+    />
+
   </div>
 </template>
 
@@ -746,9 +773,14 @@
 import { ref, computed, reactive, onMounted, onUnmounted, watch, nextTick } from "vue";
 import html2canvas from "html2canvas";
 import jsPDF from "jspdf";
+import BookPathsWizard from "@/components/BookPathsWizard.vue";
+import { BOOK_PATHS_FLOW } from "@/bookPaths/flow";
 
 export default {
   name: "BookBindingScreen",
+  components: {
+    BookPathsWizard,
+  },
   directives: {
     // v-draggable: accepts { onStart?(localPct, globalPct, pxToPct), onChange(localPct, globalPct, pxToPct), onEnd?, getRect? }
     draggable: {
@@ -833,6 +865,7 @@ export default {
     headbands: Boolean,
     changeOver: Boolean,
     spineLength: [Number, String],
+    startBookPaths: { type: Boolean, default: false },
 
     // Optional
     quiresStyle: String,
@@ -845,6 +878,49 @@ export default {
     const showRecolorPopup = ref(false);
     const recolorForGroup = ref(false);
     const recolorColor = ref("#4ea5de");
+
+    /* ---------- Book Paths wizard ---------- */
+    const showBookPathsWizard = ref(false);
+    const bookPathsSummary = ref(null);
+    const showBookPathsSummary = ref(true);
+    const bookPathsContext = computed(() => ({
+      title: props.title || "",
+      manuscriptDate: props.manuscriptDate || "",
+      shelfmark: props.shelfmark || "",
+      location: props.location || "",
+    }));
+
+    function openBookPathsWizard() {
+      showBookPathsWizard.value = true;
+    }
+
+    function closeBookPathsWizard() {
+      showBookPathsWizard.value = false;
+    }
+
+    function handleBookPathsFinish(summary) {
+      bookPathsSummary.value = summary || null;
+      showBookPathsSummary.value = true;
+      showBookPathsWizard.value = false;
+    }
+
+    watch(
+      () => props.startBookPaths,
+      (shouldOpen) => {
+        if (shouldOpen) {
+          showBookPathsWizard.value = true;
+        }
+      },
+      { immediate: true }
+    );
+
+    function resolveBookPathNodeTitle(nodeId) {
+      return BOOK_PATHS_FLOW[nodeId]?.title || nodeId;
+    }
+
+    function formatBookPathsDerived(summary) {
+      return JSON.stringify(summary?.derived || {}, null, 2);
+    }
 
     /* ---------- Rows & numbering ---------- */
     const rows = computed(() => {
@@ -4013,6 +4089,17 @@ export default {
     }
 
     return {
+      // book paths
+      showBookPathsWizard,
+      openBookPathsWizard,
+      closeBookPathsWizard,
+      handleBookPathsFinish,
+      bookPathsSummary,
+      showBookPathsSummary,
+      bookPathsContext,
+      resolveBookPathNodeTitle,
+      formatBookPathsDerived,
+
       // rows / notes
       rows,
       notes,
@@ -5073,5 +5160,211 @@ export default {
     inset 0 1px 0 rgba(255, 107, 71, 0.4),
     0 0 4px rgba(255, 107, 71, 0.3);
   animation: flicker 2s infinite alternate;
+}
+
+/* QuillApp-inspired visual layer */
+.bookbinding-screen {
+  background: linear-gradient(180deg, var(--app-bg-top), var(--app-bg-bottom));
+  color: hsl(var(--foreground));
+}
+
+.bookbinding-screen::before {
+  content: "";
+  position: fixed;
+  inset: 0;
+  pointer-events: none;
+  background-image: radial-gradient(circle at 2px 2px, rgb(23 43 77 / 0.07) 1px, transparent 0);
+  background-size: 24px 24px;
+  opacity: 0.4;
+}
+
+.header-bar {
+  background: hsl(var(--card) / 0.92);
+  border-bottom: 1px solid hsl(var(--border));
+  padding-left: 148px;
+}
+
+.footer {
+  background: linear-gradient(180deg, hsl(var(--card) / 0.96), hsl(var(--card) / 0.9));
+  color: hsl(var(--card-foreground));
+  border-top: 1px solid hsl(var(--border));
+  box-shadow: 0 -10px 28px rgb(12 17 29 / 0.12);
+  backdrop-filter: blur(10px);
+}
+
+.footer .legend {
+  background: transparent;
+}
+
+.book-paths-open-btn {
+  margin-left: 8px;
+}
+
+.breadcrumb,
+.selection-bar,
+.context-menu,
+.popup,
+.top-ruler,
+.legend,
+.table-container,
+.binding-table {
+  background: hsl(var(--card) / 0.92);
+  color: hsl(var(--card-foreground));
+  border-color: hsl(var(--border));
+}
+
+.breadcrumb {
+  box-shadow: var(--shadow-sm);
+}
+
+.selection-bar {
+  border-top: 1px solid hsl(var(--border));
+  border-bottom: 1px solid hsl(var(--border));
+}
+
+.book-paths-summary {
+  padding: 8px 12px 0;
+}
+
+.book-paths-summary-body {
+  margin-top: 8px;
+  border: 1px solid hsl(var(--border));
+  border-radius: var(--radius-sm);
+  background: hsl(var(--card) / 0.9);
+  padding: 10px 12px;
+  color: hsl(var(--card-foreground));
+}
+
+.book-paths-summary-body p {
+  margin: 0 0 8px;
+}
+
+.book-paths-summary-body ul {
+  margin: 0;
+  padding-left: 18px;
+}
+
+.book-paths-derived {
+  margin: 0;
+  border: 1px solid hsl(var(--border));
+  border-radius: 8px;
+  padding: 8px;
+  font-size: 12px;
+  line-height: 1.4;
+  background: hsl(var(--muted));
+  color: hsl(var(--card-foreground));
+  overflow: auto;
+}
+
+.breadcrumb-text,
+.tick-label,
+.tooltip,
+.drag-readout {
+  color: hsl(var(--muted-foreground));
+}
+
+.return-btn,
+.pen-btn-header,
+.btn,
+.legend button,
+.continue-btn,
+.menu-item,
+.popup-btn {
+  border-radius: var(--radius-sm);
+  font-weight: 700;
+  border: 1px solid hsl(var(--border));
+  background: hsl(var(--card));
+  color: hsl(var(--card-foreground));
+  transition: background-color 0.14s ease, color 0.14s ease, border-color 0.14s ease,
+    transform 0.08s ease, filter 0.14s ease;
+}
+
+.return-btn:hover,
+.pen-btn-header:hover,
+.btn:hover,
+.legend button:hover,
+.continue-btn:hover,
+.menu-item:hover,
+.popup-btn:hover {
+  background: hsl(var(--muted));
+  border-color: hsl(var(--ring));
+}
+
+.pen-btn-header.active,
+.btn-active,
+.continue-btn,
+.popup-btn.confirm {
+  background: hsl(var(--primary));
+  border-color: hsl(var(--primary));
+  color: hsl(var(--primary-foreground));
+}
+
+.popup-btn.cancel,
+.btn-ghost {
+  background: transparent;
+}
+
+.menu-item.danger {
+  background: #b42318;
+  border-color: #b42318;
+  color: #fff;
+}
+
+.menu-item.danger:hover {
+  background: #981b14;
+  border-color: #981b14;
+}
+
+.return-btn:active,
+.pen-btn-header:active,
+.btn:active,
+.legend button:active,
+.continue-btn:active,
+.menu-item:active,
+.popup-btn:active {
+  transform: translateY(1px);
+}
+
+.cell-input,
+.popup select,
+.popup input[type="text"],
+.popup input[type="number"],
+.popup input[type="color"] {
+  background: hsl(var(--muted));
+  color: hsl(var(--card-foreground));
+  border-color: hsl(var(--border));
+  border-radius: var(--radius-sm);
+}
+
+.overlay {
+  background: rgb(7 12 20 / 0.7);
+}
+
+.bookbinding-screen .pen-btn-header,
+.bookbinding-screen .pen-hint-header,
+.bookbinding-screen .selection-bar span,
+.bookbinding-screen .breadcrumb-text,
+.bookbinding-screen .legend,
+.bookbinding-screen .legend button,
+.bookbinding-screen .menu-item,
+.bookbinding-screen .popup h3,
+.bookbinding-screen .popup label,
+.bookbinding-screen .tick-label,
+.bookbinding-screen .tooltip,
+.bookbinding-screen .drag-readout,
+.bookbinding-screen .btn-ghost {
+  color: hsl(var(--card-foreground));
+}
+
+.bookbinding-screen .popup .popup-section label,
+.bookbinding-screen .selection-bar,
+.bookbinding-screen .context-menu {
+  color: hsl(var(--muted-foreground));
+}
+
+@media (max-width: 900px) {
+  .header-bar {
+    padding-left: 122px;
+  }
 }
 </style>

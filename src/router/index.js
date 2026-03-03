@@ -4,6 +4,7 @@ import { createRouter, createWebHistory } from 'vue-router'
 import LandingPage from '@/components/LandingPage.vue'
 import InputScreen from '@/components/InputScreen.vue'
 import BookBindingScreen from '@/components/BookBindingScreen.vue'
+import BookPathsRoute from '@/components/BookPathsRoute.vue'
 import RulingMetadataScreen from '@/components/RulingMetadataScreen.vue'
 import RulingScreen from '@/components/RulingScreen.vue'
 
@@ -32,10 +33,16 @@ const routes = [
       headbands: route.query.headbands === 'true',
       changeOver: route.query.changeOver === 'true',
       spineLength: Number(route.query.spineLength),
+      startBookPaths: route.query.startBookPaths === 'true',
 
       quiresStyle: route.query.quiresStyle,
       sewingType: route.query.sewingType,
     })
+  },
+  {
+    path: '/book-paths',
+    name: 'bookPaths',
+    component: BookPathsRoute,
   },
 
   // Ruling metadata screen

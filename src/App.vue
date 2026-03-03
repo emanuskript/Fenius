@@ -1,12 +1,12 @@
-<!-- /src/App.vue -->
 <template>
-  <router-view />
+  <div class="app-shell">
+    <ThemePicker />
+    <TourManager />
+    <router-view />
+  </div>
 </template>
 
 <script setup>
-// nothing needed here
+import ThemePicker from "@/components/ThemePicker.vue";
+import TourManager from "@/components/TourManager.vue";
 </script>
-
-<style>
-/* you can put your html,body reset here if you like */
-</style>

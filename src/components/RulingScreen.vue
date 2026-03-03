@@ -227,22 +227,6 @@
               </select>
             </label>
             <label class="inline">
-              <input type="checkbox" v-model="snapEnabled" @change="redrawAll" />
-              <span>Snap</span>
-            </label>
-            <label class="inline" :class="{ disabled: !snapEnabled }">
-              <span>step</span>
-              <input
-                type="number"
-                min="0.05"
-                step="0.05"
-                v-model.number="snapStepCm"
-                :disabled="!snapEnabled"
-                @change="redrawAll"
-              />
-              <span>cm</span>
-            </label>
-            <label class="inline">
               <input type="checkbox" v-model="showIntersectionMeasurements" @change="redrawAll" />
               <span>Show intersection measurements</span>
             </label>
@@ -801,7 +785,6 @@ function getPrickingColor(pricking) {
 const zoom = ref(1);
 const zoomPercent = computed(() => Math.round(zoom.value * 100));
 
-const snapEnabled = ref(true);
 const snapStepCm = ref(0.1);
 const showIntersectionMeasurements = ref(false);
 const showImage = ref(false);
@@ -1360,7 +1343,6 @@ function hideGuides() {
 
 /* Snap & distance helpers */
 function snapPoint(cm) {
-  if (!snapEnabled.value) return cm;
   return snapVal(cm, snapStepCm.value);
 }
 
@@ -1962,7 +1944,6 @@ function saveAutosave() {
       },
       view: {
         zoom: zoom.value,
-        snapEnabled: snapEnabled.value,
         snapStepCm: snapStepCm.value,
       },
       notes: globalNotes.value,
@@ -1996,7 +1977,6 @@ function restoreAutosave() {
     }
     if (data.view) {
       zoom.value = data.view.zoom ?? zoom.value;
-      snapEnabled.value = data.view.snapEnabled ?? snapEnabled.value;
       snapStepCm.value = data.view.snapStepCm ?? snapStepCm.value;
     }
     if (data.notes) {
@@ -3115,5 +3095,208 @@ input[type="range"] {
 
 .clear-color-btn:hover {
   background: #4a5568;
+}
+
+/* QuillApp-inspired visual layer */
+.ruling-page {
+  background: linear-gradient(180deg, var(--app-bg-top), var(--app-bg-bottom));
+  color: hsl(var(--foreground));
+}
+
+.ruling-page::before {
+  content: "";
+  position: fixed;
+  inset: 0;
+  pointer-events: none;
+  background-image: radial-gradient(circle at 2px 2px, rgb(23 43 77 / 0.07) 1px, transparent 0);
+  background-size: 24px 24px;
+  opacity: 0.4;
+}
+
+.meta-summary,
+.side,
+.panel,
+.stage-header,
+.status-bar,
+.modal-content {
+  background: hsl(var(--card) / 0.92);
+  border-color: hsl(var(--border));
+  color: hsl(var(--card-foreground));
+  box-shadow: var(--shadow-sm);
+}
+
+.meta-summary {
+  border-radius: var(--radius-md);
+  margin: 12px 14px 10px;
+  padding: 10px 24px 12px;
+  border: 1px solid hsl(var(--border) / 0.85);
+  background:
+    linear-gradient(180deg, hsl(var(--card) / 0.76), hsl(var(--card) / 0.64));
+  backdrop-filter: blur(10px);
+}
+
+.mode-pill {
+  background: hsl(var(--muted));
+  color: hsl(var(--muted-foreground));
+  border: 1px solid hsl(var(--border));
+}
+
+.side {
+  border-radius: var(--radius-md);
+  border: 1px solid hsl(var(--border) / 0.7);
+  background:
+    linear-gradient(180deg, hsl(var(--card) / 0.58), hsl(var(--card) / 0.42));
+  box-shadow: 0 18px 34px rgb(12 17 29 / 0.08);
+  backdrop-filter: blur(10px);
+}
+
+.panel {
+  border-radius: var(--radius-md);
+  border: 1px solid hsl(var(--border) / 0.78);
+  background:
+    linear-gradient(180deg, hsl(var(--card) / 0.82), hsl(var(--card) / 0.72));
+  box-shadow: inset 0 1px 0 rgb(255 255 255 / 0.08), var(--shadow-sm);
+}
+
+.stage-header,
+.status-bar {
+  border: 1px solid hsl(var(--border) / 0.8);
+  border-radius: var(--radius-md);
+  background:
+    linear-gradient(180deg, hsl(var(--card) / 0.72), hsl(var(--card) / 0.58));
+  backdrop-filter: blur(8px);
+}
+
+.stage-header {
+  padding: 10px 14px;
+  margin-bottom: 10px;
+}
+
+.status-bar {
+  margin-top: 10px;
+  padding: 10px 14px;
+}
+
+.meta-item strong,
+.ruling-page .modal-content h2 {
+  color: hsl(var(--card-foreground));
+}
+
+.hint,
+.field-label,
+.field-label-small,
+.meta-row-secondary {
+  color: hsl(var(--muted-foreground));
+}
+
+.field-input,
+.number-input,
+.field-textarea,
+.inline select,
+.inline input[type="number"] {
+  background: hsl(var(--muted));
+  color: hsl(var(--card-foreground));
+  border-color: hsl(var(--border));
+  border-radius: var(--radius-sm);
+}
+
+.canvas-wrap {
+  border-radius: var(--radius-sm);
+  box-shadow: var(--shadow-sm);
+  border: 1px solid hsl(var(--border) / 0.65);
+}
+
+button,
+.small-btn,
+.adjust-btn,
+.export-option-btn,
+.modal-close-btn,
+.clear-color-btn,
+.export-btn {
+  border-radius: var(--radius-sm);
+  font-weight: 700;
+  border: 1px solid hsl(var(--border));
+  background: hsl(var(--card));
+  color: hsl(var(--card-foreground));
+  transition: background-color 0.14s ease, color 0.14s ease, border-color 0.14s ease,
+    transform 0.08s ease, filter 0.14s ease;
+}
+
+button:hover:not(:disabled),
+.small-btn:hover:not(:disabled),
+.adjust-btn:hover:not(:disabled),
+.export-option-btn:hover:not(:disabled),
+.modal-close-btn:hover:not(:disabled),
+.clear-color-btn:hover:not(:disabled) {
+  background: hsl(var(--muted));
+  border-color: hsl(var(--ring));
+}
+
+button.active,
+.export-btn {
+  background: hsl(var(--primary));
+  color: hsl(var(--primary-foreground));
+  border-color: hsl(var(--primary));
+}
+
+button.btn-danger {
+  background: #b42318;
+  border-color: #b42318;
+  color: #fff;
+}
+
+button.btn-danger:hover:not(:disabled) {
+  background: #981b14;
+  border-color: #981b14;
+}
+
+button:active:not(:disabled) {
+  transform: translateY(1px);
+}
+
+.modal-overlay {
+  background: rgb(7 12 20 / 0.7);
+}
+
+.selected-summary,
+.image-controls {
+  border-top-color: hsl(var(--border));
+}
+
+.ruling-page .help-icon {
+  background: hsl(var(--muted));
+  border-color: hsl(var(--border));
+}
+
+.ruling-page .help-icon,
+.ruling-page .help-icon::before,
+.ruling-page .help-icon .tooltip,
+.ruling-page .status-bar,
+.ruling-page .empty-selected,
+.ruling-page .selected-text,
+.ruling-page .image-controls h4,
+.ruling-page .range-value {
+  color: hsl(var(--muted-foreground));
+}
+
+.ruling-page .help-icon .tooltip {
+  background: hsl(var(--card));
+  border-color: hsl(var(--border));
+}
+
+.ruling-page .help-icon .tooltip::after {
+  border-right-color: hsl(var(--card));
+}
+
+.ruling-page .export-option-btn strong {
+  background: transparent;
+  border: 0;
+  color: hsl(var(--card-foreground));
+  font-weight: 700;
+}
+
+.ruling-page .export-option-btn span,
+.ruling-page .modal-content h2 {
+  color: hsl(var(--card-foreground));
 }
 </style>

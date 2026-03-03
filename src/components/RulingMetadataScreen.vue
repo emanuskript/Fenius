@@ -183,22 +183,46 @@ function goToRuling() {
   height: 100dvh;
   overflow-y: auto;
   -webkit-overflow-scrolling: touch;
-  background: linear-gradient(to bottom, #3a4b60, #112233);
-  color: white;
+  color: hsl(var(--foreground));
   box-sizing: border-box;
-  padding: 24px 0;
+  padding: 90px 0 24px;
+  position: relative;
+}
+
+.ruling-meta-page::before {
+  content: "";
+  position: absolute;
+  inset: 0;
+  background: linear-gradient(180deg, var(--app-bg-top), var(--app-bg-bottom));
+  pointer-events: none;
+}
+
+.ruling-meta-page::after {
+  content: "";
+  position: absolute;
+  inset: 0;
+  background-image: radial-gradient(circle at 2px 2px, rgb(23 43 77 / 0.08) 1px, transparent 0);
+  background-size: 24px 24px;
+  opacity: 0.45;
+  pointer-events: none;
 }
 
 .form-container {
   margin: auto;
-  max-width: 800px;
+  max-width: 860px;
   width: calc(100% - 32px);
-  padding: 32px 0 48px;
+  padding: 28px 28px 34px;
+  border-radius: var(--radius-lg);
+  border: 1px solid hsl(var(--border));
+  background: hsl(var(--card) / 0.95);
+  box-shadow: var(--shadow-md);
+  position: relative;
+  z-index: 1;
 }
 
 .metadata {
   display: flex;
-  gap: 64px;
+  gap: 38px;
 }
 
 .direction-centered {
@@ -219,16 +243,17 @@ function goToRuling() {
 
 .field-label {
   font-size: 14px;
-  font-weight: 500;
+  font-weight: 600;
+  color: hsl(var(--muted-foreground));
 }
 
 .field-input {
   margin-top: 4px;
-  padding: 8px 12px;
-  background: #1f2a3a;
-  border: 1px solid #666;
-  border-radius: 4px;
-  color: white;
+  padding: 10px 12px;
+  background: hsl(var(--muted));
+  border: 1px solid hsl(var(--border));
+  border-radius: var(--radius-sm);
+  color: hsl(var(--card-foreground));
   font-size: 16px;
 }
 
@@ -238,8 +263,8 @@ function goToRuling() {
 
 .separator {
   height: 1px;
-  background: #2e3a4b;
-  margin: 32px 0;
+  background: hsl(var(--border));
+  margin: 28px 0;
 }
 
 .body {
@@ -248,7 +273,7 @@ function goToRuling() {
 
 .help-text {
   font-size: 14px;
-  color: #d0d4dd;
+  color: hsl(var(--muted-foreground));
   line-height: 1.4;
   text-align: center;
 }
@@ -262,23 +287,23 @@ function goToRuling() {
 
 .number-input {
   width: 80px;
-  padding: 8px;
-  background: #1f2a3a;
-  border: 1px solid #666;
-  border-radius: 4px;
-  color: white;
+  padding: 9px;
+  background: hsl(var(--muted));
+  border: 1px solid hsl(var(--border));
+  border-radius: var(--radius-sm);
+  color: hsl(var(--card-foreground));
   text-align: center;
   font-size: 16px;
 }
 
 .size-mult {
   font-size: 16px;
-  color: #cccccc;
+  color: hsl(var(--muted-foreground));
 }
 
 .size-unit {
   font-size: 14px;
-  color: #cccccc;
+  color: hsl(var(--muted-foreground));
 }
 
 .button-container {
@@ -289,21 +314,23 @@ function goToRuling() {
 
 .continue-btn {
   padding: 12px 48px;
-  border: 1px solid white;
-  border-radius: 4px;
-  background: transparent;
-  color: white;
-  font-size: 18px;
+  border-radius: var(--radius-md);
+  border: 1px solid hsl(var(--primary));
+  background: hsl(var(--primary));
+  color: hsl(var(--primary-foreground));
+  font-size: 17px;
+  font-weight: 700;
   cursor: pointer;
+  box-shadow: var(--shadow-sm);
+  transition: filter 0.15s ease;
 }
 
 .continue-btn:disabled {
-  opacity: 0.5;
+  opacity: 0.48;
   cursor: not-allowed;
 }
 
 .continue-btn:not(:disabled):hover {
-  background: white;
-  color: black;
+  filter: brightness(0.95);
 }
 </style>

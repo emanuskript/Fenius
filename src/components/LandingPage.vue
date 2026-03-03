@@ -1,43 +1,47 @@
 <template>
   <div class="landing-page">
+    <div class="app-bg-icons" aria-hidden="true"></div>
+
     <div class="brand-row">
       <img src="@/assets/logo.png" alt="Fenius logo" class="brand-logo" />
     </div>
 
-    <!-- Main App Buttons -->
-    <div class="button-group">
-      <button @click="goToRuling" class="action-button">
-        Create a ruling scheme
-      </button>
+    <section class="landing-card surface-card">
+      <p class="ribbon">Select a workflow</p>
 
-      <div class="spine-container">
-        <button @click="toggleSpineOptions" class="action-button">
-          Visualise a book spine
+      <div class="button-group">
+        <button @click="goToRuling" class="action-button secondary-btn">
+          Create a ruling scheme
         </button>
-        
-        <!-- Sub-options for Visualise a book spine -->
-        <transition name="slide-pop">
-          <div v-if="showSpineOptions" class="sub-options">
-            <button @click="goToBookbinding" class="sub-button">
-              Create New
-            </button>
-            <label class="sub-button cursor-pointer">
-              Import from VCEditor (JSON)
-              <input
-                type="file"
-                accept=".json"
-                class="hidden"
-                @change="handleFileUpload"
-              />
-            </label>
-          </div>
-        </transition>
-      </div>
 
-      <button @click="goToBookbinding" class="action-button">
-        Build a bookbinding
-      </button>
-    </div>
+        <div class="spine-container">
+          <button @click="toggleSpineOptions" class="action-button secondary-btn">
+            Visualise a book spine
+          </button>
+
+          <transition name="slide-pop">
+            <div v-if="showSpineOptions" class="sub-options">
+              <button @click="goToBookbindingCreate" class="sub-button secondary-btn">
+                Create New
+              </button>
+              <label class="sub-button ghost-btn cursor-pointer">
+                Import from VCEditor (JSON)
+                <input
+                  type="file"
+                  accept=".json"
+                  class="hidden"
+                  @change="handleFileUpload"
+                />
+              </label>
+            </div>
+          </transition>
+        </div>
+
+        <button @click="goToBookbindingBuild" class="action-button secondary-btn">
+          Build a bookbinding
+        </button>
+      </div>
+    </section>
   </div>
 </template>
 
@@ -52,8 +56,17 @@ function toggleSpineOptions() {
   showSpineOptions.value = !showSpineOptions.value;
 }
 
-function goToBookbinding() {
+function goToBookbindingCreate() {
   router.push("/input-screen");
+}
+
+function goToBookbindingBuild() {
+  router.push({
+    path: "/input-screen",
+    query: {
+      startBookPaths: "true",
+    },
+  });
 }
 
 function goToRuling() {
@@ -101,119 +114,128 @@ function handleFileUpload(event) {
 
 <style scoped>
 .landing-page {
-  position: fixed;
+  position: relative;
   inset: 0;
+  min-height: 100vh;
   display: flex;
   flex-direction: column;
-  background: linear-gradient(to bottom, #3a4b60 0%, #112233 100%);
-  color: white;
+  align-items: center;
+  justify-content: center;
+  overflow: hidden;
+  color: hsl(var(--foreground));
 }
 
 .brand-row {
   position: absolute;
-  top: 6px;
+  top: 18px;
   left: 0;
   right: 0;
   display: flex;
   justify-content: center;
-  z-index: 1;
+  z-index: 2;
   pointer-events: none;
 }
 
 .brand-logo {
-  width: 260px;
+  width: min(380px, 56vw);
   height: auto;
   display: block;
+  margin-bottom: 10px;
+  filter: drop-shadow(0 10px 20px rgb(15 23 42 / 0.26));
+}
+
+.landing-card {
+  position: relative;
+  z-index: 3;
+  width: min(760px, calc(100vw - 32px));
+  padding: 26px 24px 24px;
+  margin-top: 230px;
+}
+
+.ribbon {
+  margin: -42px auto 12px;
+  width: fit-content;
+  padding: 8px 20px;
+  border-radius: 999px;
+  background: #7a2359;
+  color: #fff;
+  font-size: 13px;
+  font-weight: 700;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
 }
 
 .button-group {
   display: flex;
   flex-direction: column;
-  align-items: center;
-  justify-content: center;
-  gap: 24px;
-  flex-grow: 1;
-  margin: 10px 0 0;
+  gap: 14px;
+  margin: 6px 0 0;
 }
 
 .action-button {
-  width: 400px;
-  padding: 16px 0;
-  border: 1px solid white;
-  color: white;
-  font-size: 1.125rem; /* ~18px */
+  width: 100%;
+  padding: 14px 16px;
+  font-size: 1.05rem;
   text-align: center;
-  background: transparent;
-  transition: background-color 0.2s, color 0.2s;
-}
-
-.action-button:hover {
-  background-color: white;
-  color: black;
 }
 
 .spine-container {
   position: relative;
   display: flex;
-  align-items: center;
-  justify-content: center;
+  flex-direction: column;
+  align-items: stretch;
   width: 100%;
 }
 
 .sub-options {
-  position: absolute;
-  left: calc(50% + 220px);
+  position: relative;
   display: flex;
   flex-direction: column;
-  gap: 12px;
-  width: 300px;
+  gap: 8px;
+  margin-top: 8px;
+  margin-left: 24px;
+  padding-left: 14px;
+  width: calc(100% - 24px);
+  border-left: 1px solid hsl(var(--border));
 }
 
 .sub-button {
   width: 100%;
-  padding: 12px 0;
-  border: 1px solid rgba(255, 255, 255, 0.6);
-  color: white;
-  font-size: 1rem;
+  padding: 10px 12px;
+  font-size: 0.92rem;
   text-align: center;
-  background: rgba(255, 255, 255, 0.05);
-  transition: background-color 0.2s, color 0.2s;
   cursor: pointer;
-}
-
-.sub-button:hover {
-  background-color: rgba(255, 255, 255, 0.2);
-  border-color: white;
+  border-radius: 10px;
 }
 
 /* Slide-pop animation */
 .slide-pop-enter-active {
-  animation: slidePopIn 0.4s cubic-bezier(0.34, 1.56, 0.64, 1);
+  animation: slidePopIn 0.28s cubic-bezier(0.34, 1.56, 0.64, 1);
 }
 
 .slide-pop-leave-active {
-  animation: slidePopOut 0.3s cubic-bezier(0.4, 0, 1, 1);
+  animation: slidePopOut 0.22s cubic-bezier(0.4, 0, 1, 1);
 }
 
 @keyframes slidePopIn {
   0% {
     opacity: 0;
-    transform: translateX(-40px) scale(0.8);
+    transform: translateY(-8px) scale(0.96);
   }
   100% {
     opacity: 1;
-    transform: translateX(0) scale(1);
+    transform: translateY(0) scale(1);
   }
 }
 
 @keyframes slidePopOut {
   0% {
     opacity: 1;
-    transform: translateX(0) scale(1);
+    transform: translateY(0) scale(1);
   }
   100% {
     opacity: 0;
-    transform: translateX(-40px) scale(0.8);
+    transform: translateY(-8px) scale(0.96);
   }
 }
 
@@ -230,14 +252,15 @@ function handleFileUpload(event) {
 .cursor-pointer {
   cursor: pointer;
 }
-</style>
 
-<style>
-html,
-body {
-  margin: 0;
-  padding: 0;
-  overflow: hidden;
-  height: 100%;
+@media (max-width: 700px) {
+  .landing-card {
+    margin-top: 190px;
+    padding: 22px 18px 18px;
+  }
+
+  .brand-logo {
+    width: min(320px, 66vw);
+  }
 }
 </style>

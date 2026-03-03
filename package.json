@@ -5,7 +5,8 @@
   "scripts": {
     "serve": "vue-cli-service serve",
     "build": "vue-cli-service build",
-    "lint": "vue-cli-service lint"
+    "lint": "vue-cli-service lint",
+    "sync:book-paths-assets": "node scripts/sync-book-paths-assets.mjs"
   },
   "dependencies": {
     "core-js": "^3.8.3",
