@@ -37,8 +37,8 @@
           </transition>
         </div>
 
-        <button @click="goToBookbindingBuild" class="action-button secondary-btn">
-          Build a bookbinding
+        <button type="button" class="action-button secondary-btn is-coming-soon" disabled>
+          Build a bookbinding • Coming soon!
         </button>
       </div>
     </section>
@@ -58,15 +58,6 @@ function toggleSpineOptions() {
 
 function goToBookbindingCreate() {
   router.push("/input-screen");
-}
-
-function goToBookbindingBuild() {
-  router.push({
-    path: "/input-screen",
-    query: {
-      startBookPaths: "true",
-    },
-  });
 }
 
 function goToRuling() {
@@ -176,7 +167,23 @@ function handleFileUpload(event) {
   width: 100%;
   padding: 14px 16px;
   font-size: 1.05rem;
+  line-height: 1.25;
   text-align: center;
+  white-space: normal;
+}
+
+.is-coming-soon {
+  opacity: 0.78;
+  cursor: not-allowed;
+  color: hsl(var(--muted-foreground));
+  background: linear-gradient(
+    135deg,
+    hsl(var(--card)) 0%,
+    hsl(var(--muted)) 45%,
+    hsl(var(--card)) 100%
+  );
+  border-color: hsl(var(--border));
+  box-shadow: var(--shadow-sm), inset 0 1px 0 hsl(var(--background) / 0.85);
 }
 
 .spine-container {
@@ -203,7 +210,9 @@ function handleFileUpload(event) {
   width: 100%;
   padding: 10px 12px;
   font-size: 0.92rem;
+  line-height: 1.25;
   text-align: center;
+  white-space: normal;
   cursor: pointer;
   border-radius: 10px;
 }
@@ -262,5 +271,18 @@ function handleFileUpload(event) {
   .brand-logo {
     width: min(320px, 66vw);
   }
+}
+
+@media (max-width: 480px) {
+  .button-group {
+    gap: 12px;
+  }
+
+  .action-button,
+  .sub-button {
+    padding: 12px 14px;
+    font-size: 1rem;
+  }
+
 }
 </style>

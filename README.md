@@ -1,98 +1,170 @@
-**Fenius** is a Vue.js single-page application for simulating historical bookbinding structures. It guides you through:
+# Fenius
 
-1. **Manuscript metadata entry** (title, date, repository, shelfmark)
-2. **Spine configuration** (number of quires, foliation vs pagination, sewing supports, spine length, endleaves, headbands, change-over stations)
-3. **Interactive spine visualization**
+[![License](https://img.shields.io/badge/License-Apache%202.0-blue.svg)](https://opensource.org/licenses/Apache-2.0)
+[![Vue 3](https://img.shields.io/badge/Vue-3.x-42b883.svg)](https://vuejs.org/)
+[![Node.js](https://img.shields.io/badge/Node.js-18%2B-green.svg)](https://nodejs.org/)
 
-   * Auto-generated rows for front endleaves, quires & back endleaves
-   * Drag-and-drop ruler with real-time centimeter tooltip
-   * Movable colored bars and dots for headbands, sewing supports, change-over stations & sewing holes
-   * Editable notes per row
-4. **Drawing tools (“Pens”)** for annotating stitches:
-
-   * Internal & external thread presets, plus up to 3 custom pens
-   * Configurable label, tip size, color-blind palette, draw/line/curve/pattern modes
+> A Vue-based application for manuscript workflows, including ruling scheme setup and interactive book spine visualization.
 
 ---
 
-## Features
+## Overview
 
-* **Landing page**: “Create new” or import a VCEditor JSON
-* **Input screen**: Collect all spine parameters with guided tooltips
-* **Book-binding screen**: Render a table-based spine diagram
-* **Interactive ruler**: Shows cm scale, major/minor ticks, dynamic tooltip
-* **Legend & controls**: Add/remove headbands, supports, holes, change-overs
-* **Editable notes**: Free-form text per quire/endleaf row
-* **Pen tools**: Pop-up modals for thread annotations
-* **Responsive CSS** matching a professional gray-blue palette
+Fenius helps users move from manuscript metadata to visual workflow outputs.
+
+Core workflows:
+- **Create a ruling scheme**
+- **Visualise a book spine** (create new or import VCEditor JSON)
+- **Bookbinding pathway** (currently shown as Coming soon in the UI)
 
 ---
 
-## Tech Stack
+## Repository Structure
 
-* **Vue.js 3** with Composition API & `<script setup>`
-* **Vue Router** for SPA navigation
-* **HTML5 & CSS3** (Flexbox, Grid, scoped styles)
-* **JavaScript ES6+**
+- [src/App.vue](src/App.vue) — root application shell
+- [src/router/index.js](src/router/index.js) — route definitions
+- [src/components](src/components) — UI screens and feature components
+- [src/bookPaths](src/bookPaths) — book paths state/flow/assets
+- [src/assets/styles/theme.css](src/assets/styles/theme.css) — shared theme tokens and global styling
+- [public](public) — static app assets
+- [scripts/sync-book-paths-assets.mjs](scripts/sync-book-paths-assets.mjs) — asset sync utility
 
 ---
 
-## Getting Started
+## Prerequisites
+
+- Node.js 18+
+- npm 9+
+
+---
+
+## Local Development
+
+Install dependencies:
 
 ```bash
-# Clone the repo
-git clone https://github.com/your-username/fenius.git
-cd fenius
-
-# Install dependencies
 npm install
+```
 
-# Run the development server
-npm run dev
+Run the app locally:
 
-# Build for production
-npm run build
-
-# Preview the production build
+```bash
 npm run serve
 ```
 
----
+Default local URL:
+- `http://localhost:8080`
 
-## Project Structure
+Build production assets:
 
+```bash
+npm run build
 ```
-fenius/
-├─ public/
-│  └─ index.html
-├─ src/
-│  ├─ assets/
-│  ├─ components/
-│  │  ├─ LandingPage.vue
-│  │  ├─ InputScreen.vue
-│  │  └─ BookBindingScreen.vue
-│  ├─ router/
-│  │  └─ index.js
-│  ├─ App.vue
-│  └─ main.js
-├─ .gitignore
-├─ package.json
-└─ README.md
+
+Run lint checks:
+
+```bash
+npm run lint
+```
+
+Sync generated book-path assets:
+
+```bash
+npm run sync:book-paths-assets
 ```
 
 ---
 
-## Contributing
+## Environment & Runtime Notes
 
-1. Fork the repo
-2. Create a branch (`git checkout -b feature/my-feature`)
-3. Commit your changes (`git commit -m "Add feature"`)
-4. Push to your branch (`git push origin feature/my-feature`)
-5. Open a Pull Request
+- The project uses Vue CLI (`@vue/cli-service`) and serves static production output from `dist/`.
+- Routing is handled in-app via Vue Router, so server rewrites should route unknown paths to `index.html`.
+
+---
+
+## Deployment (Server)
+
+This section covers deploying the built app to a Linux server with Nginx.
+
+### Option A: Nginx static hosting (recommended)
+
+1. Build the app:
+
+```bash
+npm ci
+npm run build
+```
+
+2. Copy `dist/` to your server (example path):
+- `/var/www/fenius/dist`
+
+3. Use an Nginx site config like:
+
+```nginx
+server {
+   listen 80;
+   server_name your-domain.example;
+
+   root /var/www/fenius/dist;
+   index index.html;
+
+   location / {
+      try_files $uri $uri/ /index.html;
+   }
+
+   location ~* \.(js|css|png|jpg|jpeg|gif|svg|ico|woff2?)$ {
+      expires 30d;
+      add_header Cache-Control "public, max-age=2592000";
+      try_files $uri =404;
+   }
+}
+```
+
+4. Validate and reload Nginx:
+
+```bash
+sudo nginx -t
+sudo systemctl reload nginx
+```
+
+5. (Recommended) Add TLS with Certbot:
+
+```bash
+sudo certbot --nginx -d your-domain.example
+```
+
+### Option B: Vercel
+
+This repository includes [vercel.json](vercel.json). You can connect the repo in Vercel and deploy directly.
+
+Typical build settings:
+- Build command: `npm run build`
+- Output directory: `dist`
+
+---
+
+## Troubleshooting
+
+### App works locally but routes 404 in production
+
+Ensure your web server rewrites unknown paths to `index.html` (SPA fallback).
+
+### Port conflict when running locally
+
+If `8080` is busy, stop the running process or set a custom port in Vue CLI config before starting.
+
+### Dependency issues after updates
+
+Try a clean install:
+
+```bash
+rm -rf node_modules package-lock.json
+npm install
+```
 
 ---
 
 ## License
 
-This project is licensed under the [MIT License](LICENSE).
+This project is licensed under the Apache License 2.0. See [LICENSE](LICENSE).
 

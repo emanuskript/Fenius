@@ -4297,7 +4297,7 @@ export default {
   -webkit-overflow-scrolling: touch;
   background: #112233;
   color: white;
-  font-family: Arial, sans-serif;
+  font-family: inherit;
 }
 .bookbinding-screen.force-scroll {
   position: fixed;
