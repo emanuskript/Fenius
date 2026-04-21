@@ -45,7 +45,7 @@
           <div class="field">
             <div class="field-header">
               <span class="field-title">Number of Quires *</span>
-              <span class="info" data-tooltip="Choose how many quires (1-10)"
+              <span class="info" data-tooltip="Choose how many quires (e.g. 1-10)"
                 >ℹ</span
               >
             </div>
@@ -114,7 +114,7 @@
           <div class="field">
             <div class="field-header">
               <span class="field-title">Sewing Supports</span>
-              <span class="info" data-tooltip="Choose number of supports (1–6)"
+              <span class="info" data-tooltip="Choose number of supports (e.g. 1–6)"
                 >ℹ</span
               >
             </div>
@@ -349,7 +349,6 @@ watch(
 const canContinue = computed(
   () => title.value.trim() !== "" && quires.value >= 1
 );
-const startBookPaths = computed(() => route.query.startBookPaths === "true");
 
 function onContinue() {
   const nextQuery = {
@@ -369,10 +368,6 @@ function onContinue() {
     headbands: headbands.value,
     changeOver: changeOver.value,
   };
-
-  if (startBookPaths.value) {
-    nextQuery.startBookPaths = "true";
-  }
 
   router.push({
     name: "bookBinding",

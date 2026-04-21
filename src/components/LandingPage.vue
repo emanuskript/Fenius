@@ -148,8 +148,8 @@ function handleFileUpload(event) {
   width: fit-content;
   padding: 8px 20px;
   border-radius: 999px;
-  background: #7a2359;
-  color: #fff;
+  background: hsl(var(--primary));
+  color: hsl(var(--primary-foreground));
   font-size: 13px;
   font-weight: 700;
   letter-spacing: 0.08em;
@@ -198,21 +198,22 @@ function handleFileUpload(event) {
   position: relative;
   display: flex;
   flex-direction: column;
+  align-items: center;
   gap: 8px;
   margin-top: 8px;
-  margin-left: 24px;
-  padding-left: 14px;
-  width: calc(100% - 24px);
-  border-left: 1px solid hsl(var(--border));
+  width: 100%;
 }
 
 .sub-button {
-  width: 100%;
+  width: 50%;
   padding: 10px 12px;
   font-size: 0.92rem;
   line-height: 1.25;
   text-align: center;
   white-space: normal;
+  display: flex;
+  align-items: center;
+  justify-content: center;
   cursor: pointer;
   border-radius: 10px;
 }

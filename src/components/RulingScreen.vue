@@ -4040,4 +4040,26 @@ button:active:not(:disabled) {
 .ruling-page .modal-content h2 {
   color: hsl(var(--card-foreground));
 }
+
+.ruling-page .meta-summary,
+.ruling-page .meta-item strong,
+.ruling-page .panel h3,
+.ruling-page .panel h4,
+.ruling-page .field-inline,
+.ruling-page .inline,
+.ruling-page .selected-text,
+.ruling-page .modal-content,
+.ruling-page .export-option-btn,
+.ruling-page .modal-close-btn,
+.ruling-page .clear-color-btn {
+  color: hsl(var(--card-foreground));
+}
+
+.ruling-page .help-icon .tooltip {
+  color: hsl(var(--card-foreground));
+}
+
+.ruling-page .help-icon .tooltip::after {
+  border-bottom-color: hsl(var(--card));
+}
 </style>

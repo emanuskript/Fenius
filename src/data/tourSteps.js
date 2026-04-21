@@ -55,6 +55,15 @@ export const FLOW_TOUR_STEPS = {
       placement: "bottom",
     },
     {
+      id: "recolor",
+      title: "Recolor Lines and Dots",
+      content:
+        "Right-click lines, change-over stations, sewing holes, supports, headbands, and tailbands to open the context menu and recolor them.",
+      target: ".bookbinding-screen .table-container",
+      placement: "top",
+      spotlightPadding: 6,
+    },
+    {
       id: "table",
       title: "Interactive Table",
       content: "This is your main workspace for supports, holes and structural annotations.",

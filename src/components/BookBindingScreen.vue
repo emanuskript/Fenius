@@ -3,9 +3,6 @@
     <!-- HEADER BAR -->
     <div class="header-bar">
       <button class="return-btn" @click="$router.back()">↩ return</button>
-      <button class="return-btn book-paths-open-btn" @click="openBookPathsWizard">
-        Book Paths
-      </button>
     </div>
 
     <!-- METADATA BREADCRUMB -->
@@ -104,30 +101,14 @@
       </div>
     </div>
 
-    <div v-if="bookPathsSummary" class="book-paths-summary">
-      <button class="btn" @click="showBookPathsSummary = !showBookPathsSummary">
-        Book Paths Summary {{ showBookPathsSummary ? "▲" : "▼" }}
-      </button>
-      <div v-if="showBookPathsSummary" class="book-paths-summary-body">
-        <p><strong>Style:</strong> {{ bookPathsSummary.style || "Not set" }}</p>
-        <ul>
-          <li v-for="(step, idx) in bookPathsSummary.steps" :key="`${step.nodeId}-${idx}`">
-            {{ idx + 1 }}. {{ resolveBookPathNodeTitle(step.nodeId) }} — {{ step.choiceLabel }}
-          </li>
-        </ul>
-        <p><strong>Derived:</strong></p>
-        <pre class="book-paths-derived">{{ formatBookPathsDerived(bookPathsSummary) }}</pre>
-      </div>
-    </div>
-
     <!-- TABLE CONTAINER -->
     <div class="table-container" ref="tableContainer">
       <!-- Drawing canvas (sits ABOVE the table; only captures events when pen/eraser is active) -->
       <canvas
         ref="drawCanvas"
         class="draw-canvas"
-        :width="canvasWidth"
-        :height="canvasHeight"
+        :width="canvasPixelWidth"
+        :height="canvasPixelHeight"
         :style="{
           pointerEvents: activePenId || eraserActive ? 'auto' : 'none',
           // Position canvas at the start of the drawable area (after quire and leaves columns)
@@ -136,10 +117,16 @@
           height: canvasHeight + 'px',
         }"
         @mousedown="startDraw"
-        @mousemove="drawMove"
+        @mousemove="handleCanvasMouseMove"
         @mouseup="endDraw"
-        @mouseleave="endDraw"
+        @mouseleave="handleCanvasMouseLeave"
       ></canvas>
+
+      <div
+        v-if="eraserActive && eraserCursor.visible"
+        class="eraser-preview"
+        :style="eraserCursorStyle"
+      ></div>
 
       <!-- Element overlay (sits ABOVE the drawing canvas; captures events when knot or rupture mode is active) -->
       <div
@@ -244,10 +231,10 @@
             </span>
           </div>
           <div
-            v-for="pct in minorTicks"
-            :key="'m' + pct"
+            v-for="tick in minorTicks"
+            :key="'m' + tick.pct"
             class="tick minor"
-            :style="{ left: pct + '%' }"
+            :style="{ left: tick.pct + '%' }"
           />
 
           <!-- Drag feedback -->
@@ -255,14 +242,14 @@
             <div class="drag-marker start" :style="{ left: dragFeedback.startPct + '%' }"></div>
             <div class="drag-marker current" :style="{ left: dragFeedback.currentPct + '%' }"></div>
             <div class="drag-readout" :style="{ left: dragFeedback.currentPct + '%' }">
-              Start: {{ dragStartCm.toFixed(2) }} cm | Current: {{ dragCurrentCm.toFixed(2) }} cm | Δ:
-              {{ dragDeltaCm >= 0 ? "+" : "" }}{{ dragDeltaCm.toFixed(2) }} cm
+              Start: {{ dragStartLabel }} | Current: {{ dragCurrentLabel }} | Δ:
+              {{ dragDeltaLabel }}
             </div>
           </div>
 
           <!-- Normal tooltip -->
           <div v-if="tooltipVisible && !dragFeedback.visible" class="tooltip" :style="{ left: tooltipX + 'px' }">
-            {{ tooltipCm.toFixed(1) }} cm
+            {{ tooltipLabel }}
           </div>
         </div>
       </div>
@@ -309,7 +296,7 @@
                 v-for="(hb, hi) in headbandLeftPositions"
                 :key="'hb-left-' + hi"
                 class="headband-bar"
-                :style="{ left: hb + '%' }"
+                :style="{ left: hb + '%', background: headbandLeftColors[hi] || '#4ea5de' }"
                 @contextmenu.prevent="openHeadbandMenu($event, 'left', hi)"
                 v-draggable="{
                   getRect: getRulerRect,
@@ -348,7 +335,7 @@
                     onStart: (localPct, globalPct) => beginDragFeedback(globalPct),
                     onChange: (localPct, globalPct) => {
                       const prev = supportEntries[si].position;
-                      const next = clampPct(localPct);
+                      const next = snapRulerPct(localPct);
                       if (next !== prev) {
                         supportEntries[si].position = next;
                         moveSewingHolesForSupport(supportEntries[si].id ?? si, next - prev);
@@ -373,7 +360,7 @@
                       onStart: (localPct, globalPct) => beginDragFeedback(globalPct),
                       onChange: (localPct, globalPct, pxToPct) => {
                         const prev = supportEntries[si].position;
-                        const center = clampPct(localPct + pxToPct(supportHalfGapPx));
+                        const center = snapRulerPct(localPct + pxToPct(supportHalfGapPx));
                         if (center !== prev) {
                           supportEntries[si].position = center;
                           moveSewingHolesForSupport(supportEntries[si].id ?? si, center - prev);
@@ -397,7 +384,7 @@
                       onStart: (localPct, globalPct) => beginDragFeedback(globalPct),
                       onChange: (localPct, globalPct, pxToPct) => {
                         const prev = supportEntries[si].position;
-                        const center = clampPct(localPct - pxToPct(supportHalfGapPx));
+                        const center = snapRulerPct(localPct - pxToPct(supportHalfGapPx));
                         if (center !== prev) {
                           supportEntries[si].position = center;
                           moveSewingHolesForSupport(supportEntries[si].id ?? si, center - prev);
@@ -424,8 +411,8 @@
                 v-draggable="{
                   getRect: getRulerRect,
                   onStart: (localPct, globalPct) => beginDragFeedback(globalPct),
-                  onChange: (localPct, globalPct) => {
-                    onSewingHoleDragged(rowIndex, sh.uid, localPct);
+                  onChange: (localPct, globalPct, pxToPct) => {
+                    onSewingHoleDragged(rowIndex, sh.uid, snapRulerPct(localPct), pxToPct);
                     updateDragFeedback(globalPct);
                   },
                   onEnd: endDragFeedback,
@@ -448,15 +435,12 @@
                 :style="{
                   left: hole.position + '%',
                   background: hole.color,
-                  borderColor: isSelected(holeKey(rowIndex, hole.uid))
-                    ? '#00b7ff'
-                    : '#222',
                 }"
                 v-draggable="{
                   getRect: getRulerRect,
                   onStart: (localPct, globalPct) => beginDragFeedback(globalPct),
                   onChange: (localPct, globalPct) => {
-                    onChangeHoleDragged(rowIndex, hole.uid, localPct);
+                    onChangeHoleDragged(rowIndex, hole.uid, snapRulerPct(localPct));
                     updateDragFeedback(globalPct);
                   },
                   onEnd: endDragFeedback,
@@ -477,7 +461,7 @@
                 v-for="(hb, hi) in headbandRightPositions"
                 :key="'hb-right-' + hi"
                 class="headband-bar"
-                :style="{ left: hb + '%' }"
+                :style="{ left: hb + '%', background: headbandRightColors[hi] || '#4ea5de' }"
                 @contextmenu.prevent="openHeadbandMenu($event, 'right', hi)"
                 v-draggable="{
                   getRect: getRulerRect,
@@ -631,6 +615,9 @@
 
       <!-- Headband/tailband menu -->
       <template v-else>
+        <button class="menu-item" @click="openRecolorPopup(false)">
+          Recolor…
+        </button>
         <button class="menu-item danger" @click="removeFromMenu">
           Remove {{ menu.kind === 'headband-left' ? 'headband' : 'tailband' }}
         </button>
@@ -714,13 +701,19 @@
 
     <!-- Export Popup -->
     <div v-if="showExportPopup" class="overlay">
-      <div class="popup">
-        <h3>Save as PDF?</h3>
-        <div class="popup-actions">
-          <button class="popup-btn" @click="previewPDF">Preview</button>
-          <button class="popup-btn confirm" @click="exportToPDF">
-            Confirm
-          </button>
+      <div class="popup export-popup">
+        <h3>Export Spine</h3>
+        <p class="popup-copy">
+          Choose a file format. PNG keeps the sharpest screen rendering,
+          JPEG gives a smaller image file, and JSON preserves the editable
+          spine data.
+        </p>
+        <div class="popup-actions export-actions">
+          <button class="popup-btn" @click="previewExport">Preview</button>
+          <button class="popup-btn confirm" @click="exportToPDF">PDF</button>
+          <button class="popup-btn" @click="exportToPNG">PNG</button>
+          <button class="popup-btn" @click="exportToJPEG">JPEG</button>
+          <button class="popup-btn" @click="exportToJSON">JSON</button>
           <button class="popup-btn cancel" @click="showExportPopup = false">
             Cancel
           </button>
@@ -728,15 +721,17 @@
       </div>
     </div>
 
-    <!-- PDF Preview Popup -->
+    <!-- Export Preview Popup -->
     <div v-if="showPreviewPopup" class="overlay">
       <div class="popup">
         <h3>Preview</h3>
-        <div style="max-width: 80vw; max-height: 60vh; overflow: auto; background:#fff; padding:8px; border-radius:6px;">
+        <div class="export-preview-frame">
           <img :src="previewImg" style="max-width: 100%; height: auto;" />
         </div>
-        <div class="popup-actions" style="margin-top:12px;">
+        <div class="popup-actions preview-actions">
           <button class="popup-btn confirm" @click="exportToPDF">Download PDF</button>
+          <button class="popup-btn" @click="exportToPNG">Download PNG</button>
+          <button class="popup-btn" @click="exportToJPEG">Download JPEG</button>
           <button class="popup-btn cancel" @click="showPreviewPopup = false">Close</button>
         </div>
       </div>
@@ -757,14 +752,6 @@
         </div>
       </div>
     </div>
-
-    <BookPathsWizard
-      v-if="showBookPathsWizard"
-      :initial-context="bookPathsContext"
-      @close="closeBookPathsWizard"
-      @finish="handleBookPathsFinish"
-    />
-
   </div>
 </template>
 
@@ -773,14 +760,9 @@
 import { ref, computed, reactive, onMounted, onUnmounted, watch, nextTick } from "vue";
 import html2canvas from "html2canvas";
 import jsPDF from "jspdf";
-import BookPathsWizard from "@/components/BookPathsWizard.vue";
-import { BOOK_PATHS_FLOW } from "@/bookPaths/flow";
 
 export default {
   name: "BookBindingScreen",
-  components: {
-    BookPathsWizard,
-  },
   directives: {
     // v-draggable: accepts { onStart?(localPct, globalPct, pxToPct), onChange(localPct, globalPct, pxToPct), onEnd?, getRect? }
     draggable: {
@@ -865,7 +847,6 @@ export default {
     headbands: Boolean,
     changeOver: Boolean,
     spineLength: [Number, String],
-    startBookPaths: { type: Boolean, default: false },
 
     // Optional
     quiresStyle: String,
@@ -878,49 +859,6 @@ export default {
     const showRecolorPopup = ref(false);
     const recolorForGroup = ref(false);
     const recolorColor = ref("#4ea5de");
-
-    /* ---------- Book Paths wizard ---------- */
-    const showBookPathsWizard = ref(false);
-    const bookPathsSummary = ref(null);
-    const showBookPathsSummary = ref(true);
-    const bookPathsContext = computed(() => ({
-      title: props.title || "",
-      manuscriptDate: props.manuscriptDate || "",
-      shelfmark: props.shelfmark || "",
-      location: props.location || "",
-    }));
-
-    function openBookPathsWizard() {
-      showBookPathsWizard.value = true;
-    }
-
-    function closeBookPathsWizard() {
-      showBookPathsWizard.value = false;
-    }
-
-    function handleBookPathsFinish(summary) {
-      bookPathsSummary.value = summary || null;
-      showBookPathsSummary.value = true;
-      showBookPathsWizard.value = false;
-    }
-
-    watch(
-      () => props.startBookPaths,
-      (shouldOpen) => {
-        if (shouldOpen) {
-          showBookPathsWizard.value = true;
-        }
-      },
-      { immediate: true }
-    );
-
-    function resolveBookPathNodeTitle(nodeId) {
-      return BOOK_PATHS_FLOW[nodeId]?.title || nodeId;
-    }
-
-    function formatBookPathsDerived(summary) {
-      return JSON.stringify(summary?.derived || {}, null, 2);
-    }
 
     /* ---------- Rows & numbering ---------- */
     const rows = computed(() => {
@@ -1080,19 +1018,50 @@ export default {
   });
 
     /* ---------- Ruler ---------- */
+    const MILLIMETRE_STEP_CM = 0.1;
     const totalCm = computed(() => Math.max(0, num(props.spineLength, 0)));
     const isScrollForced = computed(() => rows.value.length > 10);
     const totalCmNumber = computed(() => totalCm.value);
+    const clampPct = (pct) => Math.max(0, Math.min(100, pct));
+    const pctToCm = (pct) => (clampPct(pct) / 100) * totalCm.value;
+    const cmToPct = (cm) => {
+      if (totalCm.value <= 0) return 0;
+      return (cm / totalCm.value) * 100;
+    };
+    const snapCm = (cm) => {
+      const snapped = Math.round(cm / MILLIMETRE_STEP_CM) * MILLIMETRE_STEP_CM;
+      return Math.max(0, Math.min(totalCm.value, Number(snapped.toFixed(1))));
+    };
+    const snapRulerPct = (pct) => {
+      if (totalCm.value <= 0) return clampPct(pct);
+      return clampPct(cmToPct(snapCm(pctToCm(pct))));
+    };
+    function formatMeasurement(cm) {
+      const snappedMm = Math.round(Math.max(0, cm) * 10);
+      const wholeCm = Math.floor(snappedMm / 10);
+      const mm = snappedMm % 10;
+      if (wholeCm === 0 && mm === 0) return "0 cm";
+      if (mm === 0) return `${wholeCm} cm`;
+      if (wholeCm === 0) return `${mm} mm`;
+      return `${wholeCm} cm ${mm} mm`;
+    }
+    function formatDeltaMeasurement(cm) {
+      const sign = cm < 0 ? "-" : "+";
+      return `${sign}${formatMeasurement(Math.abs(cm))}`;
+    }
     const majorTicks = computed(() => {
       const t = Math.floor(totalCm.value);
       return Array.from({ length: t + 1 }, (_, i) => i);
     });
     const minorTicks = computed(() => {
-      const t = Math.floor(totalCm.value);
-      const denom = Math.max(1, t) * 10;
-      return Array.from({ length: t * 10 + 1 }, (_, i) =>
-        i % 10 ? (i / denom) * 100 : null
-      ).filter(Boolean);
+      const totalMm = Math.round(totalCm.value * 10);
+      if (totalMm <= 0 || totalCm.value <= 0) return [];
+      return Array.from({ length: totalMm + 1 }, (_, mm) => {
+        if (mm === 0 || mm % 10 === 0) return null;
+        return {
+          pct: ((mm / 10) / totalCm.value) * 100,
+        };
+      }).filter(Boolean);
     });
     const ruler = ref(null),
       tooltipVisible = ref(false),
@@ -1105,8 +1074,10 @@ export default {
       }
       
       const r = ruler.value.getBoundingClientRect();
-      tooltipX.value = e.clientX - r.left;
-      tooltipCm.value = (tooltipX.value / r.width) * totalCm.value;
+      const rawX = e.clientX - r.left;
+      const rawCm = (rawX / Math.max(1, r.width)) * totalCm.value;
+      tooltipCm.value = snapCm(rawCm);
+      tooltipX.value = (cmToPct(tooltipCm.value) / 100) * r.width;
       tooltipVisible.value = true;
     }
 
@@ -1127,21 +1098,24 @@ export default {
       startPct: 0,
       currentPct: 0,
     });
-    const clampPct = (pct) => Math.max(0, Math.min(100, pct));
     const dragStartCm = computed(
-      () => (dragFeedback.startPct / 100) * totalCm.value
+      () => snapCm((dragFeedback.startPct / 100) * totalCm.value)
     );
     const dragCurrentCm = computed(
-      () => (dragFeedback.currentPct / 100) * totalCm.value
+      () => snapCm((dragFeedback.currentPct / 100) * totalCm.value)
     );
     const dragDeltaCm = computed(() => dragCurrentCm.value - dragStartCm.value);
+    const dragStartLabel = computed(() => formatMeasurement(dragStartCm.value));
+    const dragCurrentLabel = computed(() => formatMeasurement(dragCurrentCm.value));
+    const dragDeltaLabel = computed(() => formatDeltaMeasurement(dragDeltaCm.value));
+    const tooltipLabel = computed(() => formatMeasurement(tooltipCm.value));
     function beginDragFeedback(p) {
       dragFeedback.visible = true;
-      dragFeedback.startPct = clampPct(p);
-      dragFeedback.currentPct = clampPct(p);
+      dragFeedback.startPct = snapRulerPct(p);
+      dragFeedback.currentPct = snapRulerPct(p);
     }
     function updateDragFeedback(p) {
-      dragFeedback.currentPct = clampPct(p);
+      dragFeedback.currentPct = snapRulerPct(p);
     }
     function endDragFeedback() {
       dragFeedback.visible = false;
@@ -1150,11 +1124,15 @@ export default {
     /* ---------- Headbands ---------- */
     const headbandLeftPositions = reactive(props.headbands ? [5] : []);
     const headbandRightPositions = reactive(props.headbands ? [95] : []);
+    const headbandLeftColors = reactive(props.headbands ? ['#4ea5de'] : []);
+    const headbandRightColors = reactive(props.headbands ? ['#4ea5de'] : []);
     function addHeadbandLeft() {
       headbandLeftPositions.push(50);
+      headbandLeftColors.push('#4ea5de');
     }
     function addHeadbandRight() {
       headbandRightPositions.push(50);
+      headbandRightColors.push('#4ea5de');
     }
 
     /* ---------- Sewing supports (yellow, movable) ---------- */
@@ -1270,10 +1248,10 @@ export default {
           const cmPosition = (rulerX / rulerRect.width) * totalCm.value;
           
           // Clamp to valid range
-          const clampedCm = Math.max(0, Math.min(totalCm.value, cmPosition));
+          const clampedCm = snapCm(Math.max(0, Math.min(totalCm.value, cmPosition)));
           
           // Update tooltip
-          tooltipX.value = rulerX;
+          tooltipX.value = (cmToPct(clampedCm) / 100) * rulerRect.width;
           tooltipCm.value = clampedCm;
           tooltipVisible.value = true;
         } else {
@@ -1283,7 +1261,7 @@ export default {
             tooltipCm.value = 0;
           } else {
             tooltipX.value = rulerRect.width;
-            tooltipCm.value = totalCm.value;
+            tooltipCm.value = snapCm(totalCm.value);
           }
           tooltipVisible.value = true;
         }
@@ -1530,7 +1508,7 @@ export default {
     }
     function maybeAddHole(evt, rowIndex) {
       if (!addHoleMode.value) return;
-      const pct = clampPct(pctFromEvent(evt, evt.currentTarget));
+      const pct = snapRulerPct(pctFromEvent(evt, evt.currentTarget));
       changeHolesByRow.value[rowIndex].push({
         uid: nextUid.value++,
         position: pct,
@@ -1546,15 +1524,15 @@ export default {
       const key = holeKey(rowIndex, uid);
       if (isSelected(key)) {
         // Calculate delta for this hole
-        const delta = clampPct(pct) - hole.position;
+        const delta = snapRulerPct(pct) - hole.position;
         // Move ALL selected holes by the same delta, regardless of row
         selectedKeys.value.forEach((selectedKey) => {
           const [r, u] = selectedKey.split(":").map(Number);
           const h = changeHolesByRow.value[r].find((hh) => hh.uid === u);
-          if (h) h.position = clampPct(h.position + delta);
+          if (h) h.position = snapRulerPct(h.position + delta);
         });
       } else {
-        hole.position = clampPct(pct);
+        hole.position = snapRulerPct(pct);
     }
     }
 
@@ -1635,20 +1613,35 @@ export default {
     watch(supportEntries, ensureSewingHolesArrays, { deep: true });
     watch(isDoubleSupport, () => ensureSewingHolesArrays());
 
-    function onSewingHoleDragged(rowIndex, uid, pct) {
+    function onSewingHoleDragged(rowIndex, uid, pct, pxToPct) {
       const row = sewingHolesByRow.value[rowIndex];
       const hole = row.find((h) => h.uid === uid);
       if (!hole) return;
+      let adjustedPct = snapRulerPct(pct);
+
+      // Side sewing holes are rendered with a fixed pixel offset so they sit
+      // clear of the support bar. Undo that visual offset during drag so the
+      // stored percentage matches the rendered cursor position.
+      if (hole.role !== 'center' && typeof pxToPct === 'function') {
+        const sp = supportEntries.find((s) => s.id === hole.supportId);
+        if (sp) {
+          const visualSide = adjustedPct >= sp.position ? 1 : -1;
+          adjustedPct = snapRulerPct(
+            adjustedPct - visualSide * pxToPct(sewingSideMarginPx)
+          );
+        }
+      }
+
       const key = sewingKey(rowIndex, uid);
       if (isSewingSelected(key)) {
-        const delta = clampPct(pct) - hole.position;
+        const delta = adjustedPct - hole.position;
         selectedSewingKeys.value.forEach((selectedKey) => {
           const [r, u] = selectedKey.split(":").map(Number);
           const h = sewingHolesByRow.value[r].find((hh) => hh.uid === u);
-          if (h) h.position = clampPct(h.position + delta);
+          if (h) h.position = snapRulerPct(h.position + delta);
         });
       } else {
-        hole.position = clampPct(pct);
+        hole.position = adjustedPct;
       }
     }
 
@@ -2402,9 +2395,11 @@ export default {
       } else if (menu.kind === 'headband-left') {
         if (menu.hbIndex == null) return;
         headbandLeftPositions.splice(menu.hbIndex, 1);
+        headbandLeftColors.splice(menu.hbIndex, 1);
       } else if (menu.kind === 'headband-right') {
         if (menu.hbIndex == null) return;
         headbandRightPositions.splice(menu.hbIndex, 1);
+        headbandRightColors.splice(menu.hbIndex, 1);
       }
       menu.visible = false;
     }
@@ -2475,6 +2470,10 @@ export default {
         } else if (menu.kind === 'support' && menu.supportIndex != null) {
           const sp = supportEntries[menu.supportIndex];
           if (sp) recolorColor.value = sp.color || "#e2b043";
+        } else if (menu.kind === 'headband-left' && menu.hbIndex != null) {
+          recolorColor.value = headbandLeftColors[menu.hbIndex] || "#4ea5de";
+        } else if (menu.kind === 'headband-right' && menu.hbIndex != null) {
+          recolorColor.value = headbandRightColors[menu.hbIndex] || "#4ea5de";
         }
       }
       showRecolorPopup.value = true;
@@ -2486,6 +2485,8 @@ export default {
       if (menu.kind === 'hole') return 'Recolor Station';
       if (menu.kind === 'sewing') return 'Recolor Sewing Hole';
       if (menu.kind === 'stroke') return 'Recolor Pen Stroke';
+      if (menu.kind === 'headband-left') return 'Recolor Headband';
+      if (menu.kind === 'headband-right') return 'Recolor Tailband';
       return 'Recolor';
     });
     function cancelRecolor() {
@@ -2523,6 +2524,10 @@ export default {
         } else if (menu.kind === 'support' && menu.supportIndex != null) {
           const sp = supportEntries[menu.supportIndex];
           if (sp) sp.color = recolorColor.value;
+        } else if (menu.kind === 'headband-left' && menu.hbIndex != null) {
+          headbandLeftColors[menu.hbIndex] = recolorColor.value;
+        } else if (menu.kind === 'headband-right' && menu.hbIndex != null) {
+          headbandRightColors[menu.hbIndex] = recolorColor.value;
         } else if (menu.kind === 'stroke' && menu.strokeId != null) {
           const s = strokes.value.find((st) => st.id === menu.strokeId);
           if (s) {
@@ -2594,6 +2599,7 @@ export default {
       ctx.globalCompositeOperation = 'source-over';
       ctx.lineWidth = w;
       ctx.lineCap = 'round';
+      ctx.lineJoin = 'round';
       ctx.strokeStyle = s.color || '#4ea5de';
       
       // Handle line dash styles
@@ -2628,6 +2634,38 @@ export default {
       if (ctx.setLineDash) ctx.setLineDash([]);
       ctx.restore();
     }
+
+    function drawSmoothPath(ctx, pts) {
+      if (!pts || pts.length === 0) return;
+      if (pts.length === 1) {
+        ctx.beginPath();
+        ctx.arc(pts[0].x, pts[0].y, 1, 0, Math.PI * 2);
+        ctx.fillStyle = ctx.strokeStyle;
+        ctx.fill();
+        return;
+      }
+      if (pts.length === 2) {
+        ctx.beginPath();
+        ctx.moveTo(pts[0].x, pts[0].y);
+        ctx.lineTo(pts[1].x, pts[1].y);
+        ctx.stroke();
+        return;
+      }
+
+      ctx.beginPath();
+      ctx.moveTo(pts[0].x, pts[0].y);
+
+      for (let i = 1; i < pts.length - 1; i++) {
+        const midX = (pts[i].x + pts[i + 1].x) / 2;
+        const midY = (pts[i].y + pts[i + 1].y) / 2;
+        ctx.quadraticCurveTo(pts[i].x, pts[i].y, midX, midY);
+      }
+
+      const penultimate = pts[pts.length - 2];
+      const last = pts[pts.length - 1];
+      ctx.quadraticCurveTo(penultimate.x, penultimate.y, last.x, last.y);
+      ctx.stroke();
+    }
     
     function drawStraightStroke(ctx, s, knotAnim, ruptureAnim) {
       const a = absPoint(s.start);
@@ -2659,12 +2697,7 @@ export default {
         drawBrokenFreehand(ctx, pts, s.breakStart, s.breakEnd, s.breakPoints);
       } else {
         // Normal freehand line
-        ctx.beginPath();
-        ctx.moveTo(pts[0].x, pts[0].y);
-        for (let i = 1; i < pts.length; i++) {
-          ctx.lineTo(pts[i].x, pts[i].y);
-        }
-        ctx.stroke();
+        drawSmoothPath(ctx, pts);
       }
     }
     
@@ -3448,9 +3481,9 @@ export default {
       });
     }
     function reRenderCanvas() {
-      const ctx = drawCanvas.value?.getContext('2d');
+      const ctx = getDrawContext();
       if (!ctx) return;
-      ctx.clearRect(0, 0, drawCanvas.value.width, drawCanvas.value.height);
+      ctx.clearRect(0, 0, Math.max(1, canvasWidth.value), Math.max(1, canvasHeight.value));
       for (const s of strokes.value) drawOneStroke(ctx, s);
     }
 
@@ -3471,21 +3504,74 @@ export default {
     }
     function togglePen(id) {
       activePenId.value = activePenId.value === id ? null : id;
-      if (activePenId.value) eraserActive.value = false;
+      if (activePenId.value) {
+        eraserActive.value = false;
+        eraserCursor.value.visible = false;
+      }
     }
     function toggleEraser() {
       eraserActive.value = !eraserActive.value;
       if (eraserActive.value) activePenId.value = null;
+      if (!eraserActive.value) eraserCursor.value.visible = false;
     }
     function deactivateCurrentPen() {
       activePenId.value = null;
       eraserActive.value = false;
+      eraserCursor.value.visible = false;
     }
 
     // Canvas drawing
     const drawCanvas = ref(null);
     const canvasWidth = ref(0);
     const canvasHeight = ref(0);
+    const CANVAS_RENDER_SCALE = 4;
+    const canvasPixelWidth = computed(() =>
+      Math.max(1, Math.round(canvasWidth.value * CANVAS_RENDER_SCALE))
+    );
+    const canvasPixelHeight = computed(() =>
+      Math.max(1, Math.round(canvasHeight.value * CANVAS_RENDER_SCALE))
+    );
+
+    function getDrawContext() {
+      const ctx = drawCanvas.value?.getContext("2d");
+      if (!ctx) return null;
+      ctx.setTransform(CANVAS_RENDER_SCALE, 0, 0, CANVAS_RENDER_SCALE, 0, 0);
+      ctx.imageSmoothingEnabled = true;
+      if ("imageSmoothingQuality" in ctx) ctx.imageSmoothingQuality = "high";
+      return ctx;
+    }
+
+    const ERASER_SIZE_PX = 24;
+    const eraserCursor = ref({ visible: false, leftPx: 0, topPx: 0 });
+    const eraserCursorStyle = computed(() => ({
+      left: `${getDrawableOffsetPixels() + eraserCursor.value.leftPx - ERASER_SIZE_PX / 2}px`,
+      top: `${eraserCursor.value.topPx - ERASER_SIZE_PX / 2}px`,
+      width: `${ERASER_SIZE_PX}px`,
+      height: `${ERASER_SIZE_PX}px`,
+    }));
+
+    function updateEraserCursorFromEvent(e) {
+      if (!eraserActive.value || !drawCanvas.value) {
+        eraserCursor.value.visible = false;
+        return;
+      }
+      const rect = drawCanvas.value.getBoundingClientRect();
+      eraserCursor.value = {
+        visible: true,
+        leftPx: e.clientX - rect.left,
+        topPx: e.clientY - rect.top,
+      };
+    }
+
+    function handleCanvasMouseMove(e) {
+      updateEraserCursorFromEvent(e);
+      drawMove(e);
+    }
+
+    function handleCanvasMouseLeave(e) {
+      eraserCursor.value.visible = false;
+      endDraw(e);
+    }
 
     // The drawable region (for pens) should match the distance
     // between the Head and Tail columns, same as the top ruler.
@@ -3557,8 +3643,10 @@ export default {
       lastPoint.value = point;
       startPoint.value = point;
       const pen = getPenStyle();
-      const ctx = drawCanvas.value.getContext("2d");
+      const ctx = getDrawContext();
+      if (!ctx) return;
       if (eraserActive.value) {
+        updateEraserCursorFromEvent(e);
         currentStroke = { id: strokeSeq++, tool: 'eraser', type: 'eraser', width: 24, points: [normPoint(point)] };
         return; // eraser doesn't need pen setup
       }
@@ -3572,23 +3660,17 @@ export default {
         );
         currentStroke = { id: strokeSeq++, tool: 'pen', type: 'straight', style: pen.style, color: pen.color, start: normPoint(point), end: null };
       } else {
-        // Freehand: start a continuous path so dashed/dotted are consistent
+        // Freehand: preview through full redraw so the stored and live stroke
+        // use the same smoothing logic.
         snapshot = null;
-        ctx.lineWidth = 2;
-        ctx.lineCap = "round";
-        ctx.strokeStyle = pen.color;
-        if (pen.style === "dotted") ctx.setLineDash([2, 6]);
-        else if (pen.style === "dashed") ctx.setLineDash([10, 8]);
-        else ctx.setLineDash([]);
-        ctx.beginPath();
-        ctx.moveTo(point.x, point.y);
         currentStroke = { id: strokeSeq++, tool: 'pen', type: 'freehand', style: pen.style, color: pen.color, points: [normPoint(point)] };
       }
     }
 
     function drawMove(e) {
       if (!drawing.value) return;
-      const ctx = drawCanvas.value.getContext("2d");
+      const ctx = getDrawContext();
+      if (!ctx) return;
       const rect = drawCanvas.value.getBoundingClientRect();
       const curr = { x: e.clientX - rect.left, y: e.clientY - rect.top };
 
@@ -3610,6 +3692,7 @@ export default {
         // Prepare styles for straight preview
         ctx.lineWidth = 2;
         ctx.lineCap = "round";
+        ctx.lineJoin = "round";
         ctx.strokeStyle = pen.color;
         if (pen.style === "dotted") ctx.setLineDash([2, 6]);
         else if (pen.style === "dashed") ctx.setLineDash([10, 8]);
@@ -3621,17 +3704,20 @@ export default {
         ctx.stroke();
         ctx.setLineDash([]);
       } else {
-        // Freehand: continue existing path without restarting dashes
-        ctx.lineTo(curr.x, curr.y);
+        // Freehand: redraw with smoothing on each move.
         lastPoint.value = curr;
-        ctx.stroke();
-        if (currentStroke && currentStroke.points) currentStroke.points.push(normPoint(curr));
+        if (currentStroke && currentStroke.points) {
+          currentStroke.points.push(normPoint(curr));
+          reRenderCanvas();
+          drawOneStroke(ctx, currentStroke);
+        }
       }
     }
 
     function endDraw(e) {
       if (!drawing.value) return;
-      const ctx = drawCanvas.value.getContext("2d");
+      const ctx = getDrawContext();
+      if (!ctx) return;
       if (eraserActive.value) {
         drawing.value = false;
         if (currentStroke) strokes.value.push(currentStroke);
@@ -3649,6 +3735,7 @@ export default {
           : lastPoint.value;
         ctx.lineWidth = 2;
         ctx.lineCap = "round";
+        ctx.lineJoin = "round";
         ctx.strokeStyle = pen.color;
         if (pen.style === "dotted") ctx.setLineDash([2, 6]);
         else if (pen.style === "dashed") ctx.setLineDash([10, 8]);
@@ -3664,12 +3751,11 @@ export default {
           currentStroke = null;
         }
       } else {
-        // Freehand: close out dash styles to default
-        ctx.setLineDash([]);
         if (currentStroke) {
           strokes.value.push(currentStroke);
           currentStroke = null;
         }
+        reRenderCanvas();
       }
       drawing.value = false;
       snapshot = null;
@@ -3681,6 +3767,7 @@ export default {
     const previewImg = ref("");
     const exportMode = ref(false); // no longer used for export layout; kept for potential UI hooks
     const noteRefs = ref([]);
+    const previewFileType = "image/png";
 
     // For PDF/preview we capture what the user sees on screen,
     // but temporarily change the Notes column so that only the
@@ -3718,26 +3805,187 @@ export default {
         });
       }
     }
-    async function previewPDF() {
+    function sanitizeFileStem(value) {
+      return String(value || "Untitled")
+        .trim()
+        .replace(/[<>:"/\\|?*\u0000-\u001F]/g, "")
+        .replace(/\s+/g, " ")
+        .slice(0, 120) || "Untitled";
+    }
+    function getExportBaseName() {
+      return sanitizeFileStem(props.title && String(props.title).trim());
+    }
+    function closeExportDialogs() {
+      showExportPopup.value = false;
+      showPreviewPopup.value = false;
+    }
+    function downloadUrl(url, filename) {
+      const a = document.createElement("a");
+      a.href = url;
+      a.download = filename;
+      document.body.appendChild(a);
+      a.click();
+      a.remove();
+    }
+    function downloadBlob(blob, filename) {
+      const url = URL.createObjectURL(blob);
       try {
-        const target = tableContainer.value || document.querySelector(".bookbinding-screen");
-        const dataUrl = await withExportLayout(async () => {
-          const canvas = await html2canvas(target, { scale: 1.2, useCORS: true });
-          // Show full view (including Notes) in preview
-          return canvas.toDataURL("image/jpeg", 0.72);
-        });
-        previewImg.value = dataUrl;
+        downloadUrl(url, filename);
+      } finally {
+        setTimeout(() => URL.revokeObjectURL(url), 0);
+      }
+    }
+    async function captureExportCanvas() {
+      const target =
+        tableContainer.value || document.querySelector(".bookbinding-screen");
+      return await withExportLayout(async () => {
+        return await html2canvas(target, { scale: 1.2, useCORS: true });
+      });
+    }
+    function getRowLabel(rowIndex) {
+      const row = rowsManual[rowIndex] || rows.value[rowIndex];
+      if (row) {
+        if (row.roman === "" && rowIndex === 0) return "Front endleaves";
+        if (row.roman === "" && rowIndex === rows.value.length - 1)
+          return "Back endleaves";
+        if (row.roman) return `Quire ${row.roman}`;
+      }
+      return `Row ${rowIndex + 1}`;
+    }
+    function buildExportJson() {
+      return {
+        schemaVersion: 1,
+        exportedAt: new Date().toISOString(),
+        metadata: {
+          title: props.title || "",
+          manuscriptDate: props.manuscriptDate || "",
+          location: props.location || "",
+          shelfmark: props.shelfmark || "",
+        },
+        settings: {
+          quires: num(props.quires, 0),
+          foliosPerQuire: num(props.foliosPerQuire, num(props.leavesPerQuire, 0)),
+          frontEndleaves: num(props.frontEndleaves, 0),
+          backEndleaves: num(props.backEndleaves, 0),
+          collationStyle: props.collationStyle || "foliate",
+          sewingSupports: num(props.sewingSupports, 0),
+          sewingType: props.sewingType || "",
+          quiresStyle: props.quiresStyle || "",
+          headbandsEnabled: !!props.headbands,
+          changeOverEnabled: !!props.changeOver,
+          spineLengthCm: totalCmNumber.value,
+          snapStepCm: MILLIMETRE_STEP_CM,
+        },
+        rows: rowsManual.map((row, rowIndex) => ({
+          index: rowIndex,
+          label: getRowLabel(rowIndex),
+          quire: row.roman || "",
+          range: row.range || "",
+          note: notes[rowIndex] || "",
+          changeOverStations: (changeHolesByRow.value[rowIndex] || []).map((hole) => ({
+            uid: hole.uid,
+            positionPct: Number((hole.position ?? 0).toFixed(3)),
+            color: hole.color || "#333",
+          })),
+          sewingHoles: (sewingHolesByRow.value[rowIndex] || []).map((hole) => ({
+            uid: hole.uid,
+            supportId: hole.supportId ?? null,
+            role: hole.role || "side",
+            positionPct: Number((hole.position ?? 0).toFixed(3)),
+            color: hole.color || "#333",
+          })),
+        })),
+        supports: supportEntries.map((support) => ({
+          id: support.id,
+          positionPct: Number((support.position ?? 0).toFixed(3)),
+          color: support.color || "#e2b043",
+          type: support.type || (isDoubleSupport.value ? "double" : "single"),
+        })),
+        headbands: {
+          head: headbandLeftPositions.map((position, index) => ({
+            index,
+            positionPct: Number((position ?? 0).toFixed(3)),
+            color: headbandLeftColors[index] || "#4ea5de",
+          })),
+          tail: headbandRightPositions.map((position, index) => ({
+            index,
+            positionPct: Number((position ?? 0).toFixed(3)),
+            color: headbandRightColors[index] || "#4ea5de",
+          })),
+        },
+        knots: knotEntries.map((knot) => ({
+          id: knot.id,
+          xPct: Number((knot.x ?? 0).toFixed(3)),
+          yPct: Number((knot.y ?? 0).toFixed(3)),
+          color: knot.color || "#654321",
+          size: knot.size ?? 18,
+        })),
+        ruptures: ruptureEntries.map((rupture) => ({
+          id: rupture.id,
+          xPct: Number((rupture.x ?? 0).toFixed(3)),
+          yPct: Number((rupture.y ?? 0).toFixed(3)),
+          color: rupture.color || "#FF6B47",
+          size: rupture.size ?? 16,
+        })),
+        drawing: {
+          pens: pens.value.map((pen) => ({
+            id: pen.id,
+            type: pen.type,
+            style: pen.style,
+            color: pen.color,
+          })),
+          strokes: JSON.parse(JSON.stringify(strokes.value)),
+        },
+      };
+    }
+    async function previewExport() {
+      try {
+        const canvas = await captureExportCanvas();
+        previewImg.value = canvas.toDataURL(previewFileType);
         showPreviewPopup.value = true;
       } catch (e) {
         console.error("Preview failed:", e);
       }
     }
+    async function exportImage(format) {
+      const fileName = getExportBaseName();
+      try {
+        const canvas = await captureExportCanvas();
+        if (format === "png") {
+          downloadUrl(canvas.toDataURL("image/png"), `${fileName}.png`);
+        } else {
+          downloadUrl(canvas.toDataURL("image/jpeg", 0.92), `${fileName}.jpg`);
+        }
+      } catch (e) {
+        console.error(`${format.toUpperCase()} export failed:`, e);
+        alert(`${format.toUpperCase()} export failed. Please check the console for details.`);
+      } finally {
+        closeExportDialogs();
+      }
+    }
+    async function exportToPNG() {
+      await exportImage("png");
+    }
+    async function exportToJPEG() {
+      await exportImage("jpeg");
+    }
+    async function exportToJSON() {
+      try {
+        const payload = buildExportJson();
+        const blob = new Blob([JSON.stringify(payload, null, 2)], {
+          type: "application/json;charset=utf-8",
+        });
+        downloadBlob(blob, `${getExportBaseName()}.json`);
+      } catch (e) {
+        console.error("JSON export failed:", e);
+        alert("JSON export failed. Please check the console for details.");
+      } finally {
+        closeExportDialogs();
+      }
+    }
     async function exportToPDF() {
       try {
-        const target = tableContainer.value || document.querySelector(".bookbinding-screen");
-        const canvas = await withExportLayout(async () => {
-          return await html2canvas(target, { scale: 1.2, useCORS: true });
-        });
+        const canvas = await captureExportCanvas();
 
         // Use the full canvas so geometry (including Notes column width)
         // exactly matches what the user saw on screen.
@@ -3888,7 +4136,20 @@ export default {
 
           for (const item of rowsLegend) {
             if (item.kind === "headband") {
-              pdf.setFillColor(78, 165, 222);
+              let color = { r: 78, g: 165, b: 222 };
+              const hex = (
+                headbandLeftColors[0] ||
+                headbandRightColors[0] ||
+                "#4ea5de"
+              ).replace("#", "");
+              if (hex.length === 6) {
+                const rr = parseInt(hex.slice(0, 2), 16);
+                const gg = parseInt(hex.slice(2, 4), 16);
+                const bb = parseInt(hex.slice(4, 6), 16);
+                if ([rr, gg, bb].every((n) => Number.isFinite(n)))
+                  color = { r: rr, g: gg, b: bb };
+              }
+              pdf.setFillColor(color.r, color.g, color.b);
               pdf.rect(iconX, rowY - 8, 18, 10, "F");
               drawLabel(labelX, "Headband (bar)");
             } else if (item.kind === "support") {
@@ -4009,23 +4270,7 @@ export default {
           pdf.setFontSize(11);
           
           notesWithContent.forEach(({ note, rowIndex }, index) => {
-            const row = rows.value[rowIndex];
-            let rowLabel = "";
-            
-            if (row) {
-              if (row.roman === "" && rowIndex === 0) {
-                rowLabel = "Front endleaves";
-              } else if (row.roman === "" && rowIndex === rows.value.length - 1) {
-                rowLabel = "Back endleaves";
-              } else if (row.roman) {
-                rowLabel = `Quire ${row.roman}`;
-              } else {
-                rowLabel = `Row ${rowIndex + 1}`;
-              }
-            } else {
-              rowLabel = `Row ${rowIndex + 1}`;
-            }
-            
+            const rowLabel = getRowLabel(rowIndex);
             const noteText = `${rowLabel}: ${note}`;
             
             // Check if we need a new page
@@ -4051,8 +4296,7 @@ export default {
           });
         }
 
-        const fileName =
-          (props.title && String(props.title).trim()) || "Untitled";
+        const fileName = getExportBaseName();
         
         console.log("Generating PDF with filename:", fileName);
         
@@ -4084,22 +4328,11 @@ export default {
         console.error("PDF export failed:", e);
         alert("PDF export failed. Please check the console for details.");
       } finally {
-        showExportPopup.value = false;
+        closeExportDialogs();
       }
     }
 
     return {
-      // book paths
-      showBookPathsWizard,
-      openBookPathsWizard,
-      closeBookPathsWizard,
-      handleBookPathsFinish,
-      bookPathsSummary,
-      showBookPathsSummary,
-      bookPathsContext,
-      resolveBookPathNodeTitle,
-      formatBookPathsDerived,
-
       // rows / notes
       rows,
       notes,
@@ -4137,11 +4370,17 @@ export default {
       dragStartCm,
       dragCurrentCm,
       dragDeltaCm,
+      dragStartLabel,
+      dragCurrentLabel,
+      dragDeltaLabel,
+      tooltipLabel,
       clampPct,
 
       // headbands / supports
       headbandLeftPositions,
+      headbandLeftColors,
       headbandRightPositions,
+      headbandRightColors,
       addHeadbandLeft,
       addHeadbandRight,
       supportEntries,
@@ -4266,7 +4505,13 @@ export default {
       drawCanvas,
       canvasWidth,
       canvasHeight,
+      canvasPixelWidth,
+      canvasPixelHeight,
+      eraserCursor,
+      eraserCursorStyle,
       startDraw,
+      handleCanvasMouseMove,
+      handleCanvasMouseLeave,
       drawMove,
       endDraw,
       getDrawableOffsetPixels,
@@ -4278,8 +4523,11 @@ export default {
       exportMode,
       noteRefs,
 
-      previewPDF,
+      previewExport,
       exportToPDF,
+      exportToPNG,
+      exportToJPEG,
+      exportToJSON,
     };
   },
 };
@@ -4393,8 +4641,9 @@ export default {
   top: 100%;
   left: 50%;
   transform: translateX(-50%);
-  background: #2a3b54;
-  color: white;
+  background: hsl(var(--card) / 0.96);
+  color: hsl(var(--card-foreground));
+  border: 1px solid hsl(var(--border));
   padding: 4px 8px;
   border-radius: 4px;
   font-size: 11px;
@@ -4406,11 +4655,12 @@ export default {
 
 /* Selection bars */
 .selection-bar {
-  position: absolute;
-  top: 157.5px;
-  left: 50%;
-  transform: translateX(-50%);
+  position: relative;
+  top: auto;
+  left: auto;
+  transform: none;
   width: 70%;
+  margin: 4px auto 0;
   background: #0f2340;
   border: 2px solid #4ea5de;
   border-radius: 4px;
@@ -4420,7 +4670,7 @@ export default {
   align-items: center;
   font-size: 13px;
   min-height: 24px;
-  z-index: 1001;
+  z-index: 20;
   box-shadow: 0 2px 8px rgba(0, 0, 0, 0.3);
 }
 .selection-actions {
@@ -4463,7 +4713,7 @@ export default {
   flex-shrink: 0;
   display: flex;
   flex-direction: column;
-  margin-top: 50px;
+  margin-top: 10px;
   z-index: 1; /* table layer */
   /* Reserve space so the sticky footer doesn't cover last rows */
   padding-bottom: 96px;
@@ -4475,6 +4725,16 @@ export default {
   top: 0;
   left: 0;
   z-index: 1000; /* above table & draggables; below context menu (2000) & overlays (1500) */
+}
+
+.eraser-preview {
+  position: absolute;
+  z-index: 1010;
+  border: 1px solid #000;
+  background: rgb(255 255 255 / 0.08);
+  box-shadow: 0 0 0 1px rgb(255 255 255 / 0.18);
+  border-radius: 2px;
+  pointer-events: none;
 }
 
 /* Table */
@@ -4499,6 +4759,12 @@ export default {
   overflow: hidden;
   white-space: nowrap;
   text-overflow: ellipsis;
+}
+
+.binding-table thead th {
+  background: hsl(var(--muted));
+  color: hsl(var(--card-foreground));
+  font-weight: 700;
 }
 
 .cell-input {
@@ -4605,7 +4871,7 @@ export default {
 .hole-dot.change {
   width: 8px;
   height: 8px;
-  border: 2px solid #222;
+  border: none;
   transform: translate(-50%, -50%);
 }
 .hole-dot.selected {
@@ -4931,6 +5197,7 @@ export default {
   display: flex;
   justify-content: flex-end;
   gap: 12px;
+  flex-wrap: wrap;
 }
 .popup-btn {
   padding: 6px 18px;
@@ -4946,6 +5213,30 @@ export default {
 .popup-btn.cancel {
   background: #555;
   color: #fff;
+}
+.popup-copy {
+  margin: 0 0 16px;
+  max-width: 460px;
+  color: inherit;
+  line-height: 1.45;
+}
+.export-popup {
+  min-width: min(560px, 92vw);
+}
+.export-actions {
+  justify-content: center;
+}
+.preview-actions {
+  margin-top: 12px;
+  justify-content: center;
+}
+.export-preview-frame {
+  max-width: 80vw;
+  max-height: 60vh;
+  overflow: auto;
+  background: #fff;
+  padding: 8px;
+  border-radius: 6px;
 }
 
 /* Element overlay (knots and ruptures) */
@@ -5098,12 +5389,6 @@ export default {
     0 0 8px rgba(255, 107, 71, 0.3);
   transition: transform 0.1s ease;
   text-shadow: 0 1px 2px rgba(0, 0, 0, 0.8);
-  animation: flicker 2s infinite alternate;
-}
-
-@keyframes flicker {
-  0%, 50% { opacity: 1; }
-  75%, 100% { opacity: 0.7; }
 }
 
 .rupture-element::before {
@@ -5129,7 +5414,6 @@ export default {
     inset 0 1px 0 rgba(255, 107, 71, 0.5),
     inset 0 -1px 0 rgba(102, 17, 0, 0.9),
     0 0 12px rgba(255, 107, 71, 0.5);
-  animation-duration: 1s;
 }
 
 .rupture-container:hover .rupture-mask {
@@ -5159,7 +5443,6 @@ export default {
   box-shadow: 
     inset 0 1px 0 rgba(255, 107, 71, 0.4),
     0 0 4px rgba(255, 107, 71, 0.3);
-  animation: flicker 2s infinite alternate;
 }
 
 /* QuillApp-inspired visual layer */
@@ -5182,6 +5465,7 @@ export default {
   background: hsl(var(--card) / 0.92);
   border-bottom: 1px solid hsl(var(--border));
   padding-left: 148px;
+  color: hsl(var(--card-foreground));
 }
 
 .footer {
@@ -5196,21 +5480,57 @@ export default {
   background: transparent;
 }
 
-.book-paths-open-btn {
-  margin-left: 8px;
-}
-
 .breadcrumb,
 .selection-bar,
 .context-menu,
 .popup,
 .top-ruler,
 .legend,
-.table-container,
 .binding-table {
   background: hsl(var(--card) / 0.92);
   color: hsl(var(--card-foreground));
   border-color: hsl(var(--border));
+}
+
+.table-container {
+  background: transparent;
+  border-color: transparent;
+  box-shadow: none;
+}
+
+.binding-table th,
+.binding-table td {
+  color: hsl(var(--card-foreground));
+  border-color: hsl(var(--border));
+}
+
+.even {
+  background: hsl(var(--muted) / 0.75);
+}
+
+.odd {
+  background: hsl(var(--muted) / 0.95);
+}
+
+.cell-input,
+.notes-input,
+.notes-export {
+  background: hsl(var(--card));
+  color: hsl(var(--card-foreground));
+  border-color: hsl(var(--border));
+}
+
+.notes-input::placeholder {
+  color: hsl(var(--muted-foreground));
+}
+
+.ruler {
+  background: hsl(var(--muted));
+  border-color: hsl(var(--border));
+}
+
+.tick {
+  background: hsl(var(--muted-foreground));
 }
 
 .breadcrumb {
@@ -5222,45 +5542,34 @@ export default {
   border-bottom: 1px solid hsl(var(--border));
 }
 
-.book-paths-summary {
-  padding: 8px 12px 0;
-}
-
-.book-paths-summary-body {
-  margin-top: 8px;
-  border: 1px solid hsl(var(--border));
-  border-radius: var(--radius-sm);
-  background: hsl(var(--card) / 0.9);
-  padding: 10px 12px;
-  color: hsl(var(--card-foreground));
-}
-
-.book-paths-summary-body p {
-  margin: 0 0 8px;
-}
-
-.book-paths-summary-body ul {
-  margin: 0;
-  padding-left: 18px;
-}
-
-.book-paths-derived {
-  margin: 0;
-  border: 1px solid hsl(var(--border));
-  border-radius: 8px;
-  padding: 8px;
-  font-size: 12px;
-  line-height: 1.4;
-  background: hsl(var(--muted));
-  color: hsl(var(--card-foreground));
-  overflow: auto;
-}
-
 .breadcrumb-text,
 .tick-label,
 .tooltip,
 .drag-readout {
   color: hsl(var(--muted-foreground));
+}
+
+.tick-label {
+  color: hsl(var(--card-foreground));
+}
+
+.tooltip,
+.drag-readout,
+.pen-hint,
+.pen-hint-header {
+  color: hsl(var(--card-foreground));
+}
+
+.tooltip {
+  background: hsl(var(--card) / 0.96);
+  border: 1px solid hsl(var(--border));
+}
+
+.drag-readout,
+.pen-hint,
+.pen-hint-header {
+  background: hsl(var(--card) / 0.96);
+  border-color: hsl(var(--border));
 }
 
 .return-btn,
@@ -5360,6 +5669,20 @@ export default {
 .bookbinding-screen .selection-bar,
 .bookbinding-screen .context-menu {
   color: hsl(var(--muted-foreground));
+}
+
+.bookbinding-screen .header-bar,
+.bookbinding-screen .binding-table,
+.bookbinding-screen .binding-table th,
+.bookbinding-screen .binding-table td,
+.bookbinding-screen .notes-input,
+.bookbinding-screen .notes-export,
+.bookbinding-screen .ruler,
+.bookbinding-screen .cell-input,
+.bookbinding-screen .popup,
+.bookbinding-screen .return-btn,
+.bookbinding-screen .btn {
+  color: hsl(var(--card-foreground));
 }
 
 @media (max-width: 900px) {

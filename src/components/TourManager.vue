@@ -78,7 +78,7 @@ const welcomeDescription = computed(() => {
   if (flowKey.value === "ruling") {
     return "A quick walkthrough of ruling construction, canvas controls, and export tools.";
   }
-  return "A quick walkthrough of pen controls, structure tools, and export in the book spine workspace.";
+  return "A quick walkthrough of pen controls, recoloring, structure tools, and export in the book spine workspace.";
 });
 
 function resetTourState() {

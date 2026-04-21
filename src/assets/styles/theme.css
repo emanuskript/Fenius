@@ -82,6 +82,12 @@ textarea {
   font: inherit;
 }
 
+input::placeholder,
+textarea::placeholder {
+  color: hsl(var(--muted-foreground));
+  opacity: 1;
+}
+
 .app-bg-icons {
   position: absolute;
   inset: 0;
