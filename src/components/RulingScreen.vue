@@ -18,7 +18,20 @@
       </div>
       <div class="meta-right">
         <span class="mode-pill">Mode: {{ modeLabel }}</span>
+        <button class="tutorial-btn" type="button" @click="openTutorial" aria-label="Open tutorial">
+          ?
+        </button>
       </div>
+    </div>
+
+    <div
+      v-if="floatingHelp.visible"
+      ref="floatingHelpEl"
+      class="help-tooltip-overlay"
+      :style="floatingHelpStyle"
+      role="tooltip"
+    >
+      {{ floatingHelp.content }}
     </div>
 
     <!-- Main layout -->
@@ -50,49 +63,6 @@
           </p>
         </section>
 
-        <section class="panel">
-          <h3>
-            Eraser
-            <span class="help-icon" title="Erase features with a rectangular tool">
-              <span class="tooltip">In Erase mode, drag the rectangular eraser over the page. Lines will be split where the eraser passes through them. You can also erase a fixed area by entering coordinates below.</span>
-            </span>
-          </h3>
-          <div class="field-row two">
-            <div>
-              <label class="field-label">width (cm)</label>
-              <input type="number" min="0.1" step="0.1" v-model.number="eraserWidthCm" class="number-input" />
-            </div>
-            <div>
-              <label class="field-label">height (cm)</label>
-              <input type="number" min="0.1" step="0.1" v-model.number="eraserHeightCm" class="number-input" />
-            </div>
-          </div>
-
-          <h4>Erase area</h4>
-          <div class="field-row two">
-            <div>
-              <label class="field-label">x (cm)</label>
-              <input type="number" step="0.1" v-model.number="eraseAreaX" class="number-input" />
-            </div>
-            <div>
-              <label class="field-label">y (cm)</label>
-              <input type="number" step="0.1" v-model.number="eraseAreaY" class="number-input" />
-            </div>
-          </div>
-          <div class="field-row two">
-            <div>
-              <label class="field-label">width (cm)</label>
-              <input type="number" min="0.1" step="0.1" v-model.number="eraseAreaWidth" class="number-input" />
-            </div>
-            <div>
-              <label class="field-label">height (cm)</label>
-              <input type="number" min="0.1" step="0.1" v-model.number="eraseAreaHeight" class="number-input" />
-            </div>
-          </div>
-          <button class="small-btn" @click="eraseByCoordinates">Erase area</button>
-          <p class="hint">The on-screen eraser is centered on the mouse. The manual area uses the top-left corner and size.</p>
-        </section>
-
         <!-- Lines -->
         <section class="panel">
           <h3>
@@ -101,65 +71,77 @@
               <span class="tooltip">Draw horizontal or vertical ruling lines by entering coordinates or clicking on the rulers.</span>
             </span>
           </h3>
-          <h4>
-            Single horizontal line
-            <span class="help-icon" title="Draw a single horizontal line">
-              <span class="tooltip">Enter start x, end x, and y coordinate. The line will be drawn horizontally at the specified y value.</span>
-            </span>
-          </h4>
-          <div class="field-row three">
-            <div>
-              <label class="field-label">start x (cm)</label>
-              <input type="number" step="0.1" v-model.number="start_x" class="number-input" />
+          <div
+            class="ghost-preview-scope"
+            @focusin="setActiveGhostEditor('single-line')"
+            @focusout="handleGhostEditorFocusOut('single-line', $event)"
+          >
+            <h4>
+              Single horizontal line
+              <span class="help-icon" title="Draw a single horizontal line">
+                <span class="tooltip">Enter start x, end x, and y coordinate. The line will be drawn horizontally at the specified y value.</span>
+              </span>
+            </h4>
+            <div class="field-row three">
+              <div>
+                <label class="field-label">start x (cm)</label>
+                <input type="number" step="0.1" v-model.number="start_x" class="number-input" />
+              </div>
+              <div>
+                <label class="field-label">end x (cm)</label>
+                <input type="number" step="0.1" v-model.number="end_x" class="number-input" />
+              </div>
+              <div>
+                <label class="field-label">y (cm)</label>
+                <input type="number" step="0.1" v-model.number="start_y" class="number-input" />
+              </div>
             </div>
-            <div>
-              <label class="field-label">end x (cm)</label>
-              <input type="number" step="0.1" v-model.number="end_x" class="number-input" />
-            </div>
-            <div>
-              <label class="field-label">y (cm)</label>
-              <input type="number" step="0.1" v-model.number="start_y" class="number-input" />
-            </div>
+            <button class="small-btn" @click="addSingleLine">Add line</button>
           </div>
-          <button class="small-btn" @click="addSingleLine">Add line</button>
 
-          <h4>
-            Multiple horizontals
-            <span class="help-icon" title="Draw multiple evenly-spaced horizontal lines">
-              <span class="tooltip">Create a series of evenly-spaced horizontal lines. Enter start/end x coordinates, number of lines (#), and the y-range they should span.</span>
-            </span>
-          </h4>
-          <div class="field-row three">
-            <div>
-              <label class="field-label">start x</label>
-              <input type="number" step="0.1" v-model.number="start_x2" class="number-input" />
+          <div
+            class="ghost-preview-scope"
+            @focusin="setActiveGhostEditor('multi-lines')"
+            @focusout="handleGhostEditorFocusOut('multi-lines', $event)"
+          >
+            <h4>
+              Multiple horizontals
+              <span class="help-icon" title="Draw multiple evenly-spaced horizontal lines">
+                <span class="tooltip">Create a series of evenly-spaced horizontal lines. Enter start/end x coordinates, number of lines (#), and the y-range they should span.</span>
+              </span>
+            </h4>
+            <div class="field-row three">
+              <div>
+                <label class="field-label">start x</label>
+                <input type="number" step="0.1" v-model.number="start_x2" class="number-input" />
+              </div>
+              <div>
+                <label class="field-label">end x</label>
+                <input type="number" step="0.1" v-model.number="end_x2" class="number-input" />
+              </div>
+              <div>
+                <label class="field-label">#</label>
+                <input type="number" min="1" step="1" v-model.number="number" class="number-input" />
+              </div>
             </div>
-            <div>
-              <label class="field-label">end x</label>
-              <input type="number" step="0.1" v-model.number="end_x2" class="number-input" />
+            <div class="field-row two">
+              <div>
+                <label class="field-label">start y</label>
+                <input type="number" step="0.1" v-model.number="start_y2" class="number-input" />
+              </div>
+              <div>
+                <label class="field-label">end y</label>
+                <input type="number" step="0.1" v-model.number="end_y2" class="number-input" />
+              </div>
             </div>
-            <div>
-              <label class="field-label">#</label>
-              <input type="number" min="1" step="1" v-model.number="number" class="number-input" />
+            <div class="field-row one">
+              <div>
+                <label class="field-label">spacing (cm)</label>
+                <input type="number" min="0.1" step="0.1" v-model.number="line_spacing2" class="number-input" />
+              </div>
             </div>
+            <button class="small-btn" @click="addMultipleLines">Add series</button>
           </div>
-          <div class="field-row two">
-            <div>
-              <label class="field-label">start y</label>
-              <input type="number" step="0.1" v-model.number="start_y2" class="number-input" />
-            </div>
-            <div>
-              <label class="field-label">end y</label>
-              <input type="number" step="0.1" v-model.number="end_y2" class="number-input" />
-            </div>
-          </div>
-          <div class="field-row one">
-            <div>
-              <label class="field-label">spacing (cm)</label>
-              <input type="number" min="0.1" step="0.1" v-model.number="line_spacing2" class="number-input" />
-            </div>
-          </div>
-          <button class="small-btn" @click="addMultipleLines">Add series</button>
           <p class="hint">Set either an end y range or an explicit spacing. Existing lines can still be adjusted individually in Select mode.</p>
         </section>
 
@@ -177,51 +159,63 @@
             <option value="slit">Slit</option>
             <option value="other">Other</option>
           </select>
-          <h4>
-            Single pricking
-            <span class="help-icon" title="Add a single pricking mark">
-              <span class="tooltip">Enter x and y coordinates to place a single pricking mark.</span>
-            </span>
-          </h4>
-          <div class="field-row two">
-            <div>
-              <label class="field-label">x (cm)</label>
-              <input type="number" step="0.1" v-model.number="hor" class="number-input" />
+          <div
+            class="ghost-preview-scope"
+            @focusin="setActiveGhostEditor('single-pricking')"
+            @focusout="handleGhostEditorFocusOut('single-pricking', $event)"
+          >
+            <h4>
+              Single pricking
+              <span class="help-icon" title="Add a single pricking mark">
+                <span class="tooltip">Enter x and y coordinates to place a single pricking mark.</span>
+              </span>
+            </h4>
+            <div class="field-row two">
+              <div>
+                <label class="field-label">x (cm)</label>
+                <input type="number" step="0.1" v-model.number="hor" class="number-input" />
+              </div>
+              <div>
+                <label class="field-label">y (cm)</label>
+                <input type="number" step="0.1" v-model.number="ver" class="number-input" />
+              </div>
             </div>
-            <div>
-              <label class="field-label">y (cm)</label>
-              <input type="number" step="0.1" v-model.number="ver" class="number-input" />
-            </div>
+            <button class="small-btn" @click="addSinglePricking">Add pricking</button>
           </div>
-          <button class="small-btn" @click="addSinglePricking">Add pricking</button>
 
-          <h4>
-            Vertical group
-            <span class="help-icon" title="Add multiple prickings in a vertical line">
-              <span class="tooltip">Create a series of evenly-spaced prickings along a vertical line. Enter x position, number of prickings (#), and the y-range.</span>
-            </span>
-          </h4>
-          <div class="field-row three">
-            <div>
-              <label class="field-label">x (cm)</label>
-              <input type="number" step="0.1" v-model.number="hor2" class="number-input" />
+          <div
+            class="ghost-preview-scope"
+            @focusin="setActiveGhostEditor('multi-prickings')"
+            @focusout="handleGhostEditorFocusOut('multi-prickings', $event)"
+          >
+            <h4>
+              Vertical group
+              <span class="help-icon" title="Add multiple prickings in a vertical line">
+                <span class="tooltip">Create a series of evenly-spaced prickings along a vertical line. Enter x position, number of prickings (#), and the y-range.</span>
+              </span>
+            </h4>
+            <div class="field-row three">
+              <div>
+                <label class="field-label">x (cm)</label>
+                <input type="number" step="0.1" v-model.number="hor2" class="number-input" />
+              </div>
+              <div>
+                <label class="field-label">#</label>
+                <input type="number" min="1" step="1" v-model.number="number2" class="number-input" />
+              </div>
             </div>
-            <div>
-              <label class="field-label">#</label>
-              <input type="number" min="1" step="1" v-model.number="number2" class="number-input" />
+            <div class="field-row two">
+              <div>
+                <label class="field-label">start y (cm)</label>
+                <input type="number" step="0.1" v-model.number="start_y3" class="number-input" />
+              </div>
+              <div>
+                <label class="field-label">end y (cm)</label>
+                <input type="number" step="0.1" v-model.number="end_y3" class="number-input" />
+              </div>
             </div>
+            <button class="small-btn" @click="addMultiplePrickings">Add group</button>
           </div>
-          <div class="field-row two">
-            <div>
-              <label class="field-label">start y (cm)</label>
-              <input type="number" step="0.1" v-model.number="start_y3" class="number-input" />
-            </div>
-            <div>
-              <label class="field-label">end y (cm)</label>
-              <input type="number" step="0.1" v-model.number="end_y3" class="number-input" />
-            </div>
-          </div>
-          <button class="small-btn" @click="addMultiplePrickings">Add group</button>
         </section>
 
         <!-- Circles -->
@@ -232,39 +226,45 @@
               <span class="tooltip">Draw circles or ovals to mark compass impressions. Equal radii create a circle, different radii create an oval.</span>
             </span>
           </h3>
-          <h4>
-            Single circle
-            <span class="help-icon" title="Draw a circle or oval">
-              <span class="tooltip">Enter center position, radii, and optional rotation. After adding, use Select mode to drag the center or axis handles on the canvas.</span>
-            </span>
-          </h4>
-          <div class="field-row two">
-            <div>
-              <label class="field-label">center x (cm)</label>
-              <input type="number" step="0.1" v-model.number="circle_x" class="number-input" />
+          <div
+            class="ghost-preview-scope"
+            @focusin="setActiveGhostEditor('single-circle')"
+            @focusout="handleGhostEditorFocusOut('single-circle', $event)"
+          >
+            <h4>
+              Single circle
+              <span class="help-icon" title="Draw a circle or oval">
+                <span class="tooltip">Enter center position, radii, and optional rotation. After adding, use Select mode to drag the center or axis handles on the canvas.</span>
+              </span>
+            </h4>
+            <div class="field-row two">
+              <div>
+                <label class="field-label">center x (cm)</label>
+                <input type="number" step="0.1" v-model.number="circle_x" class="number-input" />
+              </div>
+              <div>
+                <label class="field-label">center y (cm)</label>
+                <input type="number" step="0.1" v-model.number="circle_y" class="number-input" />
+              </div>
             </div>
-            <div>
-              <label class="field-label">center y (cm)</label>
-              <input type="number" step="0.1" v-model.number="circle_y" class="number-input" />
+            <div class="field-row two">
+              <div>
+                <label class="field-label">radius x (cm)</label>
+                <input type="number" step="0.1" v-model.number="circle_rx" class="number-input" />
+              </div>
+              <div>
+                <label class="field-label">radius y (cm)</label>
+                <input type="number" step="0.1" v-model.number="circle_ry" class="number-input" />
+              </div>
             </div>
+            <div class="field-row one">
+              <div>
+                <label class="field-label">rotation (°)</label>
+                <input type="number" step="1" v-model.number="circle_angle" class="number-input" />
+              </div>
+            </div>
+            <button class="small-btn" @click="addSingleCircle">Add circle</button>
           </div>
-          <div class="field-row two">
-            <div>
-              <label class="field-label">radius x (cm)</label>
-              <input type="number" step="0.1" v-model.number="circle_rx" class="number-input" />
-            </div>
-            <div>
-              <label class="field-label">radius y (cm)</label>
-              <input type="number" step="0.1" v-model.number="circle_ry" class="number-input" />
-            </div>
-          </div>
-          <div class="field-row one">
-            <div>
-              <label class="field-label">rotation (°)</label>
-              <input type="number" step="1" v-model.number="circle_angle" class="number-input" />
-            </div>
-          </div>
-          <button class="small-btn" @click="addSingleCircle">Add circle</button>
           <p class="hint">Equal radii = circle, different = oval. Rotate after adding with Select mode.</p>
         </section>
       </aside>
@@ -832,7 +832,7 @@
 
 <script setup>
 /* eslint-disable */
-import { ref, computed, onMounted, onBeforeUnmount, watch } from "vue";
+import { ref, computed, nextTick, onMounted, onBeforeUnmount, watch } from "vue";
 import { useRoute } from "vue-router";
 import jsPDF from "jspdf";
 
@@ -849,6 +849,103 @@ const heightCm = ref(Number(route.query.heightCm) || 20);
 const tool = ref(route.query.tool || "dry-point");
 const direction = ref(route.query.direction || "none");
 
+function openTutorial() {
+  window.dispatchEvent(
+    new CustomEvent("fenius:start-tour", { detail: { flow: "ruling" } })
+  );
+}
+
+const HELP_TOOLTIP_WIDTH = 260;
+const HELP_TOOLTIP_GAP = 14;
+let activeHelpIcon = null;
+let boundHelpIcons = [];
+const floatingHelpEl = ref(null);
+const floatingHelp = ref({
+  visible: false,
+  content: "",
+  left: 0,
+  top: 0,
+});
+
+const floatingHelpStyle = computed(() => ({
+  left: `${floatingHelp.value.left}px`,
+  top: `${floatingHelp.value.top}px`,
+}));
+
+function clampTooltip(value, min, max) {
+  return Math.max(min, Math.min(max, value));
+}
+
+function positionHelpTooltip(icon) {
+  if (!icon || typeof icon.getBoundingClientRect !== "function") return;
+  const rect = icon.getBoundingClientRect();
+  const overlayRect = floatingHelpEl.value?.getBoundingClientRect();
+  const overlayWidth = overlayRect?.width || HELP_TOOLTIP_WIDTH;
+  const overlayHeight = overlayRect?.height || 56;
+  const halfWidth = overlayWidth / 2;
+  const left = clampTooltip(
+    rect.left + rect.width / 2,
+    16 + halfWidth,
+    Math.max(16 + halfWidth, window.innerWidth - halfWidth - 16)
+  );
+  const top = Math.max(overlayHeight + 16, rect.top - HELP_TOOLTIP_GAP);
+  floatingHelp.value = {
+    ...floatingHelp.value,
+    left,
+    top,
+  };
+}
+
+async function showFloatingHelp(icon) {
+  if (!icon) return;
+  const content =
+    icon.querySelector(".tooltip")?.textContent?.trim() ||
+    icon.getAttribute("title") ||
+    "";
+  floatingHelp.value = {
+    visible: true,
+    content,
+    left: 0,
+    top: 0,
+  };
+  await nextTick();
+  positionHelpTooltip(icon);
+}
+
+function handleHelpEnter(event) {
+  activeHelpIcon = event.currentTarget;
+  showFloatingHelp(activeHelpIcon);
+}
+
+function handleHelpMove(event) {
+  if (activeHelpIcon === event.currentTarget) {
+    positionHelpTooltip(event.currentTarget);
+  }
+}
+
+function handleHelpLeave(event) {
+  if (activeHelpIcon === event.currentTarget) {
+    activeHelpIcon = null;
+    floatingHelp.value.visible = false;
+  }
+}
+
+function refreshActiveHelpTooltip() {
+  if (activeHelpIcon) positionHelpTooltip(activeHelpIcon);
+}
+
+function bindHelpTooltipPositions() {
+  const icons = Array.from(document.querySelectorAll(".ruling-page .help-icon"));
+  icons.forEach((icon) => {
+    icon.addEventListener("mouseenter", handleHelpEnter);
+    icon.addEventListener("mousemove", handleHelpMove);
+    icon.addEventListener("mouseleave", handleHelpLeave);
+    icon.addEventListener("focusin", handleHelpEnter);
+    icon.addEventListener("focusout", handleHelpLeave);
+  });
+  return icons;
+}
+
 /* -------- Constants & helpers -------- */
 const PAGE_BASE_WIDTH_CM = 20;
 const PX_PER_CM = 37.8;
@@ -856,6 +953,7 @@ const SCALE_FACTOR = 0.6; // slightly larger base canvas
 const IMAGE_DPI_SCALE = 2; // Higher resolution for image quality
 const AUTOSAVE_KEY = "feniusRulingAutosave";
 const MILLIMETRE_STEP_CM = 0.1;
+const EXPORT_RENDER_SCALE = 4;
 
 const clamp = (v, lo, hi) => Math.max(lo, Math.min(hi, v));
 const snapVal = (v, step) => Number((Math.round(v / step) * step).toFixed(4));
@@ -1067,6 +1165,7 @@ const showGhostSingleCircle = ref(false);
 const showGhostMultiLines = ref(false);
 const showGhostSinglePricking = ref(false);
 const showGhostMultiPrickings = ref(false);
+const activeGhostEditor = ref(null);
 
 /* Undo / redo */
 const undoStack = ref([]);
@@ -1112,6 +1211,9 @@ const CIRCLE_HANDLE_RADIUS_PX = 7;
 const activeCircleDrag = ref(null);
 const activeEraseDrag = ref({ active: false, hasSnapshot: false });
 const suppressCanvasClick = ref(false);
+const LINE_SELECT_RADIUS_PX = 10;
+const PRICKING_SELECT_RADIUS_PX = 10;
+const CIRCLE_SELECT_RADIUS_PX = 12;
 const eraserCursor = ref({ visible: false, leftPx: 15, topPx: 15 });
 const eraserCursorStyle = computed(() => ({
   left: `${eraserCursor.value.leftPx}px`,
@@ -1138,8 +1240,9 @@ function drawRulers() {
   ctx.rect(15, 15, baseWidthPx.value, baseHeightPx.value);
   ctx.stroke();
 
-  ctx.font = "9px Arial";
+  ctx.font = "10px Arial";
   ctx.textBaseline = "middle";
+  ctx.textAlign = "left";
 
   const drawTick = (x1, y1, x2, y2, color, width = 1) => {
     ctx.save();
@@ -1157,18 +1260,18 @@ function drawRulers() {
     const cm = mm / 10;
     const xPos = 15 + cmToPxX(cm);
     if (mm % 10 === 0) {
-      drawTick(xPos, 3, xPos, 14, "#ffffff", 1);
+      drawTick(xPos, 2, xPos, 14, "#ffffff", 1.2);
     } else if (mm % 5 === 0) {
-      drawTick(xPos, 6, xPos, 14, "rgba(255, 255, 255, 0.9)", 1);
+      drawTick(xPos, 5, xPos, 14, "rgba(255, 255, 255, 0.92)", 1);
     } else {
-      drawTick(xPos, 10, xPos, 14, "rgba(255, 255, 255, 0.6)", 0.75);
+      drawTick(xPos, 9, xPos, 14, "rgba(255, 255, 255, 0.72)", 0.8);
     }
   }
 
   ctx.fillStyle = "#ffffff";
   for (let cm = 0; cm <= Math.floor(widthCm.value + 0.0001); cm += 1) {
     const xPos = 15 + cmToPxX(cm);
-    ctx.fillText(String(cm), xPos + 2, 7);
+    ctx.fillText(`${cm}`, xPos + 2, 7);
   }
 
   const heightMm = Math.round(heightCm.value * 10);
@@ -1176,18 +1279,18 @@ function drawRulers() {
     const cm = mm / 10;
     const yPos = 15 + cmToPxY(cm);
     if (mm % 10 === 0) {
-      drawTick(3, yPos, 14, yPos, "#ffffff", 1);
+      drawTick(2, yPos, 14, yPos, "#ffffff", 1.2);
     } else if (mm % 5 === 0) {
-      drawTick(6, yPos, 14, yPos, "rgba(255, 255, 255, 0.9)", 1);
+      drawTick(5, yPos, 14, yPos, "rgba(255, 255, 255, 0.92)", 1);
     } else {
-      drawTick(10, yPos, 14, yPos, "rgba(255, 255, 255, 0.6)", 0.75);
+      drawTick(9, yPos, 14, yPos, "rgba(255, 255, 255, 0.72)", 0.8);
     }
   }
 
   ctx.fillStyle = "#ffffff";
   for (let cm = 0; cm <= Math.floor(heightCm.value + 0.0001); cm += 1) {
     const yPos = 15 + cmToPxY(cm);
-    ctx.fillText(String(cm), 2, yPos + 1);
+    ctx.fillText(`${cm}`, 2, yPos + 1);
   }
 }
 
@@ -1523,6 +1626,23 @@ function clearSelection() {
   redrawAll();
 }
 
+function setActiveGhostEditor(kind) {
+  if (activeGhostEditor.value === kind) return;
+  activeGhostEditor.value = kind;
+  refreshGhostPreviews();
+}
+
+function handleGhostEditorFocusOut(kind, event) {
+  if (event.currentTarget?.contains(event.relatedTarget)) return;
+  if (activeGhostEditor.value !== kind) return;
+  activeGhostEditor.value = null;
+  refreshGhostPreviews();
+}
+
+function isGhostEditorActive(kind) {
+  return activeGhostEditor.value === kind;
+}
+
 function toLocalCoords(e) {
   const wrap = canvasWrap.value;
   if (!wrap) return null;
@@ -1854,19 +1974,35 @@ function handleCanvasMouseDown(e) {
     return;
   }
 
-  if (mode.value !== "select" || !selectedCircle.value) return;
   const pos = toLocalCoords(e);
   if (!pos) return;
 
-  const handle = getCircleHandleAtPosition(pos.x, pos.y, selectedCircle.value);
-  if (!handle) return;
+  if (mode.value !== "select") return;
 
-  activeCircleDrag.value = {
-    circleId: selectedCircle.value.id,
-    handle,
-    hasMoved: false,
-  };
-  e.preventDefault();
+  if (selectedCircle.value) {
+    const handle = getCircleHandleAtPosition(pos.x, pos.y, selectedCircle.value);
+    if (handle) {
+      activeCircleDrag.value = {
+        circleId: selectedCircle.value.id,
+        handle,
+        hasMoved: false,
+      };
+      e.preventDefault();
+      return;
+    }
+  }
+
+  if (!insidePage(pos.x, pos.y)) return;
+
+  const xPagePx = clamp(pos.x - 15, 0, baseWidthPx.value);
+  const yPagePx = clamp(pos.y - 15, 0, baseHeightPx.value);
+  const xCm = pxToCmX(xPagePx);
+  const yCm = pxToCmY(yPagePx);
+
+  if (selectFeatureAtPoint(xCm, yCm, xPagePx, yPagePx)) {
+    suppressCanvasClick.value = true;
+    e.preventDefault();
+  }
 }
 
 function handleCanvasMouseMove(e) {
@@ -2049,6 +2185,25 @@ function pointToSegmentDist(x, y, L) {
   return Math.hypot(x - px, y - py);
 }
 
+function pointToSegmentDistPx(xPx, yPx, line) {
+  const x1 = cmToPxX(line.x1);
+  const y1 = cmToPxY(line.y1);
+  const x2 = cmToPxX(line.x2);
+  const y2 = cmToPxY(line.y2);
+  const vx = x2 - x1;
+  const vy = y2 - y1;
+  const wx = xPx - x1;
+  const wy = yPx - y1;
+  const c1 = vx * wx + vy * wy;
+  if (c1 <= 0) return Math.hypot(xPx - x1, yPx - y1);
+  const c2 = vx * vx + vy * vy;
+  if (c2 <= c1) return Math.hypot(xPx - x2, yPx - y2);
+  const b = c1 / c2;
+  const px = x1 + b * vx;
+  const py = y1 + b * vy;
+  return Math.hypot(xPx - px, yPx - py);
+}
+
 function pointToEllipseDist(x, y, C) {
   const local = getCircleLocalCoords(x, y, C);
   const distFromCenter = Math.hypot(local.x, local.y);
@@ -2056,6 +2211,71 @@ function pointToEllipseDist(x, y, C) {
   const ex = C.rx * Math.cos(angle);
   const ey = C.ry * Math.sin(angle);
   return Math.abs(distFromCenter - Math.hypot(ex, ey));
+}
+
+function pointToEllipseDistPx(xCm, yCm, circle) {
+  return pointToEllipseDist(xCm, yCm, circle) * cmToPxX(1);
+}
+
+function selectFeatureAtPoint(xCm, yCm, xPagePx, yPagePx) {
+  const candidates = [];
+
+  for (const pricking of prickings.value) {
+    const distPx = Math.hypot(
+      cmToPxX(pricking.x) - xPagePx,
+      cmToPxY(pricking.y) - yPagePx
+    );
+    if (distPx <= PRICKING_SELECT_RADIUS_PX) {
+      candidates.push({
+        kind: "pricking",
+        id: pricking.id,
+        distPx,
+        priority: 0,
+      });
+    }
+  }
+
+  for (const line of lines.value) {
+    const distPx = pointToSegmentDistPx(xPagePx, yPagePx, line);
+    if (distPx <= LINE_SELECT_RADIUS_PX) {
+      candidates.push({
+        kind: "line",
+        id: line.id,
+        distPx,
+        priority: 1,
+      });
+    }
+  }
+
+  for (const circle of circles.value) {
+    const distPx = pointInsideEllipse(xCm, yCm, circle)
+      ? 0
+      : pointToEllipseDistPx(xCm, yCm, circle);
+    if (distPx <= CIRCLE_SELECT_RADIUS_PX) {
+      candidates.push({
+        kind: "circle",
+        id: circle.id,
+        distPx,
+        priority: 2,
+      });
+    }
+  }
+
+  candidates.sort((a, b) => {
+    if (a.distPx !== b.distPx) return a.distPx - b.distPx;
+    return a.priority - b.priority;
+  });
+
+  if (candidates.length > 0) {
+    const best = candidates[0];
+    selectedFeature.value = { kind: best.kind, id: best.id };
+    redrawAll();
+    return true;
+  }
+
+  selectedFeature.value = { kind: null, id: null };
+  redrawAll();
+  return false;
 }
 
 /* -------- Canvas click -------- */
@@ -2120,28 +2340,7 @@ function handleCanvasClick(e) {
 
   // Select mode
   if (mode.value === "select" && insidePage(x, y)) {
-    const threshCm = Math.max(widthCm.value, heightCm.value) * 0.03;
-    let best = { kind: null, id: null, dist: threshCm };
-
-    for (const p of prickings.value) {
-      const d = Math.hypot(p.x - xCm, p.y - yCm);
-      if (d < best.dist) best = { kind: "pricking", id: p.id, dist: d };
-    }
-    for (const L of lines.value) {
-      const d = pointToSegmentDist(xCm, yCm, L);
-      if (d < best.dist) best = { kind: "line", id: L.id, dist: d };
-    }
-    for (const C of circles.value) {
-      const d = pointInsideEllipse(xCm, yCm, C) ? 0 : pointToEllipseDist(xCm, yCm, C);
-      if (d < best.dist) best = { kind: "circle", id: C.id, dist: d };
-    }
-
-    if (best.kind) {
-      selectedFeature.value = { kind: best.kind, id: best.id };
-    } else {
-      selectedFeature.value = { kind: null, id: null };
-    }
-    redrawAll();
+    selectFeatureAtPoint(xCm, yCm, xPagePx, yPagePx);
   }
 }
 
@@ -2160,6 +2359,7 @@ function addSingleLine() {
   ];
   showGhostSingleLine.value = false;
   ghostSingleLine.value = null;
+  if (activeGhostEditor.value === "single-line") activeGhostEditor.value = null;
   redrawAll();
 }
 
@@ -2190,6 +2390,7 @@ function addMultipleLines() {
   lines.value = [...lines.value, ...newLines];
   showGhostMultiLines.value = false;
   ghostMultiLines.value = [];
+  if (activeGhostEditor.value === "multi-lines") activeGhostEditor.value = null;
   redrawAll();
 }
 
@@ -2201,6 +2402,7 @@ function addSinglePricking() {
   ];
   showGhostSinglePricking.value = false;
   ghostSinglePricking.value = null;
+  if (activeGhostEditor.value === "single-pricking") activeGhostEditor.value = null;
   redrawAll();
 }
 
@@ -2218,6 +2420,7 @@ function addMultiplePrickings() {
   prickings.value = [...prickings.value, ...newPr];
   showGhostMultiPrickings.value = false;
   ghostMultiPrickings.value = [];
+  if (activeGhostEditor.value === "multi-prickings") activeGhostEditor.value = null;
   redrawAll();
 }
 
@@ -2235,11 +2438,12 @@ function addSingleCircle() {
   ];
   showGhostSingleCircle.value = false;
   ghostSingleCircle.value = null;
+  if (activeGhostEditor.value === "single-circle") activeGhostEditor.value = null;
   redrawAll();
 }
 
 /* -------- Ghost previews (watch form fields) -------- */
-watch([start_x, start_y, end_x], () => {
+function updateGhostSingleLine() {
   const x1 = start_x.value;
   const y = start_y.value;
   const x2 = end_x.value;
@@ -2254,15 +2458,14 @@ watch([start_x, start_y, end_x], () => {
       x2: snapPoint(x2),
       y2: snapPoint(y), // Use same y for both endpoints (horizontal line)
     };
-    showGhostSingleLine.value = true;
+    showGhostSingleLine.value = isGhostEditorActive("single-line");
   } else {
     ghostSingleLine.value = null;
     showGhostSingleLine.value = false;
   }
-  redrawAll();
-});
+}
 
-watch([start_x2, end_x2, start_y2, end_y2, line_spacing2, number], () => {
+function updateGhostMultiLines() {
   const n = Math.max(1, Math.floor(number.value || 0));
   const y0 = start_y2.value;
   const y1 = end_y2.value;
@@ -2270,7 +2473,6 @@ watch([start_x2, end_x2, start_y2, end_y2, line_spacing2, number], () => {
   if (!Number.isFinite(y0) || (!hasExplicitSpacing && !Number.isFinite(y1)) || !n) {
     ghostMultiLines.value = [];
     showGhostMultiLines.value = false;
-    redrawAll();
     return;
   }
   const step = hasExplicitSpacing
@@ -2289,31 +2491,28 @@ watch([start_x2, end_x2, start_y2, end_y2, line_spacing2, number], () => {
     });
   }
   ghostMultiLines.value = arr;
-  showGhostMultiLines.value = true;
-  redrawAll();
-});
+  showGhostMultiLines.value = isGhostEditorActive("multi-lines");
+}
 
-watch([hor, ver], () => {
+function updateGhostSinglePricking() {
   const x = hor.value;
   const y = ver.value;
   if (Number.isFinite(x) && Number.isFinite(y)) {
     ghostSinglePricking.value = { x: snapPoint(x), y: snapPoint(y) };
-    showGhostSinglePricking.value = true;
+    showGhostSinglePricking.value = isGhostEditorActive("single-pricking");
   } else {
     ghostSinglePricking.value = null;
     showGhostSinglePricking.value = false;
   }
-  redrawAll();
-});
+}
 
-watch([hor2, start_y3, end_y3, number2], () => {
+function updateGhostMultiPrickings() {
   const n = Math.max(1, Math.floor(number2.value || 0));
   const y0 = start_y3.value;
   const y1 = end_y3.value;
   if (!Number.isFinite(y0) || !Number.isFinite(y1) || !n) {
     ghostMultiPrickings.value = [];
     showGhostMultiPrickings.value = false;
-    redrawAll();
     return;
   }
   const step = n === 1 ? 0 : (y1 - y0) / (n - 1);
@@ -2323,11 +2522,10 @@ watch([hor2, start_y3, end_y3, number2], () => {
     arr.push({ x: snapPoint(hor2.value), y });
   }
   ghostMultiPrickings.value = arr;
-  showGhostMultiPrickings.value = true;
-  redrawAll();
-});
+  showGhostMultiPrickings.value = isGhostEditorActive("multi-prickings");
+}
 
-watch([circle_x, circle_y, circle_rx, circle_ry, circle_angle], () => {
+function updateGhostSingleCircle() {
   const cx = circle_x.value;
   const cy = circle_y.value;
   const rx = circle_rx.value;
@@ -2345,13 +2543,27 @@ watch([circle_x, circle_y, circle_rx, circle_ry, circle_angle], () => {
       ry: snapPoint(ry),
       angle: normalizeAngleDeg(Number(circle_angle.value) || 0),
     };
-    showGhostSingleCircle.value = true;
+    showGhostSingleCircle.value = isGhostEditorActive("single-circle");
   } else {
     ghostSingleCircle.value = null;
     showGhostSingleCircle.value = false;
   }
+}
+
+function refreshGhostPreviews() {
+  updateGhostSingleLine();
+  updateGhostMultiLines();
+  updateGhostSinglePricking();
+  updateGhostMultiPrickings();
+  updateGhostSingleCircle();
   redrawAll();
-});
+}
+
+watch([start_x, start_y, end_x], refreshGhostPreviews);
+watch([start_x2, end_x2, start_y2, end_y2, line_spacing2, number], refreshGhostPreviews);
+watch([hor, ver], refreshGhostPreviews);
+watch([hor2, start_y3, end_y3, number2], refreshGhostPreviews);
+watch([circle_x, circle_y, circle_rx, circle_ry, circle_angle], refreshGhostPreviews);
 
 /* -------- Selected feature updates -------- */
 function updateSelectedLineCoord(coord, val) {
@@ -2359,7 +2571,11 @@ function updateSelectedLineCoord(coord, val) {
   if (l) {
     const num = parseFloat(val);
     if (Number.isFinite(num)) {
-      l[coord] = num;
+      if (coord === "x1" || coord === "x2") {
+        l[coord] = clamp(snapPoint(num), 0, widthCm.value);
+      } else {
+        l[coord] = clamp(snapPoint(num), 0, heightCm.value);
+      }
       redrawAll();
     }
   }
@@ -2463,7 +2679,11 @@ function updateSelectedPrickingCoord(coord, val) {
   if (p) {
     const num = parseFloat(val);
     if (Number.isFinite(num)) {
-      p[coord] = num;
+      if (coord === "x") {
+        p.x = clamp(snapPoint(num), 0, widthCm.value);
+      } else {
+        p.y = clamp(snapPoint(num), 0, heightCm.value);
+      }
       redrawAll();
     }
   }
@@ -2517,11 +2737,11 @@ function updateSelectedCircleCoord(coord, val) {
   if (!Number.isFinite(num)) return;
 
   if (coord === "rx" || coord === "ry") {
-    c[coord] = Math.max(snapStepCm.value, num);
+    c[coord] = Math.max(snapStepCm.value, snapPoint(num));
   } else if (coord === "cx") {
-    c.cx = clamp(num, 0, widthCm.value);
+    c.cx = clamp(snapPoint(num), 0, widthCm.value);
   } else if (coord === "cy") {
-    c.cy = clamp(num, 0, heightCm.value);
+    c.cy = clamp(snapPoint(num), 0, heightCm.value);
   }
   redrawAll();
 }
@@ -2690,44 +2910,59 @@ function drawExportRulers(ctx, offsetX = 0, offsetY = 0) {
   ctx.strokeStyle = "#ffffff";
   ctx.fillStyle = "#ffffff";
   ctx.font = "10px Arial";
+  ctx.textBaseline = "middle";
+  ctx.textAlign = "left";
   ctx.lineWidth = 1;
+
+  const drawTick = (x1, y1, x2, y2, color, width = 1) => {
+    ctx.save();
+    ctx.strokeStyle = color;
+    ctx.lineWidth = width;
+    ctx.beginPath();
+    ctx.moveTo(x1, y1);
+    ctx.lineTo(x2, y2);
+    ctx.stroke();
+    ctx.restore();
+  };
 
   ctx.beginPath();
   ctx.rect(offsetX + 15, offsetY + 15, baseWidthPx.value, baseHeightPx.value);
   ctx.stroke();
 
-  for (let cm = 0; cm <= widthCm.value; cm += 1) {
+  const widthMm = Math.round(widthCm.value * 10);
+  for (let mm = 0; mm <= widthMm; mm++) {
+    const cm = mm / 10;
     const xPos = offsetX + 15 + cmToPxX(cm);
-    ctx.beginPath();
-    ctx.moveTo(xPos, offsetY + 7);
-    ctx.lineTo(xPos, offsetY + 14);
-    ctx.stroke();
+    if (mm % 10 === 0) {
+      drawTick(xPos, offsetY + 2, xPos, offsetY + 14, "#ffffff", 1.2);
+    } else if (mm % 5 === 0) {
+      drawTick(xPos, offsetY + 5, xPos, offsetY + 14, "rgba(255, 255, 255, 0.92)", 1);
+    } else {
+      drawTick(xPos, offsetY + 9, xPos, offsetY + 14, "rgba(255, 255, 255, 0.72)", 0.8);
+    }
   }
 
-  for (let cm = 0; cm <= widthCm.value; cm += 5) {
+  for (let cm = 0; cm <= Math.floor(widthCm.value + 0.0001); cm += 1) {
     const xPos = offsetX + 15 + cmToPxX(cm);
-    ctx.beginPath();
-    ctx.moveTo(xPos, offsetY);
-    ctx.lineTo(xPos, offsetY + 14);
-    ctx.stroke();
-    ctx.fillText(String(cm), xPos + 2, offsetY + 10);
+    ctx.fillText(`${cm}`, xPos + 2, offsetY + 7);
   }
 
-  for (let cm = 0; cm <= heightCm.value; cm += 1) {
+  const heightMm = Math.round(heightCm.value * 10);
+  for (let mm = 0; mm <= heightMm; mm++) {
+    const cm = mm / 10;
     const yPos = offsetY + 15 + cmToPxY(cm);
-    ctx.beginPath();
-    ctx.moveTo(offsetX + 7, yPos);
-    ctx.lineTo(offsetX + 14, yPos);
-    ctx.stroke();
+    if (mm % 10 === 0) {
+      drawTick(offsetX + 2, yPos, offsetX + 14, yPos, "#ffffff", 1.2);
+    } else if (mm % 5 === 0) {
+      drawTick(offsetX + 5, yPos, offsetX + 14, yPos, "rgba(255, 255, 255, 0.92)", 1);
+    } else {
+      drawTick(offsetX + 9, yPos, offsetX + 14, yPos, "rgba(255, 255, 255, 0.72)", 0.8);
+    }
   }
 
-  for (let cm = 0; cm <= heightCm.value; cm += 5) {
+  for (let cm = 0; cm <= Math.floor(heightCm.value + 0.0001); cm += 1) {
     const yPos = offsetY + 15 + cmToPxY(cm);
-    ctx.beginPath();
-    ctx.moveTo(offsetX, yPos);
-    ctx.lineTo(offsetX + 14, yPos);
-    ctx.stroke();
-    ctx.fillText(String(cm), offsetX + 2, yPos + 10);
+    ctx.fillText(`${cm}`, offsetX + 2, yPos + 1);
   }
   ctx.restore();
 }
@@ -2843,6 +3078,41 @@ function renderSchemaToCanvasForPdf(ctx, includeImage, includeMeasurements) {
       ctx.fillText(text, px + 8, py - 8);
     });
     ctx.restore();
+  }
+}
+
+function createHighResExportCanvas() {
+  const temp = document.createElement("canvas");
+  const logicalWidth = includeRulingGridInExport.value ? baseWidthPx.value + 15 : baseWidthPx.value;
+  const logicalHeight = includeRulingGridInExport.value ? baseHeightPx.value + 15 : baseHeightPx.value;
+  temp.width = logicalWidth * EXPORT_RENDER_SCALE;
+  temp.height = logicalHeight * EXPORT_RENDER_SCALE;
+  temp.style.width = `${logicalWidth}px`;
+  temp.style.height = `${logicalHeight}px`;
+  const ctx = temp.getContext("2d");
+  ctx.imageSmoothingEnabled = true;
+  ctx.imageSmoothingQuality = "high";
+  ctx.scale(EXPORT_RENDER_SCALE, EXPORT_RENDER_SCALE);
+  return { temp, ctx };
+}
+
+function renderExportCanvas(ctx, includeImage) {
+  if (includeRulingGridInExport.value) {
+    drawExportRulers(ctx);
+    ctx.save();
+    ctx.translate(15, 15);
+    renderSchemaToCanvasForPdf(
+      ctx,
+      includeImage,
+      includeIntersectionMeasurementsInExport.value
+    );
+    ctx.restore();
+  } else {
+    renderSchemaToCanvasForPdf(
+      ctx,
+      includeImage,
+      includeIntersectionMeasurementsInExport.value
+    );
   }
 }
 
@@ -3014,31 +3284,11 @@ function exportPdf() {
 
   // ---------- SECOND PAGE: SCHEMA ----------
   pdf.addPage();
-  const temp = document.createElement("canvas");
-  temp.width = includeRulingGridInExport.value ? baseWidthPx.value + 15 : baseWidthPx.value;
-  temp.height = includeRulingGridInExport.value ? baseHeightPx.value + 15 : baseHeightPx.value;
-  const ctx = temp.getContext("2d");
-
-  if (includeRulingGridInExport.value) {
-    drawExportRulers(ctx);
-    ctx.save();
-    ctx.translate(15, 15);
-    renderSchemaToCanvasForPdf(
-      ctx,
-      includeImageInPdf.value,
-      includeIntersectionMeasurementsInExport.value
-    );
-    ctx.restore();
-  } else {
-    renderSchemaToCanvasForPdf(
-      ctx,
-      includeImageInPdf.value,
-      includeIntersectionMeasurementsInExport.value
-    );
-  }
+  const { temp, ctx } = createHighResExportCanvas();
+  renderExportCanvas(ctx, includeImageInPdf.value);
 
   const img = temp.toDataURL("image/png", 1.0);
-  pdf.addImage(img, "PNG", 0.5, 0.5, width_size(), height_size());
+  pdf.addImage(img, "PNG", 0.5, 0.5, width_size(), height_size(), undefined, "NONE");
 
   const filename = (shelfmark.value || "ruling-schema") + ".pdf";
   pdf.save(filename);
@@ -3074,28 +3324,8 @@ function exportJson() {
 }
 
 function exportPng() {
-  const temp = document.createElement("canvas");
-  temp.width = includeRulingGridInExport.value ? baseWidthPx.value + 15 : baseWidthPx.value;
-  temp.height = includeRulingGridInExport.value ? baseHeightPx.value + 15 : baseHeightPx.value;
-  const ctx = temp.getContext("2d");
-
-  if (includeRulingGridInExport.value) {
-    drawExportRulers(ctx);
-    ctx.save();
-    ctx.translate(15, 15);
-    renderSchemaToCanvasForPdf(
-      ctx,
-      includeImageInImage.value,
-      includeIntersectionMeasurementsInExport.value
-    );
-    ctx.restore();
-  } else {
-    renderSchemaToCanvasForPdf(
-      ctx,
-      includeImageInImage.value,
-      includeIntersectionMeasurementsInExport.value
-    );
-  }
+  const { temp, ctx } = createHighResExportCanvas();
+  renderExportCanvas(ctx, includeImageInImage.value);
 
   temp.toBlob((blob) => {
     const url = URL.createObjectURL(blob);
@@ -3111,28 +3341,8 @@ function exportTiff() {
   // Note: Modern browsers don't natively support TIFF export
   // We'll export as high-quality PNG with .tif extension
   // For true TIFF, a library like tiff.js would be needed
-  const temp = document.createElement("canvas");
-  temp.width = includeRulingGridInExport.value ? baseWidthPx.value + 15 : baseWidthPx.value;
-  temp.height = includeRulingGridInExport.value ? baseHeightPx.value + 15 : baseHeightPx.value;
-  const ctx = temp.getContext("2d");
-
-  if (includeRulingGridInExport.value) {
-    drawExportRulers(ctx);
-    ctx.save();
-    ctx.translate(15, 15);
-    renderSchemaToCanvasForPdf(
-      ctx,
-      includeImageInImage.value,
-      includeIntersectionMeasurementsInExport.value
-    );
-    ctx.restore();
-  } else {
-    renderSchemaToCanvasForPdf(
-      ctx,
-      includeImageInImage.value,
-      includeIntersectionMeasurementsInExport.value
-    );
-  }
+  const { temp, ctx } = createHighResExportCanvas();
+  renderExportCanvas(ctx, includeImageInImage.value);
 
   temp.toBlob((blob) => {
     const url = URL.createObjectURL(blob);
@@ -3172,9 +3382,24 @@ function onKey(e) {
 onMounted(() => {
   redrawAll();
   window.addEventListener("keydown", onKey);
+  boundHelpIcons = bindHelpTooltipPositions();
+  window.addEventListener("resize", refreshActiveHelpTooltip);
+  document.addEventListener("scroll", refreshActiveHelpTooltip, true);
 });
 onBeforeUnmount(() => {
   window.removeEventListener("keydown", onKey);
+  boundHelpIcons.forEach((icon) => {
+    icon.removeEventListener("mouseenter", handleHelpEnter);
+    icon.removeEventListener("mousemove", handleHelpMove);
+    icon.removeEventListener("mouseleave", handleHelpLeave);
+    icon.removeEventListener("focusin", handleHelpEnter);
+    icon.removeEventListener("focusout", handleHelpLeave);
+  });
+  boundHelpIcons = [];
+  activeHelpIcon = null;
+  floatingHelp.value.visible = false;
+  window.removeEventListener("resize", refreshActiveHelpTooltip);
+  document.removeEventListener("scroll", refreshActiveHelpTooltip, true);
 });
 </script>
 
@@ -3231,6 +3456,7 @@ onBeforeUnmount(() => {
   display: flex;
   justify-content: flex-end;
   align-items: center;
+  gap: 10px;
 }
 
 .mode-pill {
@@ -3238,6 +3464,32 @@ onBeforeUnmount(() => {
   border-radius: 999px;
   border: 1px solid rgba(255, 255, 255, 0.4);
   font-size: 13px;
+}
+
+.tutorial-btn {
+  width: 34px;
+  height: 34px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  border-radius: 999px;
+  border: 1px solid rgba(255, 255, 255, 0.4);
+  background: rgba(255, 255, 255, 0.08);
+  color: inherit;
+  font-size: 18px;
+  font-weight: 700;
+  cursor: pointer;
+  transition: background-color 0.14s ease, border-color 0.14s ease,
+    transform 0.08s ease;
+}
+
+.tutorial-btn:hover {
+  background: rgba(255, 255, 255, 0.16);
+  border-color: rgba(255, 255, 255, 0.58);
+}
+
+.tutorial-btn:active {
+  transform: translateY(1px);
 }
 
 /* Layout */
@@ -3253,6 +3505,7 @@ onBeforeUnmount(() => {
 
 /* Sidebars */
 .side {
+  position: relative;
   padding: 8px;
   background: #1b2738;
   border-radius: 12px;
@@ -3274,11 +3527,18 @@ onBeforeUnmount(() => {
 
 /* Panels */
 .panel {
+  position: relative;
+  z-index: 0;
   margin-bottom: 10px;
   background: rgba(15, 23, 42, 0.9);
   border-radius: 10px;
   padding: 8px;
   border: 1px solid rgba(148, 163, 184, 0.45);
+}
+
+.panel:hover,
+.panel:focus-within {
+  z-index: 40;
 }
 
 .panel h3 {
@@ -3313,6 +3573,7 @@ onBeforeUnmount(() => {
   font-weight: 700;
   cursor: help;
   position: relative;
+  z-index: 60;
   flex-shrink: 0;
   overflow: visible;
 }
@@ -3322,40 +3583,36 @@ onBeforeUnmount(() => {
 }
 
 .help-icon .tooltip {
-  visibility: hidden;
-  opacity: 0;
-  position: absolute;
-  top: calc(100% + 8px);
-  right: 0;
-  background: #1e293b;
-  color: #f1f5f9;
+  display: none;
+}
+
+.help-tooltip-overlay {
+  position: fixed;
+  width: 260px;
+  max-width: min(260px, calc(100vw - 32px));
   padding: 8px 12px;
   border-radius: 8px;
   font-size: 12px;
   font-weight: 400;
-  white-space: normal;
-  width: 220px;
   text-align: left;
-  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.5);
-  border: 1px solid rgba(148, 163, 184, 0.3);
-  z-index: 10000;
-  pointer-events: none;
-  transition: opacity 0.2s ease, visibility 0.2s ease;
   line-height: 1.4;
+  pointer-events: none;
+  z-index: 12000;
+  box-shadow: 0 8px 24px rgba(0, 0, 0, 0.32);
+  transform: translate(-50%, -100%);
+  background: #1e293b;
+  color: #f1f5f9;
+  border: 1px solid rgba(148, 163, 184, 0.3);
 }
 
-.help-icon .tooltip::after {
+.help-tooltip-overlay::after {
   content: '';
   position: absolute;
-  right: 8px;
-  bottom: 100%;
+  left: 50%;
+  top: 100%;
+  transform: translateX(-50%);
   border: 6px solid transparent;
-  border-bottom-color: #1e293b;
-}
-
-.help-icon:hover .tooltip {
-  visibility: visible;
-  opacity: 1;
+  border-top-color: #1e293b;
 }
 
 /* Text */
@@ -4020,13 +4277,14 @@ button:active:not(:disabled) {
   color: hsl(var(--muted-foreground));
 }
 
-.ruling-page .help-icon .tooltip {
+.ruling-page .help-tooltip-overlay {
   background: hsl(var(--card));
   border-color: hsl(var(--border));
+  color: hsl(var(--card-foreground));
 }
 
-.ruling-page .help-icon .tooltip::after {
-  border-right-color: hsl(var(--card));
+.ruling-page .help-tooltip-overlay::after {
+  border-top-color: hsl(var(--card));
 }
 
 .ruling-page .export-option-btn strong {
@@ -4057,6 +4315,17 @@ button:active:not(:disabled) {
 
 .ruling-page .help-icon .tooltip {
   color: hsl(var(--card-foreground));
+}
+
+.ruling-page .tutorial-btn {
+  color: hsl(var(--card-foreground));
+  border-color: hsl(var(--border));
+  background: hsl(var(--card) / 0.76);
+}
+
+.ruling-page .tutorial-btn:hover {
+  background: hsl(var(--muted));
+  border-color: hsl(var(--ring));
 }
 
 .ruling-page .help-icon .tooltip::after {

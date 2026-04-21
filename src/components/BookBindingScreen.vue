@@ -3,6 +3,14 @@
     <!-- HEADER BAR -->
     <div class="header-bar">
       <button class="return-btn" @click="$router.back()">↩ return</button>
+      <button
+        class="tutorial-btn"
+        type="button"
+        @click="openTutorial"
+        aria-label="Open tutorial"
+      >
+        ?
+      </button>
     </div>
 
     <!-- METADATA BREADCRUMB -->
@@ -854,6 +862,14 @@ export default {
   },
   setup(props) {
     const num = (v, d = 0) => (Number.isFinite(Number(v)) ? Number(v) : d);
+
+    function openTutorial() {
+      window.dispatchEvent(
+        new CustomEvent("fenius:start-tour", {
+          detail: { flow: "bookBinding" },
+        })
+      );
+    }
 
     /* ---------- Recolor popup state ---------- */
     const showRecolorPopup = ref(false);
@@ -4528,6 +4544,7 @@ export default {
       exportToPNG,
       exportToJPEG,
       exportToJSON,
+      openTutorial,
     };
   },
 };
@@ -4559,7 +4576,7 @@ export default {
 }
 .header-bar {
   display: flex;
-  justify-content: flex-end;
+  justify-content: space-between;
   align-items: center;
   background: #c0c2c3;
   color: black;
@@ -4572,6 +4589,17 @@ export default {
   border: none;
   cursor: pointer;
   font-size: 16px;
+}
+.tutorial-btn {
+  width: 34px;
+  height: 34px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  border-radius: 999px;
+  cursor: pointer;
+  font-size: 18px;
+  font-weight: 700;
 }
 .breadcrumb {
   background: #1f2a3a;
@@ -5578,7 +5606,8 @@ export default {
 .legend button,
 .continue-btn,
 .menu-item,
-.popup-btn {
+.popup-btn,
+.tutorial-btn {
   border-radius: var(--radius-sm);
   font-weight: 700;
   border: 1px solid hsl(var(--border));
@@ -5594,7 +5623,8 @@ export default {
 .legend button:hover,
 .continue-btn:hover,
 .menu-item:hover,
-.popup-btn:hover {
+.popup-btn:hover,
+.tutorial-btn:hover {
   background: hsl(var(--muted));
   border-color: hsl(var(--ring));
 }
@@ -5630,7 +5660,8 @@ export default {
 .legend button:active,
 .continue-btn:active,
 .menu-item:active,
-.popup-btn:active {
+.popup-btn:active,
+.tutorial-btn:active {
   transform: translateY(1px);
 }
 
@@ -5669,6 +5700,10 @@ export default {
 .bookbinding-screen .selection-bar,
 .bookbinding-screen .context-menu {
   color: hsl(var(--muted-foreground));
+}
+
+.bookbinding-screen .tutorial-btn {
+  border-radius: 999px;
 }
 
 .bookbinding-screen .header-bar,

@@ -22,7 +22,7 @@
 </template>
 
 <script setup>
-import { computed, ref, watch } from "vue";
+import { computed, onMounted, onUnmounted, ref, watch } from "vue";
 import { useRoute } from "vue-router";
 import TourOverlay from "@/components/tour/TourOverlay.vue";
 import TourWelcome from "@/components/tour/TourWelcome.vue";
@@ -93,6 +93,14 @@ function startTour() {
   isActive.value = true;
 }
 
+function openTour(flow = flowKey.value) {
+  if (!flow) return;
+  flowKey.value = flow;
+  showWelcome.value = false;
+  stepIndex.value = 0;
+  isActive.value = true;
+}
+
 function nextStep() {
   if (stepIndex.value >= steps.value.length - 1) {
     finishTour();
@@ -115,6 +123,20 @@ function skipTour() {
   markSeen(flowKey.value);
 }
 
+function handleExternalStart(event) {
+  const requestedFlow =
+    event?.detail?.flow || flowMap[route.name] || flowKey.value;
+  openTour(requestedFlow);
+}
+
+onMounted(() => {
+  window.addEventListener("fenius:start-tour", handleExternalStart);
+});
+
+onUnmounted(() => {
+  window.removeEventListener("fenius:start-tour", handleExternalStart);
+});
+
 watch(
   () => route.name,
   (routeName) => {
@@ -125,7 +147,7 @@ watch(
     if (!nextFlow) return;
 
     setTimeout(() => {
-      if (!hasSeen(nextFlow)) {
+      if (!isActive.value && !showWelcome.value && !hasSeen(nextFlow)) {
         showWelcome.value = true;
       }
     }, 450);
