@@ -30,7 +30,7 @@
           <h3>
             Mode
             <span class="help-icon" title="Choose your interaction mode">
-              <span class="tooltip">Draw: Add lines/prickings by clicking rulers or using forms. Erase: Click features to delete them. Select: Click features to view/edit properties.</span>
+              <span class="tooltip">Draw: Add lines/prickings by clicking rulers or using forms. Erase: Drag a rectangular eraser over features or erase a coordinate-defined area. Select: Click features to view/edit properties.</span>
             </span>
           </h3>
           <div class="mode-buttons">
@@ -48,6 +48,49 @@
           <p class="hint">
             Click on rulers to add lines, inside the page to add prickings.
           </p>
+        </section>
+
+        <section class="panel">
+          <h3>
+            Eraser
+            <span class="help-icon" title="Erase features with a rectangular tool">
+              <span class="tooltip">In Erase mode, drag the rectangular eraser over the page. Lines will be split where the eraser passes through them. You can also erase a fixed area by entering coordinates below.</span>
+            </span>
+          </h3>
+          <div class="field-row two">
+            <div>
+              <label class="field-label">width (cm)</label>
+              <input type="number" min="0.1" step="0.1" v-model.number="eraserWidthCm" class="number-input" />
+            </div>
+            <div>
+              <label class="field-label">height (cm)</label>
+              <input type="number" min="0.1" step="0.1" v-model.number="eraserHeightCm" class="number-input" />
+            </div>
+          </div>
+
+          <h4>Erase area</h4>
+          <div class="field-row two">
+            <div>
+              <label class="field-label">x (cm)</label>
+              <input type="number" step="0.1" v-model.number="eraseAreaX" class="number-input" />
+            </div>
+            <div>
+              <label class="field-label">y (cm)</label>
+              <input type="number" step="0.1" v-model.number="eraseAreaY" class="number-input" />
+            </div>
+          </div>
+          <div class="field-row two">
+            <div>
+              <label class="field-label">width (cm)</label>
+              <input type="number" min="0.1" step="0.1" v-model.number="eraseAreaWidth" class="number-input" />
+            </div>
+            <div>
+              <label class="field-label">height (cm)</label>
+              <input type="number" min="0.1" step="0.1" v-model.number="eraseAreaHeight" class="number-input" />
+            </div>
+          </div>
+          <button class="small-btn" @click="eraseByCoordinates">Erase area</button>
+          <p class="hint">The on-screen eraser is centered on the mouse. The manual area uses the top-left corner and size.</p>
         </section>
 
         <!-- Lines -->
@@ -110,45 +153,14 @@
               <input type="number" step="0.1" v-model.number="end_y2" class="number-input" />
             </div>
           </div>
+          <div class="field-row one">
+            <div>
+              <label class="field-label">spacing (cm)</label>
+              <input type="number" min="0.1" step="0.1" v-model.number="line_spacing2" class="number-input" />
+            </div>
+          </div>
           <button class="small-btn" @click="addMultipleLines">Add series</button>
-        </section>
-
-        <!-- Circles -->
-        <section class="panel">
-          <h3>
-            Circles/Ovals
-            <span class="help-icon" title="Mark compass impressions">
-              <span class="tooltip">Draw circles or ovals to mark compass impressions. Equal radii create a circle, different radii create an oval.</span>
-            </span>
-          </h3>
-          <h4>
-            Single circle
-            <span class="help-icon" title="Draw a circle or oval">
-              <span class="tooltip">Enter center position (x, y) and radii. Use equal rx and ry for a perfect circle, or different values for an oval.</span>
-            </span>
-          </h4>
-          <div class="field-row two">
-            <div>
-              <label class="field-label">center x (cm)</label>
-              <input type="number" step="0.1" v-model.number="circle_x" class="number-input" />
-            </div>
-            <div>
-              <label class="field-label">center y (cm)</label>
-              <input type="number" step="0.1" v-model.number="circle_y" class="number-input" />
-            </div>
-          </div>
-          <div class="field-row two">
-            <div>
-              <label class="field-label">radius x (cm)</label>
-              <input type="number" step="0.1" v-model.number="circle_rx" class="number-input" />
-            </div>
-            <div>
-              <label class="field-label">radius y (cm)</label>
-              <input type="number" step="0.1" v-model.number="circle_ry" class="number-input" />
-            </div>
-          </div>
-          <button class="small-btn" @click="addSingleCircle">Add circle</button>
-          <p class="hint">Equal radii = circle, different = oval</p>
+          <p class="hint">Set either an end y range or an explicit spacing. Existing lines can still be adjusted individually in Select mode.</p>
         </section>
 
         <!-- Prickings -->
@@ -211,6 +223,50 @@
           </div>
           <button class="small-btn" @click="addMultiplePrickings">Add group</button>
         </section>
+
+        <!-- Circles -->
+        <section class="panel">
+          <h3>
+            Circles/Ovals
+            <span class="help-icon" title="Mark compass impressions">
+              <span class="tooltip">Draw circles or ovals to mark compass impressions. Equal radii create a circle, different radii create an oval.</span>
+            </span>
+          </h3>
+          <h4>
+            Single circle
+            <span class="help-icon" title="Draw a circle or oval">
+              <span class="tooltip">Enter center position, radii, and optional rotation. After adding, use Select mode to drag the center or axis handles on the canvas.</span>
+            </span>
+          </h4>
+          <div class="field-row two">
+            <div>
+              <label class="field-label">center x (cm)</label>
+              <input type="number" step="0.1" v-model.number="circle_x" class="number-input" />
+            </div>
+            <div>
+              <label class="field-label">center y (cm)</label>
+              <input type="number" step="0.1" v-model.number="circle_y" class="number-input" />
+            </div>
+          </div>
+          <div class="field-row two">
+            <div>
+              <label class="field-label">radius x (cm)</label>
+              <input type="number" step="0.1" v-model.number="circle_rx" class="number-input" />
+            </div>
+            <div>
+              <label class="field-label">radius y (cm)</label>
+              <input type="number" step="0.1" v-model.number="circle_ry" class="number-input" />
+            </div>
+          </div>
+          <div class="field-row one">
+            <div>
+              <label class="field-label">rotation (°)</label>
+              <input type="number" step="1" v-model.number="circle_angle" class="number-input" />
+            </div>
+          </div>
+          <button class="small-btn" @click="addSingleCircle">Add circle</button>
+          <p class="hint">Equal radii = circle, different = oval. Rotate after adding with Select mode.</p>
+        </section>
       </aside>
 
       <!-- CENTER: canvas -->
@@ -253,14 +309,17 @@
 
         <div
           class="canvas-wrap"
+          :class="{ 'erase-mode': mode === 'erase' }"
           ref="canvasWrap"
           :style="{
             transform: `scale(${zoom})`,
             width: baseWidthPxPlusGutter + 'px',
             height: baseHeightPxPlusGutter + 'px'
           }"
-          @mousemove="moveGuides"
-          @mouseleave="hideGuides"
+          @mousemove="handleCanvasMouseMove"
+          @mouseleave="handleCanvasMouseLeave"
+          @mousedown="handleCanvasMouseDown"
+          @mouseup="handleCanvasMouseUp"
           @click="handleCanvasClick"
         >
           <!-- Rulers -->
@@ -299,11 +358,17 @@
           <!-- Guides -->
           <div ref="hGuide" class="guide-h"></div>
           <div ref="vGuide" class="guide-v"></div>
+          <div
+            v-if="eraserCursor.visible"
+            class="eraser-cursor"
+            :style="eraserCursorStyle"
+          ></div>
         </div>
 
         <!-- Status bar -->
         <footer class="status-bar">
           <div>pos: {{ cursorCm.x.toFixed(2) }} cm, {{ cursorCm.y.toFixed(2) }} cm</div>
+          <div>snap: 1 mm</div>
           <div>zoom: {{ zoomPercent }}%</div>
           <div>lines: {{ lines.length }}</div>
           <div>prickings: {{ prickings.length }}</div>
@@ -395,7 +460,15 @@
                 type="color"
                 :value="selectedLine.customColor || getLineColor(selectedLine)"
                 @input="updateSelectedLineColor($event.target.value)"
+                @change="updateSelectedLineColor($event.target.value)"
                 class="color-input"
+              />
+              <input
+                type="text"
+                :value="selectedLine.customColor || getLineColor(selectedLine)"
+                @input="updateSelectedLineColor($event.target.value)"
+                class="field-input color-hex-input"
+                placeholder="#000000"
               />
               <button
                 v-if="selectedLine.customColor"
@@ -476,7 +549,15 @@
                 type="color"
                 :value="selectedPricking.customColor || getPrickingColor(selectedPricking)"
                 @input="updateSelectedPrickingColor($event.target.value)"
+                @change="updateSelectedPrickingColor($event.target.value)"
                 class="color-input"
+              />
+              <input
+                type="text"
+                :value="selectedPricking.customColor || getPrickingColor(selectedPricking)"
+                @input="updateSelectedPrickingColor($event.target.value)"
+                class="field-input color-hex-input"
+                placeholder="#000000"
               />
               <button
                 v-if="selectedPricking.customColor"
@@ -507,15 +588,68 @@
           <div v-else-if="selectedKind === 'circle' && selectedCircle">
             <label class="field-label">Center (cm)</label>
             <div class="field-row two">
-              <span>x: {{ selectedCircle.cx.toFixed(2) }}</span>
-              <span>y: {{ selectedCircle.cy.toFixed(2) }}</span>
+              <div>
+                <label class="field-label-small">x</label>
+                <input
+                  type="number"
+                  step="0.1"
+                  :value="selectedCircle.cx"
+                  @input="updateSelectedCircleCoord('cx', $event.target.value)"
+                  class="number-input"
+                />
+              </div>
+              <div>
+                <label class="field-label-small">y</label>
+                <input
+                  type="number"
+                  step="0.1"
+                  :value="selectedCircle.cy"
+                  @input="updateSelectedCircleCoord('cy', $event.target.value)"
+                  class="number-input"
+                />
+              </div>
             </div>
 
             <label class="field-label">Radius (cm)</label>
             <div class="field-row two">
-              <span>rx: {{ selectedCircle.rx.toFixed(2) }}</span>
-              <span>ry: {{ selectedCircle.ry.toFixed(2) }}</span>
+              <div>
+                <label class="field-label-small">rx</label>
+                <input
+                  type="number"
+                  min="0.1"
+                  step="0.1"
+                  :value="selectedCircle.rx"
+                  @input="updateSelectedCircleCoord('rx', $event.target.value)"
+                  class="number-input"
+                />
+              </div>
+              <div>
+                <label class="field-label-small">ry</label>
+                <input
+                  type="number"
+                  min="0.1"
+                  step="0.1"
+                  :value="selectedCircle.ry"
+                  @input="updateSelectedCircleCoord('ry', $event.target.value)"
+                  class="number-input"
+                />
+              </div>
             </div>
+
+            <label class="field-label">Rotation</label>
+            <div class="field-row one">
+              <div>
+                <label class="field-label-small">angle (°)</label>
+                <input
+                  type="number"
+                  step="1"
+                  :value="selectedCircle.angle || 0"
+                  @input="updateSelectedCircleAngle($event.target.value)"
+                  class="number-input"
+                />
+              </div>
+            </div>
+            <p class="hint">Drag the teal center handle to move, the pink handle to rotate/resize the long axis, and the blue handle to resize the short axis.</p>
 
             <label class="field-inline">
               <input
@@ -557,7 +691,19 @@
         <!-- Image -->
         <section class="panel">
           <h3>Image</h3>
-          <input type="file" accept="image/*" @change="handleImageUpload" class="file-input" />
+          <div class="file-input-row">
+            <button type="button" class="file-select-btn" @click="openImagePicker">Choose file</button>
+            <span class="file-name" :title="selectedImageName || 'No file chosen'">
+              {{ selectedImageName || "No file chosen" }}
+            </span>
+          </div>
+          <input
+            ref="imageFileInput"
+            type="file"
+            accept="image/*"
+            @change="handleImageUpload"
+            class="file-input"
+          />
           <div class="btn-row">
             <button @click="removeBackground" :disabled="!bgImage">Remove</button>
             <button @click="fitToWidth" :disabled="!bgImage">Fit to width</button>
@@ -649,6 +795,14 @@
             <input type="checkbox" v-model="includeImageInImage" />
             include image in PNG/TIFF
           </label>
+          <label class="field-inline">
+            <input type="checkbox" v-model="includeRulingGridInExport" />
+            include ruling grid/rulers in export
+          </label>
+          <label class="field-inline">
+            <input type="checkbox" v-model="includeIntersectionMeasurementsInExport" />
+            include intersection measurements in export
+          </label>
         </div>
 
         <div class="export-buttons">
@@ -701,9 +855,10 @@ const PX_PER_CM = 37.8;
 const SCALE_FACTOR = 0.6; // slightly larger base canvas
 const IMAGE_DPI_SCALE = 2; // Higher resolution for image quality
 const AUTOSAVE_KEY = "feniusRulingAutosave";
+const MILLIMETRE_STEP_CM = 0.1;
 
 const clamp = (v, lo, hi) => Math.max(lo, Math.min(hi, v));
-const snapVal = (v, step) => Math.round(v / step) * step;
+const snapVal = (v, step) => Number((Math.round(v / step) * step).toFixed(4));
 
 let lineIdCounter = 1;
 let prickingIdCounter = 1;
@@ -717,6 +872,7 @@ function makeLine(data) {
     x2: data.x2,
     y2: data.y2,
     role: data.role || "other",
+    customColor: data.customColor || "",
     hypothetical: !!data.hypothetical,
     note: data.note || "",
   };
@@ -729,6 +885,7 @@ function makePricking(data) {
     y: data.y,
     role: data.role || "other",
     prickingType: data.prickingType || "pierced",
+    customColor: data.customColor || "",
     hypothetical: !!data.hypothetical,
     note: data.note || "",
   };
@@ -741,6 +898,8 @@ function makeCircle(data) {
     cy: data.cy,
     rx: data.rx,
     ry: data.ry,
+    angle: Number.isFinite(data.angle) ? data.angle : 0,
+    customColor: data.customColor || "",
     hypothetical: !!data.hypothetical,
     note: data.note || "",
   };
@@ -785,7 +944,7 @@ function getPrickingColor(pricking) {
 const zoom = ref(1);
 const zoomPercent = computed(() => Math.round(zoom.value * 100));
 
-const snapStepCm = ref(0.1);
+const snapStepCm = ref(MILLIMETRE_STEP_CM);
 const showIntersectionMeasurements = ref(false);
 const showImage = ref(false);
 const imageOpacity = ref(0.6);
@@ -804,8 +963,8 @@ const modeLabel = computed(() => {
 });
 
 const directionLabel = computed(() => {
-  if (direction.value === ">") return "> applied from above";
-  if (direction.value === "<") return "< applied from below";
+  if (direction.value === ">") return "> applied from recto";
+  if (direction.value === "<") return "< applied from verso";
   return direction.value;
 });
 
@@ -869,6 +1028,7 @@ const start_x2 = ref(0);
 const end_x2 = ref(0);
 const start_y2 = ref(0);
 const end_y2 = ref(0);
+const line_spacing2 = ref(null);
 const number = ref(2);
 
 const hor = ref(0);
@@ -881,11 +1041,20 @@ const number2 = ref(2);
 /* Pricking type */
 const prickingType = ref("pierced");
 
+/* Eraser controls */
+const eraserWidthCm = ref(0.5);
+const eraserHeightCm = ref(0.5);
+const eraseAreaX = ref(0);
+const eraseAreaY = ref(0);
+const eraseAreaWidth = ref(0.5);
+const eraseAreaHeight = ref(0.5);
+
 /* Circle form fields */
 const circle_x = ref(null);
 const circle_y = ref(null);
 const circle_rx = ref(null);
 const circle_ry = ref(null);
+const circle_angle = ref(0);
 
 /* Ghost previews for forms */
 const ghostSingleLine = ref(null);
@@ -893,6 +1062,11 @@ const ghostSingleCircle = ref(null);
 const ghostMultiLines = ref([]);
 const ghostSinglePricking = ref(null);
 const ghostMultiPrickings = ref([]);
+const showGhostSingleLine = ref(false);
+const showGhostSingleCircle = ref(false);
+const showGhostMultiLines = ref(false);
+const showGhostSinglePricking = ref(false);
+const showGhostMultiPrickings = ref(false);
 
 /* Undo / redo */
 const undoStack = ref([]);
@@ -904,6 +1078,8 @@ const canRedo = computed(() => redoStack.value.length > 0);
 const includeImageInPdf = ref(true);
 const includeNotesInPdf = ref(true);
 const includeImageInImage = ref(true);
+const includeRulingGridInExport = ref(true);
+const includeIntersectionMeasurementsInExport = ref(true);
 const showExportModal = ref(false);
 
 /* Canvas refs / geometry */
@@ -913,6 +1089,8 @@ const bg = ref(null);
 const draw = ref(null);
 const hGuide = ref(null);
 const vGuide = ref(null);
+const imageFileInput = ref(null);
+const selectedImageName = ref("");
 
 const baseWidthPx = computed(() => Math.round(PAGE_BASE_WIDTH_CM * PX_PER_CM * SCALE_FACTOR));
 const baseHeightPx = computed(() =>
@@ -929,6 +1107,18 @@ const cmToPxX = (x) => (x / widthCm.value) * baseWidthPx.value;
 const cmToPxY = (y) => (y / heightCm.value) * baseHeightPx.value;
 const pxToCmX = (px) => (px / baseWidthPx.value) * widthCm.value;
 const pxToCmY = (px) => (px / baseHeightPx.value) * heightCm.value;
+const CIRCLE_HANDLE_RADIUS_PX = 7;
+
+const activeCircleDrag = ref(null);
+const activeEraseDrag = ref({ active: false, hasSnapshot: false });
+const suppressCanvasClick = ref(false);
+const eraserCursor = ref({ visible: false, leftPx: 15, topPx: 15 });
+const eraserCursorStyle = computed(() => ({
+  left: `${eraserCursor.value.leftPx}px`,
+  top: `${eraserCursor.value.topPx}px`,
+  width: `${cmToPxX(Math.max(0.1, eraserWidthCm.value))}px`,
+  height: `${cmToPxY(Math.max(0.1, eraserHeightCm.value))}px`,
+}));
 
 /* -------- Drawing -------- */
 function drawRulers() {
@@ -948,51 +1138,57 @@ function drawRulers() {
   ctx.rect(15, 15, baseWidthPx.value, baseHeightPx.value);
   ctx.stroke();
 
-  ctx.font = "10px Arial";
+  ctx.font = "9px Arial";
+  ctx.textBaseline = "middle";
+
+  const drawTick = (x1, y1, x2, y2, color, width = 1) => {
+    ctx.save();
+    ctx.strokeStyle = color;
+    ctx.lineWidth = width;
+    ctx.beginPath();
+    ctx.moveTo(x1, y1);
+    ctx.lineTo(x2, y2);
+    ctx.stroke();
+    ctx.restore();
+  };
+
+  const widthMm = Math.round(widthCm.value * 10);
+  for (let mm = 0; mm <= widthMm; mm++) {
+    const cm = mm / 10;
+    const xPos = 15 + cmToPxX(cm);
+    if (mm % 10 === 0) {
+      drawTick(xPos, 3, xPos, 14, "#ffffff", 1);
+    } else if (mm % 5 === 0) {
+      drawTick(xPos, 6, xPos, 14, "rgba(255, 255, 255, 0.9)", 1);
+    } else {
+      drawTick(xPos, 10, xPos, 14, "rgba(255, 255, 255, 0.6)", 0.75);
+    }
+  }
+
   ctx.fillStyle = "#ffffff";
-
-  const stepPx = Math.round(PX_PER_CM * SCALE_FACTOR);
-  const fiveStepPx = stepPx * 5;
-
-  // top ruler with 5cm markers
-  ctx.beginPath();
-  // Draw 1cm ticks
-  for (let cm = 0; cm <= widthCm.value; cm += 1) {
+  for (let cm = 0; cm <= Math.floor(widthCm.value + 0.0001); cm += 1) {
     const xPos = 15 + cmToPxX(cm);
-    ctx.moveTo(xPos, 7);
-    ctx.lineTo(xPos, 14);
+    ctx.fillText(String(cm), xPos + 2, 7);
   }
-  ctx.stroke();
 
-  // Draw 5cm ticks and labels
-  ctx.beginPath();
-  for (let cm = 0; cm <= widthCm.value; cm += 5) {
-    const xPos = 15 + cmToPxX(cm);
-    ctx.moveTo(xPos, 0);
-    ctx.lineTo(xPos, 14);
-    ctx.fillText(String(cm), xPos + 2, 10);
-  }
-  ctx.stroke();
-
-  // left ruler with 5cm markers
-  ctx.beginPath();
-  // Draw 1cm ticks
-  for (let cm = 0; cm <= heightCm.value; cm += 1) {
+  const heightMm = Math.round(heightCm.value * 10);
+  for (let mm = 0; mm <= heightMm; mm++) {
+    const cm = mm / 10;
     const yPos = 15 + cmToPxY(cm);
-    ctx.moveTo(7, yPos);
-    ctx.lineTo(14, yPos);
+    if (mm % 10 === 0) {
+      drawTick(3, yPos, 14, yPos, "#ffffff", 1);
+    } else if (mm % 5 === 0) {
+      drawTick(6, yPos, 14, yPos, "rgba(255, 255, 255, 0.9)", 1);
+    } else {
+      drawTick(10, yPos, 14, yPos, "rgba(255, 255, 255, 0.6)", 0.75);
+    }
   }
-  ctx.stroke();
 
-  // Draw 5cm ticks and labels
-  ctx.beginPath();
-  for (let cm = 0; cm <= heightCm.value; cm += 5) {
+  ctx.fillStyle = "#ffffff";
+  for (let cm = 0; cm <= Math.floor(heightCm.value + 0.0001); cm += 1) {
     const yPos = 15 + cmToPxY(cm);
-    ctx.moveTo(0, yPos);
-    ctx.lineTo(14, yPos);
-    ctx.fillText(String(cm), 2, yPos + 10);
+    ctx.fillText(String(cm), 2, yPos + 1);
   }
-  ctx.stroke();
 }
 
 function drawBackground() {
@@ -1111,12 +1307,44 @@ function drawShapes() {
       cmToPxY(C.cy),
       cmToPxX(C.rx),
       cmToPxY(C.ry),
-      0,
+      getCircleAngleRad(C),
       0,
       2 * Math.PI
     );
     ctx.stroke();
     ctx.restore();
+  }
+
+  if (selectedCircle.value) {
+    const handles = getCircleHandlePositionsPx(selectedCircle.value);
+
+    ctx.save();
+    ctx.setLineDash([5, 4]);
+    ctx.lineWidth = 1;
+    ctx.strokeStyle = "rgba(255, 255, 255, 0.55)";
+    ctx.beginPath();
+    ctx.moveTo(handles.center.x, handles.center.y);
+    ctx.lineTo(handles.major.x, handles.major.y);
+    ctx.moveTo(handles.center.x, handles.center.y);
+    ctx.lineTo(handles.minor.x, handles.minor.y);
+    ctx.stroke();
+    ctx.restore();
+
+    const drawHandle = (point, color) => {
+      ctx.save();
+      ctx.fillStyle = color;
+      ctx.strokeStyle = "#ffffff";
+      ctx.lineWidth = 1.5;
+      ctx.beginPath();
+      ctx.arc(point.x, point.y, CIRCLE_HANDLE_RADIUS_PX, 0, 2 * Math.PI);
+      ctx.fill();
+      ctx.stroke();
+      ctx.restore();
+    };
+
+    drawHandle(handles.center, "#00ffd5");
+    drawHandle(handles.major, "#ff0088");
+    drawHandle(handles.minor, "#38bdf8");
   }
 
   // ----- Ghost previews -----
@@ -1125,18 +1353,20 @@ function drawShapes() {
   ctx.setLineDash([4, 4]);
   ctx.globalAlpha = 0.6;
   ctx.strokeStyle = "#9ca3af";
-  if (ghostSingleLine.value) {
+  if (showGhostSingleLine.value && ghostSingleLine.value) {
     const L = ghostSingleLine.value;
     ctx.beginPath();
     ctx.moveTo(cmToPxX(L.x1), cmToPxY(L.y1));
     ctx.lineTo(cmToPxX(L.x2), cmToPxY(L.y2));
     ctx.stroke();
   }
-  for (const L of ghostMultiLines.value) {
-    ctx.beginPath();
-    ctx.moveTo(cmToPxX(L.x1), cmToPxY(L.y1));
-    ctx.lineTo(cmToPxX(L.x2), cmToPxY(L.y2));
-    ctx.stroke();
+  if (showGhostMultiLines.value) {
+    for (const L of ghostMultiLines.value) {
+      ctx.beginPath();
+      ctx.moveTo(cmToPxX(L.x1), cmToPxY(L.y1));
+      ctx.lineTo(cmToPxX(L.x2), cmToPxY(L.y2));
+      ctx.stroke();
+    }
   }
   ctx.restore();
 
@@ -1146,7 +1376,7 @@ function drawShapes() {
   ctx.fillStyle = "#9ca3af";
   ctx.strokeStyle = "#9ca3af";
   ctx.lineWidth = 2;
-  if (ghostSinglePricking.value) {
+  if (showGhostSinglePricking.value && ghostSinglePricking.value) {
     const P = ghostSinglePricking.value;
     const px = cmToPxX(P.x);
     const py = cmToPxY(P.y);
@@ -1163,20 +1393,22 @@ function drawShapes() {
       ctx.fillRect(px - 3, py - 1, 6, 2);
     }
   }
-  for (const P of ghostMultiPrickings.value) {
-    const px = cmToPxX(P.x);
-    const py = cmToPxY(P.y);
-    if (prickingType.value === 'slit') {
-      ctx.beginPath();
-      ctx.moveTo(px, py - 4);
-      ctx.lineTo(px, py + 4);
-      ctx.stroke();
-    } else if (prickingType.value === 'pierced') {
-      ctx.beginPath();
-      ctx.arc(px, py, 3, 0, 2 * Math.PI);
-      ctx.fill();
-    } else {
-      ctx.fillRect(px - 3, py - 1, 6, 2);
+  if (showGhostMultiPrickings.value) {
+    for (const P of ghostMultiPrickings.value) {
+      const px = cmToPxX(P.x);
+      const py = cmToPxY(P.y);
+      if (prickingType.value === 'slit') {
+        ctx.beginPath();
+        ctx.moveTo(px, py - 4);
+        ctx.lineTo(px, py + 4);
+        ctx.stroke();
+      } else if (prickingType.value === 'pierced') {
+        ctx.beginPath();
+        ctx.arc(px, py, 3, 0, 2 * Math.PI);
+        ctx.fill();
+      } else {
+        ctx.fillRect(px - 3, py - 1, 6, 2);
+      }
     }
   }
   ctx.restore();
@@ -1187,7 +1419,7 @@ function drawShapes() {
   ctx.globalAlpha = 0.6;
   ctx.strokeStyle = "#9ca3af";
   ctx.lineWidth = 1.5;
-  if (ghostSingleCircle.value) {
+  if (showGhostSingleCircle.value && ghostSingleCircle.value) {
     const C = ghostSingleCircle.value;
     ctx.beginPath();
     ctx.ellipse(
@@ -1195,7 +1427,7 @@ function drawShapes() {
       cmToPxY(C.cy),
       cmToPxX(C.rx),
       cmToPxY(C.ry),
-      0,
+      getCircleAngleRad(C),
       0,
       2 * Math.PI
     );
@@ -1220,10 +1452,8 @@ function drawShapes() {
       ctx.fillStyle = "#ff0000";
       ctx.fill();
       
-      // Draw measurement text with white outline
+      // Draw measurement text
       const text = `(${point.x.toFixed(2)}, ${point.y.toFixed(2)})`;
-      ctx.strokeStyle = "#ffffff";
-      ctx.strokeText(text, px + 6, py - 6);
       ctx.fillStyle = "#ff0000";
       ctx.fillText(text, px + 6, py - 6);
     });
@@ -1268,7 +1498,7 @@ function redo() {
 }
 
 function clearAll() {
-  if (!confirm('Clear all lines and prickings? This cannot be undone.')) return;
+  if (!confirm('Clear all lines, prickings, and circles/ovals? This cannot be undone.')) return;
   lines.value = [];
   prickings.value = [];
   circles.value = [];
@@ -1283,6 +1513,9 @@ function clearAll() {
 /* -------- Modes & mouse helpers -------- */
 function setMode(m) {
   mode.value = m;
+  activeEraseDrag.value = { active: false, hasSnapshot: false };
+  activeCircleDrag.value = null;
+  hideGuides();
 }
 
 function clearSelection() {
@@ -1308,6 +1541,22 @@ function moveGuides(e) {
   if (!pos) return;
   const x = pos.x;
   const y = pos.y;
+  const xPagePx = clamp(x - 15, 0, baseWidthPx.value);
+  const yPagePx = clamp(y - 15, 0, baseHeightPx.value);
+  const rawXcm = pxToCmX(xPagePx);
+  const rawYcm = pxToCmY(yPagePx);
+  const snappedXcm = snapPoint(rawXcm);
+  const snappedYcm = snapPoint(rawYcm);
+  const snapDisplay = mode.value === "draw";
+
+  if (mode.value === "erase") {
+    hideGuides();
+    updateEraserCursor(pos);
+    cursorCm.value = { x: rawXcm, y: rawYcm };
+    return;
+  }
+
+  eraserCursor.value.visible = false;
 
   const hEl = hGuide.value;
   const vEl = vGuide.value;
@@ -1316,7 +1565,7 @@ function moveGuides(e) {
   if (y > 15 && y < 15 + baseHeightPx.value) {
     hEl.style.display = "block";
     hEl.style.width = baseWidthPx.value + "px";
-    hEl.style.top = y + "px";
+    hEl.style.top = `${15 + cmToPxY(snapDisplay ? snappedYcm : rawYcm)}px`;
     hEl.style.left = "15px";
   } else {
     hEl.style.display = "none";
@@ -1325,25 +1574,402 @@ function moveGuides(e) {
   if (x > 15 && x < 15 + baseWidthPx.value) {
     vEl.style.display = "block";
     vEl.style.height = baseHeightPx.value + "px";
-    vEl.style.left = x + "px";
+    vEl.style.left = `${15 + cmToPxX(snapDisplay ? snappedXcm : rawXcm)}px`;
     vEl.style.top = "15px";
   } else {
     vEl.style.display = "none";
   }
 
-  const xPagePx = clamp(x - 15, 0, baseWidthPx.value);
-  const yPagePx = clamp(y - 15, 0, baseHeightPx.value);
-  cursorCm.value = { x: pxToCmX(xPagePx), y: pxToCmY(yPagePx) };
+  cursorCm.value = {
+    x: snapDisplay ? snappedXcm : rawXcm,
+    y: snapDisplay ? snappedYcm : rawYcm,
+  };
 }
 
 function hideGuides() {
   if (hGuide.value) hGuide.value.style.display = "none";
   if (vGuide.value) vGuide.value.style.display = "none";
+  eraserCursor.value.visible = false;
+}
+
+function updateEraserCursor(pos) {
+  if (mode.value !== "erase" || !insidePage(pos.x, pos.y)) {
+    eraserCursor.value.visible = false;
+    return;
+  }
+
+  const widthPx = cmToPxX(Math.max(0.1, eraserWidthCm.value));
+  const heightPx = cmToPxY(Math.max(0.1, eraserHeightCm.value));
+  const minLeft = 15;
+  const maxLeft = 15 + baseWidthPx.value - widthPx;
+  const minTop = 15;
+  const maxTop = 15 + baseHeightPx.value - heightPx;
+
+  eraserCursor.value = {
+    visible: true,
+    leftPx: clamp(pos.x - widthPx / 2, minLeft, Math.max(minLeft, maxLeft)),
+    topPx: clamp(pos.y - heightPx / 2, minTop, Math.max(minTop, maxTop)),
+  };
+}
+
+function pointInRect(x, y, rect) {
+  return x >= rect.xMin && x <= rect.xMax && y >= rect.yMin && y <= rect.yMax;
+}
+
+function getCenteredEraseRect(xCm, yCm) {
+  const halfW = Math.max(0.1, eraserWidthCm.value) / 2;
+  const halfH = Math.max(0.1, eraserHeightCm.value) / 2;
+  return {
+    xMin: clamp(xCm - halfW, 0, widthCm.value),
+    xMax: clamp(xCm + halfW, 0, widthCm.value),
+    yMin: clamp(yCm - halfH, 0, heightCm.value),
+    yMax: clamp(yCm + halfH, 0, heightCm.value),
+  };
+}
+
+function getManualEraseRect() {
+  const w = Math.max(0.1, eraseAreaWidth.value || 0.1);
+  const h = Math.max(0.1, eraseAreaHeight.value || 0.1);
+  return {
+    xMin: clamp(eraseAreaX.value, 0, widthCm.value),
+    xMax: clamp(eraseAreaX.value + w, 0, widthCm.value),
+    yMin: clamp(eraseAreaY.value, 0, heightCm.value),
+    yMax: clamp(eraseAreaY.value + h, 0, heightCm.value),
+  };
+}
+
+function sampleRotatedEllipsePoints(circle, steps = 48) {
+  const theta = getCircleAngleRad(circle);
+  const points = [{ x: circle.cx, y: circle.cy }];
+  for (let i = 0; i < steps; i++) {
+    const t = (i / steps) * 2 * Math.PI;
+    const localX = circle.rx * Math.cos(t);
+    const localY = circle.ry * Math.sin(t);
+    points.push({
+      x: circle.cx + localX * Math.cos(theta) - localY * Math.sin(theta),
+      y: circle.cy + localX * Math.sin(theta) + localY * Math.cos(theta),
+    });
+  }
+  return points;
+}
+
+function circleIntersectsRect(circle, rect) {
+  if (
+    pointInRect(circle.cx, circle.cy, rect) ||
+    pointInsideEllipse(rect.xMin, rect.yMin, circle) ||
+    pointInsideEllipse(rect.xMax, rect.yMin, circle) ||
+    pointInsideEllipse(rect.xMin, rect.yMax, circle) ||
+    pointInsideEllipse(rect.xMax, rect.yMax, circle)
+  ) {
+    return true;
+  }
+
+  return sampleRotatedEllipsePoints(circle).some((point) => pointInRect(point.x, point.y, rect));
+}
+
+function interpolateLinePoint(line, t) {
+  return {
+    x: line.x1 + (line.x2 - line.x1) * t,
+    y: line.y1 + (line.y2 - line.y1) * t,
+  };
+}
+
+function createLineSegmentFromExisting(line, start, end) {
+  const next = makeLine({
+    x1: snapPoint(start.x),
+    y1: snapPoint(start.y),
+    x2: snapPoint(end.x),
+    y2: snapPoint(end.y),
+    role: line.role,
+    hypothetical: line.hypothetical,
+    note: line.note,
+  });
+  if (line.customColor) next.customColor = line.customColor;
+  return next;
+}
+
+function getLineRectIntersectionInterval(line, rect) {
+  const dx = line.x2 - line.x1;
+  const dy = line.y2 - line.y1;
+  let t0 = 0;
+  let t1 = 1;
+
+  const clip = (p, q) => {
+    if (Math.abs(p) < 1e-9) return q >= 0;
+    const r = q / p;
+    if (p < 0) {
+      if (r > t1) return false;
+      if (r > t0) t0 = r;
+    } else {
+      if (r < t0) return false;
+      if (r < t1) t1 = r;
+    }
+    return true;
+  };
+
+  if (
+    clip(-dx, line.x1 - rect.xMin) &&
+    clip(dx, rect.xMax - line.x1) &&
+    clip(-dy, line.y1 - rect.yMin) &&
+    clip(dy, rect.yMax - line.y1)
+  ) {
+    return { t0, t1 };
+  }
+  return null;
+}
+
+function eraseLineWithRect(line, rect) {
+  const interval = getLineRectIntersectionInterval(line, rect);
+  if (!interval) return [line];
+
+  const epsilon = 1e-4;
+  if (interval.t0 <= epsilon && interval.t1 >= 1 - epsilon) return [];
+
+  const segments = [];
+  if (interval.t0 > epsilon) {
+    segments.push(
+      createLineSegmentFromExisting(line, { x: line.x1, y: line.y1 }, interpolateLinePoint(line, interval.t0))
+    );
+  }
+  if (interval.t1 < 1 - epsilon) {
+    segments.push(
+      createLineSegmentFromExisting(line, interpolateLinePoint(line, interval.t1), { x: line.x2, y: line.y2 })
+    );
+  }
+  return segments.filter(
+    (segment) => Math.hypot(segment.x2 - segment.x1, segment.y2 - segment.y1) > epsilon
+  );
+}
+
+function eraseUsingRect(rect) {
+  const nextPrickings = prickings.value.filter((p) => !pointInRect(p.x, p.y, rect));
+  const nextCircles = circles.value.filter((c) => !circleIntersectsRect(c, rect));
+  const nextLines = lines.value.flatMap((line) => eraseLineWithRect(line, rect));
+
+  const changed =
+    nextPrickings.length !== prickings.value.length ||
+    nextCircles.length !== circles.value.length ||
+    nextLines.length !== lines.value.length ||
+    nextLines.some((line, idx) => {
+      const current = lines.value[idx];
+      return (
+        !current ||
+        line.x1 !== current.x1 ||
+        line.y1 !== current.y1 ||
+        line.x2 !== current.x2 ||
+        line.y2 !== current.y2
+      );
+    });
+
+  if (!changed) return false;
+
+  prickings.value = nextPrickings;
+  circles.value = nextCircles;
+  lines.value = nextLines;
+  selectedFeature.value = { kind: null, id: null };
+  redrawAll();
+  return true;
+}
+
+function eraseAtPoint(xCm, yCm, { snapshot = true } = {}) {
+  const rect = getCenteredEraseRect(xCm, yCm);
+  const hadChanges =
+    prickings.value.some((p) => pointInRect(p.x, p.y, rect)) ||
+    circles.value.some((c) => circleIntersectsRect(c, rect)) ||
+    lines.value.some((line) => eraseLineWithRect(line, rect).length !== 1 || eraseLineWithRect(line, rect)[0] !== line);
+
+  if (!hadChanges) return false;
+  if (snapshot) pushUndoSnapshot();
+  return eraseUsingRect(rect);
+}
+
+function eraseByCoordinates() {
+  const rect = getManualEraseRect();
+  const wouldChange =
+    prickings.value.some((p) => pointInRect(p.x, p.y, rect)) ||
+    circles.value.some((c) => circleIntersectsRect(c, rect)) ||
+    lines.value.some((line) => eraseLineWithRect(line, rect).length !== 1 || eraseLineWithRect(line, rect)[0] !== line);
+
+  if (!wouldChange) return;
+  pushUndoSnapshot();
+  eraseUsingRect(rect);
+}
+
+function getCircleHandleAtPosition(xPx, yPx, circle) {
+  const handles = getCircleHandlePositionsPx(circle);
+  const threshold = CIRCLE_HANDLE_RADIUS_PX + 4;
+  for (const [name, point] of Object.entries(handles)) {
+    if (Math.hypot(xPx - point.x, yPx - point.y) <= threshold) {
+      return name;
+    }
+  }
+  return null;
+}
+
+function updateDraggedCircle(pos) {
+  const drag = activeCircleDrag.value;
+  const circle = selectedCircle.value;
+  if (!drag || !circle || drag.circleId !== circle.id) return;
+
+  const xPagePx = clamp(pos.x - 15, 0, baseWidthPx.value);
+  const yPagePx = clamp(pos.y - 15, 0, baseHeightPx.value);
+  const xCm = pxToCmX(xPagePx);
+  const yCm = pxToCmY(yPagePx);
+
+  if (!drag.hasMoved) {
+    pushUndoSnapshot();
+    drag.hasMoved = true;
+  }
+
+  if (drag.handle === "center") {
+    circle.cx = snapPoint(xCm);
+    circle.cy = snapPoint(yCm);
+  } else if (drag.handle === "major") {
+    const dx = xCm - circle.cx;
+    const dy = yCm - circle.cy;
+    circle.rx = Math.max(snapStepCm.value, snapPoint(Math.hypot(dx, dy)));
+    circle.angle = normalizeAngleDeg((Math.atan2(dy, dx) * 180) / Math.PI);
+  } else if (drag.handle === "minor") {
+    const theta = getCircleAngleRad(circle);
+    const dx = xCm - circle.cx;
+    const dy = yCm - circle.cy;
+    const projection = dx * -Math.sin(theta) + dy * Math.cos(theta);
+    circle.ry = Math.max(snapStepCm.value, snapPoint(Math.abs(projection)));
+  }
+
+  suppressCanvasClick.value = true;
+  redrawAll();
+}
+
+function handleCanvasMouseDown(e) {
+  if (mode.value === "erase") {
+    const pos = toLocalCoords(e);
+    if (!pos || !insidePage(pos.x, pos.y)) return;
+    const xCm = pxToCmX(clamp(pos.x - 15, 0, baseWidthPx.value));
+    const yCm = pxToCmY(clamp(pos.y - 15, 0, baseHeightPx.value));
+    const changed = eraseAtPoint(xCm, yCm, { snapshot: true });
+    activeEraseDrag.value = { active: true, hasSnapshot: changed };
+    suppressCanvasClick.value = true;
+    e.preventDefault();
+    return;
+  }
+
+  if (mode.value !== "select" || !selectedCircle.value) return;
+  const pos = toLocalCoords(e);
+  if (!pos) return;
+
+  const handle = getCircleHandleAtPosition(pos.x, pos.y, selectedCircle.value);
+  if (!handle) return;
+
+  activeCircleDrag.value = {
+    circleId: selectedCircle.value.id,
+    handle,
+    hasMoved: false,
+  };
+  e.preventDefault();
+}
+
+function handleCanvasMouseMove(e) {
+  moveGuides(e);
+  const pos = toLocalCoords(e);
+  if (!pos) return;
+
+  if (mode.value === "erase" && activeEraseDrag.value.active && insidePage(pos.x, pos.y)) {
+    const xCm = pxToCmX(clamp(pos.x - 15, 0, baseWidthPx.value));
+    const yCm = pxToCmY(clamp(pos.y - 15, 0, baseHeightPx.value));
+    const changed = eraseAtPoint(xCm, yCm, { snapshot: !activeEraseDrag.value.hasSnapshot });
+    if (changed && !activeEraseDrag.value.hasSnapshot) {
+      activeEraseDrag.value = { active: true, hasSnapshot: true };
+    }
+    return;
+  }
+
+  if (!activeCircleDrag.value) return;
+  updateDraggedCircle(pos);
+}
+
+function handleCanvasMouseUp() {
+  activeEraseDrag.value = { active: false, hasSnapshot: false };
+  activeCircleDrag.value = null;
+}
+
+function handleCanvasMouseLeave() {
+  hideGuides();
+  activeEraseDrag.value = { active: false, hasSnapshot: false };
+  activeCircleDrag.value = null;
 }
 
 /* Snap & distance helpers */
 function snapPoint(cm) {
   return snapVal(cm, snapStepCm.value);
+}
+
+function normalizeAngleDeg(angle) {
+  let normalized = angle % 360;
+  if (normalized < 0) normalized += 360;
+  return normalized;
+}
+
+function normalizeHexColor(value) {
+  if (typeof value !== "string") return null;
+  const trimmed = value.trim();
+  if (!trimmed) return null;
+  if (/^#[0-9a-fA-F]{6}$/.test(trimmed)) return trimmed.toLowerCase();
+  if (/^[0-9a-fA-F]{6}$/.test(trimmed)) return `#${trimmed.toLowerCase()}`;
+  return null;
+}
+
+function getCircleAngleRad(circle) {
+  return ((circle.angle || 0) * Math.PI) / 180;
+}
+
+function getCircleLocalCoords(x, y, circle) {
+  const dx = x - circle.cx;
+  const dy = y - circle.cy;
+  const theta = -getCircleAngleRad(circle);
+  const cos = Math.cos(theta);
+  const sin = Math.sin(theta);
+  return {
+    x: dx * cos - dy * sin,
+    y: dx * sin + dy * cos,
+  };
+}
+
+function pointInsideEllipse(x, y, circle) {
+  if (circle.rx <= 0 || circle.ry <= 0) return false;
+  const local = getCircleLocalCoords(x, y, circle);
+  const norm =
+    (local.x * local.x) / (circle.rx * circle.rx) +
+    (local.y * local.y) / (circle.ry * circle.ry);
+  return norm <= 1;
+}
+
+function getCircleHandlePositionsCm(circle) {
+  const theta = getCircleAngleRad(circle);
+  return {
+    center: { x: circle.cx, y: circle.cy },
+    major: {
+      x: circle.cx + circle.rx * Math.cos(theta),
+      y: circle.cy + circle.rx * Math.sin(theta),
+    },
+    minor: {
+      x: circle.cx - circle.ry * Math.sin(theta),
+      y: circle.cy + circle.ry * Math.cos(theta),
+    },
+  };
+}
+
+function getCircleHandlePositionsPx(circle) {
+  const handles = getCircleHandlePositionsCm(circle);
+  const toPx = (point) => ({
+    x: 15 + cmToPxX(point.x),
+    y: 15 + cmToPxY(point.y),
+  });
+  return {
+    center: toPx(handles.center),
+    major: toPx(handles.major),
+    minor: toPx(handles.minor),
+  };
 }
 
 // Calculate intersection point between two line segments
@@ -1366,16 +1992,40 @@ function getLineIntersection(line1, line2) {
   return null;
 }
 
-// Get all intersection points from lines
+function addUniqueIntersection(intersections, seen, point) {
+  const key = `${point.x.toFixed(3)}|${point.y.toFixed(3)}`;
+  if (seen.has(key)) return;
+  seen.add(key);
+  intersections.push(point);
+}
+
+// Get all intersection points from lines and prickings on lines
 function getIntersections() {
   const intersections = [];
+  const seen = new Set();
   const linesArray = lines.value;
   
   for (let i = 0; i < linesArray.length; i++) {
     for (let j = i + 1; j < linesArray.length; j++) {
       const intersection = getLineIntersection(linesArray[i], linesArray[j]);
       if (intersection) {
-        intersections.push(intersection);
+        addUniqueIntersection(intersections, seen, {
+          x: snapPoint(intersection.x),
+          y: snapPoint(intersection.y),
+        });
+      }
+    }
+  }
+
+  const prickingThresholdCm = Math.max(MILLIMETRE_STEP_CM / 2, 0.03);
+  for (const pricking of prickings.value) {
+    for (const line of linesArray) {
+      if (pointToSegmentDist(pricking.x, pricking.y, line) <= prickingThresholdCm) {
+        addUniqueIntersection(intersections, seen, {
+          x: snapPoint(pricking.x),
+          y: snapPoint(pricking.y),
+        });
+        break;
       }
     }
   }
@@ -1400,24 +2050,21 @@ function pointToSegmentDist(x, y, L) {
 }
 
 function pointToEllipseDist(x, y, C) {
-  // Approximate distance from point to ellipse perimeter
-  const dx = x - C.cx;
-  const dy = y - C.cy;
-  const distFromCenter = Math.hypot(dx, dy);
-  
-  // Angle from center to point
-  const angle = Math.atan2(dy, dx);
-  
-  // Point on ellipse at this angle
-  const ex = C.cx + C.rx * Math.cos(angle);
-  const ey = C.cy + C.ry * Math.sin(angle);
-  
-  // Distance from point to ellipse perimeter
-  return Math.abs(distFromCenter - Math.hypot(ex - C.cx, ey - C.cy));
+  const local = getCircleLocalCoords(x, y, C);
+  const distFromCenter = Math.hypot(local.x, local.y);
+  const angle = Math.atan2(local.y, local.x);
+  const ex = C.rx * Math.cos(angle);
+  const ey = C.ry * Math.sin(angle);
+  return Math.abs(distFromCenter - Math.hypot(ex, ey));
 }
 
 /* -------- Canvas click -------- */
 function handleCanvasClick(e) {
+  if (suppressCanvasClick.value) {
+    suppressCanvasClick.value = false;
+    return;
+  }
+
   const pos = toLocalCoords(e);
   if (!pos) return;
   const x = pos.x;
@@ -1468,49 +2115,6 @@ function handleCanvasClick(e) {
 
   // Erase mode
   if (mode.value === "erase" && insidePage(x, y)) {
-    const threshCm = Math.max(widthCm.value, heightCm.value) * 0.03;
-    let removed = false;
-
-    // prickings first
-    let bestPr = { idx: -1, dist: threshCm };
-    prickings.value.forEach((p, idx) => {
-      const d = Math.hypot(p.x - xCm, p.y - yCm);
-      if (d < bestPr.dist) bestPr = { idx, dist: d };
-    });
-    if (bestPr.idx >= 0) {
-      pushUndoSnapshot();
-      prickings.value.splice(bestPr.idx, 1);
-      removed = true;
-    }
-
-    // lines
-    if (!removed) {
-      let bestLn = { idx: -1, dist: threshCm / 2 };
-      lines.value.forEach((L, idx) => {
-        const d = pointToSegmentDist(xCm, yCm, L);
-        if (d < bestLn.dist) bestLn = { idx, dist: d };
-      });
-      if (bestLn.idx >= 0) {
-        pushUndoSnapshot();
-        lines.value.splice(bestLn.idx, 1);
-        removed = true;
-      }
-    }
-
-    // circles
-    if (!removed) {
-      let bestCi = { idx: -1, dist: threshCm / 2 };
-      circles.value.forEach((C, idx) => {
-        const d = pointToEllipseDist(xCm, yCm, C);
-        if (d < bestCi.dist) bestCi = { idx, dist: d };
-      });
-      if (bestCi.idx >= 0) {
-        pushUndoSnapshot();
-        circles.value.splice(bestCi.idx, 1);
-        removed = true;
-      }
-    }
-    if (removed) redrawAll();
     return;
   }
 
@@ -1528,7 +2132,7 @@ function handleCanvasClick(e) {
       if (d < best.dist) best = { kind: "line", id: L.id, dist: d };
     }
     for (const C of circles.value) {
-      const d = pointToEllipseDist(xCm, yCm, C);
+      const d = pointInsideEllipse(xCm, yCm, C) ? 0 : pointToEllipseDist(xCm, yCm, C);
       if (d < best.dist) best = { kind: "circle", id: C.id, dist: d };
     }
 
@@ -1554,6 +2158,7 @@ function addSingleLine() {
       role: "text-horizontal",
     }),
   ];
+  showGhostSingleLine.value = false;
   ghostSingleLine.value = null;
   redrawAll();
 }
@@ -1561,8 +2166,13 @@ function addSingleLine() {
 function addMultipleLines() {
   const n = Math.max(1, Math.floor(number.value || 1));
   const y0 = start_y2.value;
+  const hasExplicitSpacing = Number.isFinite(line_spacing2.value) && line_spacing2.value > 0;
   const y1 = end_y2.value;
-  const step = n === 1 ? 0 : (y1 - y0) / (n - 1);
+  const step = hasExplicitSpacing
+    ? line_spacing2.value
+    : n === 1
+      ? 0
+      : (y1 - y0) / (n - 1);
   const newLines = [];
   for (let i = 0; i < n; i++) {
     const y = snapPoint(y0 + i * step);
@@ -1578,6 +2188,7 @@ function addMultipleLines() {
   }
   pushUndoSnapshot();
   lines.value = [...lines.value, ...newLines];
+  showGhostMultiLines.value = false;
   ghostMultiLines.value = [];
   redrawAll();
 }
@@ -1588,6 +2199,7 @@ function addSinglePricking() {
     ...prickings.value,
     makePricking({ x: snapPoint(hor.value), y: snapPoint(ver.value), role: "margin", prickingType: prickingType.value }),
   ];
+  showGhostSinglePricking.value = false;
   ghostSinglePricking.value = null;
   redrawAll();
 }
@@ -1604,6 +2216,7 @@ function addMultiplePrickings() {
   }
   pushUndoSnapshot();
   prickings.value = [...prickings.value, ...newPr];
+  showGhostMultiPrickings.value = false;
   ghostMultiPrickings.value = [];
   redrawAll();
 }
@@ -1617,8 +2230,10 @@ function addSingleCircle() {
       cy: snapPoint(circle_y.value),
       rx: snapPoint(circle_rx.value),
       ry: snapPoint(circle_ry.value),
+      angle: normalizeAngleDeg(Number(circle_angle.value) || 0),
     }),
   ];
+  showGhostSingleCircle.value = false;
   ghostSingleCircle.value = null;
   redrawAll();
 }
@@ -1639,22 +2254,30 @@ watch([start_x, start_y, end_x], () => {
       x2: snapPoint(x2),
       y2: snapPoint(y), // Use same y for both endpoints (horizontal line)
     };
+    showGhostSingleLine.value = true;
   } else {
     ghostSingleLine.value = null;
+    showGhostSingleLine.value = false;
   }
   redrawAll();
 });
 
-watch([start_x2, end_x2, start_y2, end_y2, number], () => {
+watch([start_x2, end_x2, start_y2, end_y2, line_spacing2, number], () => {
   const n = Math.max(1, Math.floor(number.value || 0));
   const y0 = start_y2.value;
   const y1 = end_y2.value;
-  if (!Number.isFinite(y0) || !Number.isFinite(y1) || !n) {
+  const hasExplicitSpacing = Number.isFinite(line_spacing2.value) && line_spacing2.value > 0;
+  if (!Number.isFinite(y0) || (!hasExplicitSpacing && !Number.isFinite(y1)) || !n) {
     ghostMultiLines.value = [];
+    showGhostMultiLines.value = false;
     redrawAll();
     return;
   }
-  const step = n === 1 ? 0 : (y1 - y0) / (n - 1);
+  const step = hasExplicitSpacing
+    ? line_spacing2.value
+    : n === 1
+      ? 0
+      : (y1 - y0) / (n - 1);
   const arr = [];
   for (let i = 0; i < n; i++) {
     const y = snapPoint(y0 + i * step);
@@ -1666,6 +2289,7 @@ watch([start_x2, end_x2, start_y2, end_y2, number], () => {
     });
   }
   ghostMultiLines.value = arr;
+  showGhostMultiLines.value = true;
   redrawAll();
 });
 
@@ -1674,8 +2298,10 @@ watch([hor, ver], () => {
   const y = ver.value;
   if (Number.isFinite(x) && Number.isFinite(y)) {
     ghostSinglePricking.value = { x: snapPoint(x), y: snapPoint(y) };
+    showGhostSinglePricking.value = true;
   } else {
     ghostSinglePricking.value = null;
+    showGhostSinglePricking.value = false;
   }
   redrawAll();
 });
@@ -1686,6 +2312,7 @@ watch([hor2, start_y3, end_y3, number2], () => {
   const y1 = end_y3.value;
   if (!Number.isFinite(y0) || !Number.isFinite(y1) || !n) {
     ghostMultiPrickings.value = [];
+    showGhostMultiPrickings.value = false;
     redrawAll();
     return;
   }
@@ -1696,10 +2323,11 @@ watch([hor2, start_y3, end_y3, number2], () => {
     arr.push({ x: snapPoint(hor2.value), y });
   }
   ghostMultiPrickings.value = arr;
+  showGhostMultiPrickings.value = true;
   redrawAll();
 });
 
-watch([circle_x, circle_y, circle_rx, circle_ry], () => {
+watch([circle_x, circle_y, circle_rx, circle_ry, circle_angle], () => {
   const cx = circle_x.value;
   const cy = circle_y.value;
   const rx = circle_rx.value;
@@ -1715,9 +2343,12 @@ watch([circle_x, circle_y, circle_rx, circle_ry], () => {
       cy: snapPoint(cy),
       rx: snapPoint(rx),
       ry: snapPoint(ry),
+      angle: normalizeAngleDeg(Number(circle_angle.value) || 0),
     };
+    showGhostSingleCircle.value = true;
   } else {
     ghostSingleCircle.value = null;
+    showGhostSingleCircle.value = false;
   }
   redrawAll();
 });
@@ -1802,14 +2433,16 @@ function updateSelectedLineRole(val) {
 function updateSelectedLineColor(val) {
   const l = selectedLine.value;
   if (l) {
-    l.customColor = val;
+    const normalized = normalizeHexColor(val);
+    if (!normalized) return;
+    l.customColor = normalized;
     redrawAll();
   }
 }
 function clearSelectedLineColor() {
   const l = selectedLine.value;
   if (l) {
-    delete l.customColor;
+    l.customColor = "";
     redrawAll();
   }
 }
@@ -1852,14 +2485,16 @@ function updateSelectedPrickingType(val) {
 function updateSelectedPrickingColor(val) {
   const p = selectedPricking.value;
   if (p) {
-    p.customColor = val;
+    const normalized = normalizeHexColor(val);
+    if (!normalized) return;
+    p.customColor = normalized;
     redrawAll();
   }
 }
 function clearSelectedPrickingColor() {
   const p = selectedPricking.value;
   if (p) {
-    delete p.customColor;
+    p.customColor = "";
     redrawAll();
   }
 }
@@ -1875,6 +2510,31 @@ function updateSelectedPrickingNote(val) {
   if (p) p.note = val;
 }
 
+function updateSelectedCircleCoord(coord, val) {
+  const c = selectedCircle.value;
+  if (!c) return;
+  const num = parseFloat(val);
+  if (!Number.isFinite(num)) return;
+
+  if (coord === "rx" || coord === "ry") {
+    c[coord] = Math.max(snapStepCm.value, num);
+  } else if (coord === "cx") {
+    c.cx = clamp(num, 0, widthCm.value);
+  } else if (coord === "cy") {
+    c.cy = clamp(num, 0, heightCm.value);
+  }
+  redrawAll();
+}
+
+function updateSelectedCircleAngle(val) {
+  const c = selectedCircle.value;
+  if (!c) return;
+  const num = parseFloat(val);
+  if (!Number.isFinite(num)) return;
+  c.angle = normalizeAngleDeg(num);
+  redrawAll();
+}
+
 function updateSelectedCircleHypothetical(val) {
   const c = selectedCircle.value;
   if (c) {
@@ -1888,9 +2548,14 @@ function updateSelectedCircleNote(val) {
 }
 
 /* -------- Image handling -------- */
+function openImagePicker() {
+  imageFileInput.value?.click();
+}
+
 function handleImageUpload(e) {
   const file = e.target.files?.[0];
   if (!file) return;
+  selectedImageName.value = file.name;
   const reader = new FileReader();
   reader.onload = (ev) => {
     const img = new Image();
@@ -1905,6 +2570,8 @@ function handleImageUpload(e) {
 }
 function removeBackground() {
   bgImage.value = null;
+  selectedImageName.value = "";
+  if (imageFileInput.value) imageFileInput.value.value = "";
   redrawAll();
 }
 function fitToWidth() {
@@ -1977,7 +2644,7 @@ function restoreAutosave() {
     }
     if (data.view) {
       zoom.value = data.view.zoom ?? zoom.value;
-      snapStepCm.value = data.view.snapStepCm ?? snapStepCm.value;
+      snapStepCm.value = MILLIMETRE_STEP_CM;
     }
     if (data.notes) {
       globalNotes.value = data.notes;
@@ -2015,8 +2682,58 @@ function hexToRgb(hex) {
   };
 }
 
-// render schema into temp canvas for PDF (thicker, saturated)
-function renderSchemaToCanvasForPdf(ctx, includeImage) {
+function drawExportRulers(ctx, offsetX = 0, offsetY = 0) {
+  ctx.save();
+  ctx.fillStyle = "#0b1724";
+  ctx.fillRect(offsetX, offsetY, baseWidthPx.value + 15, baseHeightPx.value + 15);
+
+  ctx.strokeStyle = "#ffffff";
+  ctx.fillStyle = "#ffffff";
+  ctx.font = "10px Arial";
+  ctx.lineWidth = 1;
+
+  ctx.beginPath();
+  ctx.rect(offsetX + 15, offsetY + 15, baseWidthPx.value, baseHeightPx.value);
+  ctx.stroke();
+
+  for (let cm = 0; cm <= widthCm.value; cm += 1) {
+    const xPos = offsetX + 15 + cmToPxX(cm);
+    ctx.beginPath();
+    ctx.moveTo(xPos, offsetY + 7);
+    ctx.lineTo(xPos, offsetY + 14);
+    ctx.stroke();
+  }
+
+  for (let cm = 0; cm <= widthCm.value; cm += 5) {
+    const xPos = offsetX + 15 + cmToPxX(cm);
+    ctx.beginPath();
+    ctx.moveTo(xPos, offsetY);
+    ctx.lineTo(xPos, offsetY + 14);
+    ctx.stroke();
+    ctx.fillText(String(cm), xPos + 2, offsetY + 10);
+  }
+
+  for (let cm = 0; cm <= heightCm.value; cm += 1) {
+    const yPos = offsetY + 15 + cmToPxY(cm);
+    ctx.beginPath();
+    ctx.moveTo(offsetX + 7, yPos);
+    ctx.lineTo(offsetX + 14, yPos);
+    ctx.stroke();
+  }
+
+  for (let cm = 0; cm <= heightCm.value; cm += 5) {
+    const yPos = offsetY + 15 + cmToPxY(cm);
+    ctx.beginPath();
+    ctx.moveTo(offsetX, yPos);
+    ctx.lineTo(offsetX + 14, yPos);
+    ctx.stroke();
+    ctx.fillText(String(cm), offsetX + 2, yPos + 10);
+  }
+  ctx.restore();
+}
+
+// render schema into temp canvas for export (thicker, saturated)
+function renderSchemaToCanvasForPdf(ctx, includeImage, includeMeasurements) {
   const w = baseWidthPx.value;
   const h = baseHeightPx.value;
 
@@ -2095,7 +2812,7 @@ function renderSchemaToCanvasForPdf(ctx, includeImage) {
       cmToPxY(C.cy),
       cmToPxX(C.rx),
       cmToPxY(C.ry),
-      0,
+      getCircleAngleRad(C),
       0,
       2 * Math.PI
     );
@@ -2104,7 +2821,7 @@ function renderSchemaToCanvasForPdf(ctx, includeImage) {
   }
 
   // Intersection Measurements (if enabled)
-  if (showIntersectionMeasurements.value) {
+  if (includeMeasurements) {
     const intersections = getIntersections();
     ctx.save();
     ctx.font = "14px Arial";
@@ -2120,10 +2837,8 @@ function renderSchemaToCanvasForPdf(ctx, includeImage) {
       ctx.fillStyle = "#ff0000";
       ctx.fill();
       
-      // Draw measurement text with white outline
+      // Draw measurement text
       const text = `(${point.x.toFixed(2)}, ${point.y.toFixed(2)})`;
-      ctx.strokeStyle = "#ffffff";
-      ctx.strokeText(text, px + 8, py - 8);
       ctx.fillStyle = "#ff0000";
       ctx.fillText(text, px + 8, py - 8);
     });
@@ -2146,10 +2861,11 @@ function exportPdf() {
   }
   pdf.text(1, y, `Size: ${widthCm.value} × ${heightCm.value} cm`); y += 0.7;
   pdf.text(1, y, `Ruling tool: ${tool.value}, direction: ${direction.value}`); y += 0.7;
+  pdf.text(1, y, `Lines: ${lines.value.length}, prickings: ${prickings.value.length}, circles: ${circles.value.length}`); y += 0.7;
   
-  if (showIntersectionMeasurements.value) {
+  if (includeIntersectionMeasurementsInExport.value) {
     const intersections = getIntersections();
-    pdf.text(1, y, `Line intersections: ${intersections.length}`); y += 0.7;
+    pdf.text(1, y, `Intersections: ${intersections.length}`); y += 0.7;
   }
   
   y += 0.3;
@@ -2236,38 +2952,48 @@ function exportPdf() {
   y += 0.6;
 
   const legendEntries = [
-    { label: "Text lines (horizontal)",        color: "#0088ff" },
-    { label: "Bounding lines",                color: "#ff8800" },
-    { label: "Margin guidelines / prickings", color: "#e645ff" },
-    { label: "Column boundaries / prickings", color: "#00d0b8" },
+    { label: "Text lines (horizontal)", color: "#0088ff" },
+    { label: "Bounding lines", color: "#ff8800" },
+    { label: "Margin guidelines", color: "#e645ff" },
+    { label: "Column boundaries", color: "#00d0b8" },
     { label: "Circles (compass impressions)", color: "#ff0088" },
-    { label: "Hypothetical (reconstructed)",  color: "#808080" },
+    { label: "Hypothetical (reconstructed)", color: "#808080" },
   ];
 
-  // Add pricking type legend entries if those types exist
-  const hasPiercedPricking = prickings.value.some(p => !p.prickingType || p.prickingType === 'pierced');
-  const hasSlitPricking = prickings.value.some(p => p.prickingType === 'slit');
-  const hasOtherPricking = prickings.value.some(p => p.prickingType === 'other');
+  const prickingRoleLabels = {
+    margin: "Margin pricking",
+    column: "Column pricking",
+    other: "Pricking",
+  };
+  const prickingShapeLabels = {
+    pierced: "pierced circle",
+    slit: "slit",
+    other: "rectangular mark",
+  };
+  const seenPrickingLegendEntries = new Set();
 
-  if (hasPiercedPricking) {
-    legendEntries.push({ label: "Pierced pricking (circle)", color: "#ffa500", shape: 'pierced' });
-  }
-  if (hasSlitPricking) {
-    legendEntries.push({ label: "Slit pricking (vertical line)", color: null, shape: 'slit' });
-  }
-  if (hasOtherPricking) {
-    legendEntries.push({ label: "Other pricking (rectangle)", color: null, shape: 'other' });
-  }
+  prickings.value.forEach((pricking) => {
+    const shape = pricking.prickingType || "pierced";
+    const color = getPrickingColor(pricking);
+    const roleLabel = prickingRoleLabels[pricking.role] || "Pricking";
+    const label = pricking.customColor
+      ? `${roleLabel} (${prickingShapeLabels[shape]}, custom color)`
+      : `${roleLabel} (${prickingShapeLabels[shape]})`;
+    const key = `${label}|${shape}|${color}`;
+    if (seenPrickingLegendEntries.has(key)) return;
+    seenPrickingLegendEntries.add(key);
+    legendEntries.push({ label, color, shape });
+  });
 
   pdf.setLineWidth(0.06);
   for (const entry of legendEntries) {
     ensureSpace(0.8);
     if (entry.shape) {
       // Draw pricking type shape
-      pdf.setDrawColor(0, 0, 0);
+      const { r, g, b } = hexToRgb(entry.color);
+      pdf.setDrawColor(r, g, b);
+      pdf.setFillColor(r, g, b);
       if (entry.shape === 'pierced') {
-        const { r, g, b } = hexToRgb(entry.color);
-        pdf.setFillColor(r, g, b);
         pdf.circle(1.075, y, 0.075, 'F');
       } else if (entry.shape === 'slit') {
         pdf.line(1.075, y - 0.1, 1.075, y + 0.1);
@@ -2289,69 +3015,27 @@ function exportPdf() {
   // ---------- SECOND PAGE: SCHEMA ----------
   pdf.addPage();
   const temp = document.createElement("canvas");
-  temp.width = baseWidthPx.value + 15;
-  temp.height = baseHeightPx.value + 15;
+  temp.width = includeRulingGridInExport.value ? baseWidthPx.value + 15 : baseWidthPx.value;
+  temp.height = includeRulingGridInExport.value ? baseHeightPx.value + 15 : baseHeightPx.value;
   const ctx = temp.getContext("2d");
 
-  // Draw ruler background
-  ctx.fillStyle = "#0b1724";
-  ctx.fillRect(0, 0, temp.width, temp.height);
-
-  // Draw rulers
-  ctx.strokeStyle = "#ffffff";
-  ctx.fillStyle = "#ffffff";
-  ctx.font = "10px Arial";
-  ctx.lineWidth = 1;
-
-  const stepPx = Math.round(PX_PER_CM * SCALE_FACTOR);
-
-  // Top ruler
-  ctx.beginPath();
-  // 1cm ticks
-  for (let cm = 0; cm <= widthCm.value; cm += 1) {
-    const xPos = 15 + cmToPxX(cm);
-    ctx.moveTo(xPos, 7);
-    ctx.lineTo(xPos, 14);
+  if (includeRulingGridInExport.value) {
+    drawExportRulers(ctx);
+    ctx.save();
+    ctx.translate(15, 15);
+    renderSchemaToCanvasForPdf(
+      ctx,
+      includeImageInPdf.value,
+      includeIntersectionMeasurementsInExport.value
+    );
+    ctx.restore();
+  } else {
+    renderSchemaToCanvasForPdf(
+      ctx,
+      includeImageInPdf.value,
+      includeIntersectionMeasurementsInExport.value
+    );
   }
-  ctx.stroke();
-
-  // 5cm ticks and labels
-  ctx.beginPath();
-  for (let cm = 0; cm <= widthCm.value; cm += 5) {
-    const xPos = 15 + cmToPxX(cm);
-    ctx.moveTo(xPos, 0);
-    ctx.lineTo(xPos, 14);
-    ctx.fillText(String(cm), xPos + 2, 10);
-  }
-  ctx.stroke();
-
-  // Left ruler
-  ctx.beginPath();
-  // 1cm ticks
-  for (let cm = 0; cm <= heightCm.value; cm += 1) {
-    const yPos = 15 + cmToPxY(cm);
-    ctx.moveTo(7, yPos);
-    ctx.lineTo(14, yPos);
-  }
-  ctx.stroke();
-
-  // 5cm ticks and labels
-  ctx.beginPath();
-  for (let cm = 0; cm <= heightCm.value; cm += 5) {
-    const yPos = 15 + cmToPxY(cm);
-    ctx.moveTo(0, yPos);
-    ctx.lineTo(14, yPos);
-    ctx.fillText(String(cm), 2, yPos + 10);
-  }
-  ctx.stroke();
-
-  // Save context and translate for content
-  ctx.save();
-  ctx.translate(15, 15);
-  
-  renderSchemaToCanvasForPdf(ctx, includeImageInPdf.value);
-  
-  ctx.restore();
 
   const img = temp.toDataURL("image/png", 1.0);
   pdf.addImage(img, "PNG", 0.5, 0.5, width_size(), height_size());
@@ -2391,11 +3075,27 @@ function exportJson() {
 
 function exportPng() {
   const temp = document.createElement("canvas");
-  temp.width = baseWidthPx.value;
-  temp.height = baseHeightPx.value;
+  temp.width = includeRulingGridInExport.value ? baseWidthPx.value + 15 : baseWidthPx.value;
+  temp.height = includeRulingGridInExport.value ? baseHeightPx.value + 15 : baseHeightPx.value;
   const ctx = temp.getContext("2d");
 
-  renderSchemaToCanvasForPdf(ctx, includeImageInImage.value);
+  if (includeRulingGridInExport.value) {
+    drawExportRulers(ctx);
+    ctx.save();
+    ctx.translate(15, 15);
+    renderSchemaToCanvasForPdf(
+      ctx,
+      includeImageInImage.value,
+      includeIntersectionMeasurementsInExport.value
+    );
+    ctx.restore();
+  } else {
+    renderSchemaToCanvasForPdf(
+      ctx,
+      includeImageInImage.value,
+      includeIntersectionMeasurementsInExport.value
+    );
+  }
 
   temp.toBlob((blob) => {
     const url = URL.createObjectURL(blob);
@@ -2412,11 +3112,27 @@ function exportTiff() {
   // We'll export as high-quality PNG with .tif extension
   // For true TIFF, a library like tiff.js would be needed
   const temp = document.createElement("canvas");
-  temp.width = baseWidthPx.value;
-  temp.height = baseHeightPx.value;
+  temp.width = includeRulingGridInExport.value ? baseWidthPx.value + 15 : baseWidthPx.value;
+  temp.height = includeRulingGridInExport.value ? baseHeightPx.value + 15 : baseHeightPx.value;
   const ctx = temp.getContext("2d");
 
-  renderSchemaToCanvasForPdf(ctx, includeImageInImage.value);
+  if (includeRulingGridInExport.value) {
+    drawExportRulers(ctx);
+    ctx.save();
+    ctx.translate(15, 15);
+    renderSchemaToCanvasForPdf(
+      ctx,
+      includeImageInImage.value,
+      includeIntersectionMeasurementsInExport.value
+    );
+    ctx.restore();
+  } else {
+    renderSchemaToCanvasForPdf(
+      ctx,
+      includeImageInImage.value,
+      includeIntersectionMeasurementsInExport.value
+    );
+  }
 
   temp.toBlob((blob) => {
     const url = URL.createObjectURL(blob);
@@ -2456,27 +3172,10 @@ function onKey(e) {
 onMounted(() => {
   redrawAll();
   window.addEventListener("keydown", onKey);
-  setupTooltips();
 });
 onBeforeUnmount(() => {
   window.removeEventListener("keydown", onKey);
 });
-
-/* -------- Tooltip positioning -------- */
-function setupTooltips() {
-  // Position tooltips on hover to ensure they appear correctly with fixed positioning
-  document.querySelectorAll('.help-icon').forEach(icon => {
-    icon.addEventListener('mouseenter', (e) => {
-      const tooltip = icon.querySelector('.tooltip');
-      if (!tooltip) return;
-      
-      const rect = icon.getBoundingClientRect();
-      tooltip.style.top = rect.top + rect.height / 2 + 'px';
-      tooltip.style.left = rect.right + 'px';
-      tooltip.style.transform = 'translateY(-50%)';
-    });
-  });
-}
 </script>
 
 <style scoped>
@@ -2625,7 +3324,9 @@ function setupTooltips() {
 .help-icon .tooltip {
   visibility: hidden;
   opacity: 0;
-  position: fixed;
+  position: absolute;
+  top: calc(100% + 8px);
+  right: 0;
   background: #1e293b;
   color: #f1f5f9;
   padding: 8px 12px;
@@ -2641,17 +3342,15 @@ function setupTooltips() {
   pointer-events: none;
   transition: opacity 0.2s ease, visibility 0.2s ease;
   line-height: 1.4;
-  margin-left: 8px;
 }
 
 .help-icon .tooltip::after {
   content: '';
   position: absolute;
-  top: 50%;
-  right: 100%;
-  transform: translateY(-50%);
+  right: 8px;
+  bottom: 100%;
   border: 6px solid transparent;
-  border-right-color: #1e293b;
+  border-bottom-color: #1e293b;
 }
 
 .help-icon:hover .tooltip {
@@ -2829,6 +3528,10 @@ select {
   border-radius: 6px;
 }
 
+.canvas-wrap.erase-mode {
+  cursor: none;
+}
+
 .layer {
   position: absolute;
   left: 0;
@@ -2864,6 +3567,16 @@ select {
   border-left: 1px solid #00ffd5;
   z-index: 4;
   display: none;
+  pointer-events: none;
+}
+
+.eraser-cursor {
+  position: absolute;
+  z-index: 5;
+  border: 2px solid #f3f4f6;
+  background: rgb(255 255 255 / 0.15);
+  border-radius: 2px;
+  box-shadow: 0 0 0 1px rgb(15 23 42 / 0.5);
   pointer-events: none;
 }
 
@@ -2920,8 +3633,29 @@ select {
 
 /* File input */
 .file-input {
-  font-size: 13px;
+  display: none;
+}
+
+.file-input-row {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  min-width: 0;
   margin-bottom: 6px;
+}
+
+.file-select-btn {
+  flex: 0 0 auto;
+}
+
+.file-name {
+  flex: 1 1 auto;
+  min-width: 0;
+  font-size: 13px;
+  color: hsl(var(--muted-foreground));
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
 }
 
 /* Image controls */
@@ -3079,7 +3813,14 @@ input[type="range"] {
   border: 1px solid #4a5568;
   border-radius: 4px;
   cursor: pointer;
-  background: transparent;
+  background: hsl(var(--card));
+  padding: 2px;
+}
+
+.color-hex-input {
+  flex: 1;
+  min-width: 0;
+  text-transform: lowercase;
 }
 
 .clear-color-btn {

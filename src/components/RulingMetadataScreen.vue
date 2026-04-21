@@ -40,11 +40,10 @@
             placeholder="Optional siglum or catalogue code"
           />
 
-          <label class="field-label mt">Folio / Page *</label>
+          <label class="field-label mt">Folio / Page</label>
           <input
             v-model="folio"
             type="text"
-            required
             class="field-input"
             placeholder="e.g. 12r or p. 24"
           />
@@ -84,8 +83,8 @@
         <label class="field-label">Direction</label>
         <select v-model="direction" class="field-input">
           <option value="none">none</option>
-          <option value=">">&gt; applied from above</option>
-          <option value="<">&lt; applied from below</option>
+          <option value=">">&gt; applied from recto</option>
+          <option value="<">&lt; applied from verso</option>
         </select>
       </div>
 
@@ -145,12 +144,11 @@ onMounted(() => {
   direction.value = route.query.direction || "none";
 });
 
-// Required fields: cityRepository, shelfmark, folio, width, height
+// Required fields: cityRepository, shelfmark, width, height
 const canContinue = computed(
   () =>
     cityRepository.value.trim() !== "" &&
     shelfmark.value.trim() !== "" &&
-    folio.value.trim() !== "" &&
     widthCm.value > 0 &&
     heightCm.value > 0
 );
