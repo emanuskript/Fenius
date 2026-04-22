@@ -649,6 +649,32 @@
                 />
               </div>
             </div>
+
+            <label class="field-label">Custom Color</label>
+            <div class="color-picker-row">
+              <input
+                type="color"
+                :value="selectedCircle.customColor || getCircleColor(selectedCircle)"
+                @input="updateSelectedCircleColor($event.target.value)"
+                @change="updateSelectedCircleColor($event.target.value)"
+                class="color-input"
+              />
+              <input
+                type="text"
+                :value="selectedCircle.customColor || getCircleColor(selectedCircle)"
+                @input="updateSelectedCircleColor($event.target.value)"
+                class="field-input color-hex-input"
+                placeholder="#000000"
+              />
+              <button
+                v-if="selectedCircle.customColor"
+                @click="clearSelectedCircleColor"
+                class="clear-color-btn"
+              >
+                Reset
+              </button>
+            </div>
+
             <p class="hint">Drag the teal center handle to move, the pink handle to rotate/resize the long axis, and the blue handle to resize the short axis.</p>
 
             <label class="field-inline">
@@ -751,7 +777,7 @@
               </div>
             </div>
             <div class="btn-row">
-              <button @click="resetImageTransform" :disabled="bgLocked">Reset</button>
+              <button @click="resetImageToOriginal" :disabled="!bgImage">Back to original</button>
               <button @click="bgLocked = !bgLocked" :class="{ active: bgLocked }">
                 {{ bgLocked ? 'Unlock' : 'Lock' }}
               </button>
@@ -1038,6 +1064,12 @@ function getPrickingColor(pricking) {
   }
 }
 
+function getCircleColor(circle) {
+  if (circle.customColor) return circle.customColor;
+  if (circle.hypothetical) return "#808080";
+  return "#ff0088";
+}
+
 /* -------- State -------- */
 const zoom = ref(1);
 const zoomPercent = computed(() => Math.round(zoom.value * 100));
@@ -1090,7 +1122,7 @@ const selectedCircle = computed(() => {
 const selectedColor = computed(() => {
   if (selectedLine.value) return getLineColor(selectedLine.value);
   if (selectedPricking.value) return getPrickingColor(selectedPricking.value);
-  if (selectedCircle.value) return "#ff0088"; // pink for circles
+  if (selectedCircle.value) return getCircleColor(selectedCircle.value);
   return "#4b5563";
 });
 const selectedIdLabel = computed(() => {
@@ -1403,7 +1435,7 @@ function drawShapes() {
       ctx.setLineDash([]);
     }
 
-    ctx.strokeStyle = isSelected ? "#00ffd5" : "#ff0088"; // pink
+    ctx.strokeStyle = isSelected ? "#00ffd5" : getCircleColor(C);
     ctx.beginPath();
     ctx.ellipse(
       cmToPxX(C.cx),
@@ -1419,7 +1451,7 @@ function drawShapes() {
   }
 
   if (selectedCircle.value) {
-    const handles = getCircleHandlePositionsPx(selectedCircle.value);
+    const handles = getCircleHandlePositionsCanvasPx(selectedCircle.value);
 
     ctx.save();
     ctx.setLineDash([5, 4]);
@@ -1916,7 +1948,7 @@ function eraseByCoordinates() {
 }
 
 function getCircleHandleAtPosition(xPx, yPx, circle) {
-  const handles = getCircleHandlePositionsPx(circle);
+  const handles = getCircleHandlePositionsWrapPx(circle);
   const threshold = CIRCLE_HANDLE_RADIUS_PX + 4;
   for (const [name, point] of Object.entries(handles)) {
     if (Math.hypot(xPx - point.x, yPx - point.y) <= threshold) {
@@ -2095,16 +2127,25 @@ function getCircleHandlePositionsCm(circle) {
   };
 }
 
-function getCircleHandlePositionsPx(circle) {
+function getCircleHandlePositionsCanvasPx(circle) {
   const handles = getCircleHandlePositionsCm(circle);
   const toPx = (point) => ({
-    x: 15 + cmToPxX(point.x),
-    y: 15 + cmToPxY(point.y),
+    x: cmToPxX(point.x),
+    y: cmToPxY(point.y),
   });
   return {
     center: toPx(handles.center),
     major: toPx(handles.major),
     minor: toPx(handles.minor),
+  };
+}
+
+function getCircleHandlePositionsWrapPx(circle) {
+  const handles = getCircleHandlePositionsCanvasPx(circle);
+  return {
+    center: { x: 15 + handles.center.x, y: 15 + handles.center.y },
+    major: { x: 15 + handles.major.x, y: 15 + handles.major.y },
+    minor: { x: 15 + handles.minor.x, y: 15 + handles.minor.y },
   };
 }
 
@@ -2755,6 +2796,24 @@ function updateSelectedCircleAngle(val) {
   redrawAll();
 }
 
+function updateSelectedCircleColor(val) {
+  const c = selectedCircle.value;
+  if (!c) return;
+  const normalized = normalizeHexColor(val);
+  if (normalized) {
+    c.customColor = normalized;
+    redrawAll();
+  }
+}
+
+function clearSelectedCircleColor() {
+  const c = selectedCircle.value;
+  if (c) {
+    c.customColor = "";
+    redrawAll();
+  }
+}
+
 function updateSelectedCircleHypothetical(val) {
   const c = selectedCircle.value;
   if (c) {
@@ -2802,10 +2861,14 @@ function fitToWidth() {
   redrawAll();
 }
 
-function resetImageTransform() {
+function resetImageToOriginal() {
+  showImage.value = true;
+  imageOpacity.value = 0.6;
+  bgFitMode.value = "width";
   bgScale.value = 1.0;
   bgOffsetX.value = 0;
   bgOffsetY.value = 0;
+  bgLocked.value = false;
   redrawAll();
 }
 
@@ -3035,7 +3098,7 @@ function renderSchemaToCanvasForPdf(ctx, includeImage, includeMeasurements) {
   ctx.lineWidth = 2;
   for (const C of circles.value) {
     ctx.save();
-    ctx.strokeStyle = "#ff0088"; // pink
+    ctx.strokeStyle = getCircleColor(C);
     if (C.hypothetical) {
       ctx.setLineDash([6, 4]);
     } else {
@@ -3114,6 +3177,24 @@ function renderExportCanvas(ctx, includeImage) {
       includeIntersectionMeasurementsInExport.value
     );
   }
+}
+
+function sanitizeFilenamePart(value) {
+  return String(value || "")
+    .trim()
+    .replace(/[\\/:*?"<>|]+/g, "-")
+    .replace(/\s+/g, " ")
+    .replace(/-+/g, "-")
+    .trim()
+    .replace(/^[-.\s]+|[-.\s]+$/g, "");
+}
+
+function getExportBaseName() {
+  const parts = [
+    sanitizeFilenamePart(cityRepository.value),
+    sanitizeFilenamePart(shelfmark.value),
+  ].filter(Boolean);
+  return parts.length ? parts.join("_") : "ruling-schema";
 }
 
 function exportPdf() {
@@ -3255,6 +3336,20 @@ function exportPdf() {
     legendEntries.push({ label, color, shape });
   });
 
+  const seenCircleLegendEntries = new Set();
+  circles.value.forEach((circle) => {
+    const color = getCircleColor(circle);
+    const label = circle.customColor
+      ? "Circle/Oval (custom color)"
+      : circle.hypothetical
+        ? "Circle/Oval (hypothetical)"
+        : "Circle/Oval";
+    const key = `${label}|${color}`;
+    if (seenCircleLegendEntries.has(key)) return;
+    seenCircleLegendEntries.add(key);
+    legendEntries.push({ label, color });
+  });
+
   pdf.setLineWidth(0.06);
   for (const entry of legendEntries) {
     ensureSpace(0.8);
@@ -3290,7 +3385,7 @@ function exportPdf() {
   const img = temp.toDataURL("image/png", 1.0);
   pdf.addImage(img, "PNG", 0.5, 0.5, width_size(), height_size(), undefined, "NONE");
 
-  const filename = (shelfmark.value || "ruling-schema") + ".pdf";
+  const filename = `${getExportBaseName()}.pdf`;
   pdf.save(filename);
 }
 
@@ -3318,7 +3413,7 @@ function exportJson() {
   const url = URL.createObjectURL(blob);
   const a = document.createElement("a");
   a.href = url;
-  a.download = (shelfmark.value || "ruling-schema") + ".json";
+  a.download = `${getExportBaseName()}.json`;
   a.click();
   URL.revokeObjectURL(url);
 }
@@ -3331,7 +3426,7 @@ function exportPng() {
     const url = URL.createObjectURL(blob);
     const a = document.createElement("a");
     a.href = url;
-    a.download = (shelfmark.value || "ruling-schema") + ".png";
+    a.download = `${getExportBaseName()}.png`;
     a.click();
     URL.revokeObjectURL(url);
   }, "image/png", 1.0);
@@ -3348,7 +3443,7 @@ function exportTiff() {
     const url = URL.createObjectURL(blob);
     const a = document.createElement("a");
     a.href = url;
-    a.download = (shelfmark.value || "ruling-schema") + ".tif";
+    a.download = `${getExportBaseName()}.tif`;
     a.click();
     URL.revokeObjectURL(url);
   }, "image/png", 1.0);
@@ -3841,12 +3936,21 @@ select {
 .status-bar {
   width: 100%;
   display: flex;
-  justify-content: space-between;
+  flex-wrap: wrap;
+  justify-content: flex-start;
+  align-items: center;
   gap: 8px;
+  row-gap: 6px;
   font-size: 13px;
   margin-top: 6px;
   padding: 2px 4px 0;
   color: #d0d6e5;
+  overflow-wrap: anywhere;
+}
+
+.status-bar > div {
+  flex: 0 1 auto;
+  min-width: 0;
 }
 
 /* Selected empty */

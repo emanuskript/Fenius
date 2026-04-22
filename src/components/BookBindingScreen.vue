@@ -200,7 +200,10 @@
               height: rupture.size + 'px',
             }"
           >
-            ⚡
+            <span class="rupture-glyph" aria-hidden="true">
+              <span class="rupture-segment rupture-segment-left"></span>
+              <span class="rupture-segment rupture-segment-right"></span>
+            </span>
           </div>
         </div>
       </div>
@@ -334,7 +337,10 @@
                 <template v-if="(sp.type || (isDoubleSupport ? 'double' : 'single')) === 'single'">
                   <div
                     class="support-bar"
-                    :class="{ selected: isSupportSelected(sp.id) }"
+                    :class="{
+                      selected: isSupportSelected(sp.id),
+                      'recently-added': recentlyAddedSupportId === sp.id,
+                    }"
                     :style="{ left: sp.position + '%', background: sp.color }"
                     @contextmenu.prevent="openSupportMenu($event, si)"
                     @click.stop="onSupportClick(si)"
@@ -359,7 +365,10 @@
                   <!-- Left bar and its dots -->
                   <div
                     class="support-bar"
-                    :class="{ selected: isSupportSelected(sp.id) }"
+                    :class="{
+                      selected: isSupportSelected(sp.id),
+                      'recently-added': recentlyAddedSupportId === sp.id,
+                    }"
                     :style="{ left: `calc(${sp.position}% - ${supportHalfGapPx}px)`, background: sp.color }"
                     @contextmenu.prevent="openSupportMenu($event, si)"
                     @click.stop="onSupportClick(si)"
@@ -383,7 +392,10 @@
                   <!-- Right bar and its dots -->
                   <div
                     class="support-bar"
-                    :class="{ selected: isSupportSelected(sp.id) }"
+                    :class="{
+                      selected: isSupportSelected(sp.id),
+                      'recently-added': recentlyAddedSupportId === sp.id,
+                    }"
                     :style="{ left: `calc(${sp.position}% + ${supportHalfGapPx}px)`, background: sp.color }"
                     @contextmenu.prevent="openSupportMenu($event, si)"
                     @click.stop="onSupportClick(si)"
@@ -414,7 +426,7 @@
                 :class="{ selected: isSewingSelected(sewingKey(rowIndex, sh.uid)) }"
                 :style="{
                   left: sewingHoleLeft(sh),
-                  background: sh.color,
+                  background: getHoleDisplayColor(sh.color),
                 }"
                 v-draggable="{
                   getRect: getRulerRect,
@@ -442,7 +454,7 @@
                 :class="{ selected: isSelected(holeKey(rowIndex, hole.uid)) }"
                 :style="{
                   left: hole.position + '%',
-                  background: hole.color,
+                  background: getHoleDisplayColor(hole.color),
                 }"
                 v-draggable="{
                   getRect: getRulerRect,
@@ -503,50 +515,88 @@
 
     <div class="footer" ref="footer">
       <div class="legend">
-        <div>
-          <span class="swatch headband"></span> Headbands
-          <button @click="addHeadbandLeft">+ Add Headband</button>
-          <button @click="addHeadbandRight" class="ml8">+ Add Tailband</button>
-        </div>
-        <div>
-          <span class="swatch support"></span> Sewing support
-          <button @click="openAddSupportPopup">+ Add</button>
-        </div>
-        <div>
-          <span class="swatch change"></span> Change‑over station
-          <button :class="{ 'btn-active': addHoleMode }" @click="toggleAddHole">
-            {{ addHoleMode ? "Click in a row to place…" : "+ Add" }}
-          </button>
-        </div>
-
-        <div>
-          <span class="swatch knot"></span> Bow/Knot
-          <button :class="{ 'btn-active': addKnotMode }" @click="toggleAddKnot">
-            {{ addKnotMode ? "Click on table to place…" : "+ Add knot" }}
-          </button>
+        <div class="legend-group">
+          <div class="legend-buttons legend-buttons-tools">
+            <button class="legend-tool-btn" @click="addHeadbandLeft">
+              <span class="legend-tool-icon">
+                <span class="swatch headband"></span>
+                <span class="legend-tool-plus">+</span>
+              </span>
+              <span>Headband</span>
+            </button>
+            <button class="legend-tool-btn" @click="addHeadbandRight">
+              <span class="legend-tool-icon">
+                <span class="swatch headband"></span>
+                <span class="legend-tool-plus">+</span>
+              </span>
+              <span>Tailband</span>
+            </button>
+          </div>
         </div>
 
-        <div>
-          <span class="swatch rupture"></span> Sewing rupture
-          <button :class="{ 'btn-active': addRuptureMode }" @click="toggleAddRupture">
-            {{ addRuptureMode ? "Click on table to place…" : "+ Insert sewing rupture" }}
-          </button>
+        <div class="legend-group">
+          <div class="legend-buttons legend-buttons-tools">
+            <button class="legend-tool-btn" @click="openAddSupportPopup">
+              <span class="legend-tool-icon">
+                <span class="swatch support"></span>
+                <span class="legend-tool-plus">+</span>
+              </span>
+              <span>Sewing support</span>
+            </button>
+          </div>
         </div>
 
-        <div>
-          Rows
-          <button class="ml8" :class="{ 'btn-active': editRowsMode }" @click="toggleEditRows">
-            {{ editRowsMode ? 'Editing…' : 'Edit quires/leaves' }}
-          </button>
-          <button v-if="editRowsMode" class="ml8" @click="resetRowsManual">Reset from metadata</button>
+        <div class="legend-group">
+          <div class="legend-buttons legend-buttons-tools">
+            <button class="legend-tool-btn" :class="{ 'btn-active': addHoleMode }" @click="toggleAddHole">
+              <span class="legend-tool-icon">
+                <span class="swatch change"></span>
+                <span class="legend-tool-plus">+</span>
+              </span>
+              <span>Change-over station</span>
+            </button>
+          </div>
         </div>
 
+        <div class="legend-group">
+          <div class="legend-buttons legend-buttons-tools">
+            <button class="legend-tool-btn" :class="{ 'btn-active': addKnotMode }" @click="toggleAddKnot">
+              <span class="legend-tool-icon">
+                <span class="swatch knot"></span>
+                <span class="legend-tool-plus">+</span>
+              </span>
+              <span>Bow/Knot</span>
+            </button>
+          </div>
+        </div>
 
+        <div class="legend-group">
+          <div class="legend-buttons legend-buttons-tools">
+            <button class="legend-tool-btn" :class="{ 'btn-active': addRuptureMode }" @click="toggleAddRupture">
+              <span class="legend-tool-icon">
+                <span class="swatch rupture"></span>
+                <span class="legend-tool-plus">+</span>
+              </span>
+              <span>Sewing rupture</span>
+            </button>
+          </div>
+        </div>
+
+        <div class="legend-group">
+          <div class="legend-buttons">
+            <button class="legend-tool-btn" :class="{ 'btn-active': editRowsMode }" @click="toggleEditRows">
+              <span>Edit quires/leaves</span>
+            </button>
+            <button v-if="editRowsMode" @click="resetRowsManual">Reset</button>
+          </div>
+        </div>
       </div>
 
-      <button class="continue-btn" @click="showExportPopup = true">
-        Export
-      </button>
+      <div class="footer-export">
+        <button class="continue-btn" @click="showExportPopup = true">
+          Export
+        </button>
+      </div>
     </div>
 
     <!-- Context menu -->
@@ -768,6 +818,7 @@
 import { ref, computed, reactive, onMounted, onUnmounted, watch, nextTick } from "vue";
 import html2canvas from "html2canvas";
 import jsPDF from "jspdf";
+import { useTheme } from "@/composables/useTheme";
 
 export default {
   name: "BookBindingScreen",
@@ -777,61 +828,107 @@ export default {
       mounted(el, binding) {
         el.style.position = "absolute";
         el.style.cursor = "grab";
+        el.style.touchAction = "none";
 
         const getHandler = () =>
           typeof binding.value === "function"
             ? { onChange: binding.value }
             : binding.value || {};
 
-        const onMove = (e) => {
+        const getMetrics = (clientX) => {
           const parentRect = el.parentElement.getBoundingClientRect();
           let measureRect = parentRect;
           try {
             const getter = getHandler().getRect;
-            const maybeRect = typeof getter === 'function' ? getter() : null;
-            if (maybeRect && typeof maybeRect.left === 'number') measureRect = maybeRect;
+            const maybeRect = typeof getter === "function" ? getter() : null;
+            if (maybeRect && typeof maybeRect.left === "number") measureRect = maybeRect;
           } catch (_) {
             measureRect = parentRect;
           }
-          const xLocal = Math.max(0, Math.min(parentRect.width, e.clientX - parentRect.left));
-          const xGlobal = Math.max(0, Math.min(measureRect.width, e.clientX - measureRect.left));
-          const pctLocal = (xLocal / parentRect.width) * 100;
+          const xLocal = Math.max(0, Math.min(parentRect.width, clientX - parentRect.left));
+          const xGlobal = Math.max(0, Math.min(measureRect.width, clientX - measureRect.left));
+          const pctLocal = (xLocal / Math.max(1, parentRect.width)) * 100;
           const pctGlobal = (xGlobal / Math.max(1, measureRect.width)) * 100;
+          const pxToPct = (px) => (px / Math.max(1, parentRect.width)) * 100;
+          return { pctLocal, pctGlobal, pxToPct };
+        };
+
+        let dragging = false;
+        let activePointerId = null;
+        let restoreUserSelect = "";
+
+        const onPointerMove = (e) => {
+          if (!dragging) return;
+          if (activePointerId != null && e.pointerId != null && e.pointerId !== activePointerId) return;
+          e.preventDefault();
+          const { pctLocal, pctGlobal, pxToPct } = getMetrics(e.clientX);
           const { onChange } = getHandler();
-          const pxToPct = (px) => (px / Math.max(1, parentRect.width)) * 100;
           if (onChange) onChange(pctLocal, pctGlobal, pxToPct);
-          el.style.left = pctLocal + "%";
         };
 
-        const onDown = (ev) => {
-          ev.preventDefault();
-          const parentRect = el.parentElement.getBoundingClientRect();
-          let measureRect = parentRect;
-          try {
-            const getter = getHandler().getRect;
-            const maybeRect = typeof getter === 'function' ? getter() : null;
-            if (maybeRect && typeof maybeRect.left === 'number') measureRect = maybeRect;
-          } catch (_) {
-            measureRect = parentRect;
+        const finishDrag = () => {
+          if (!dragging) return;
+          dragging = false;
+          if (activePointerId != null && typeof el.releasePointerCapture === "function") {
+            try {
+              el.releasePointerCapture(activePointerId);
+            } catch (_) {
+              void 0;
+            }
           }
-          const xLocal = Math.max(0, Math.min(parentRect.width, ev.clientX - parentRect.left));
-          const xGlobal = Math.max(0, Math.min(measureRect.width, ev.clientX - measureRect.left));
-          const pctLocal = (xLocal / parentRect.width) * 100;
-          const pctGlobal = (xGlobal / Math.max(1, measureRect.width)) * 100;
-          const { onStart } = getHandler();
-          const pxToPct = (px) => (px / Math.max(1, parentRect.width)) * 100;
-          if (onStart) onStart(pctLocal, pctGlobal, pxToPct);
-          document.addEventListener("mousemove", onMove);
-          document.addEventListener("mouseup", onUp, { once: true });
-        };
-
-        const onUp = () => {
+          activePointerId = null;
+          window.removeEventListener("pointermove", onPointerMove, true);
+          window.removeEventListener("pointerup", onPointerUp, true);
+          window.removeEventListener("pointercancel", onPointerUp, true);
+          document.body.style.userSelect = restoreUserSelect;
+          document.body.style.cursor = "";
+          el.style.cursor = "grab";
           const { onEnd } = getHandler();
           if (onEnd) onEnd();
-          document.removeEventListener("mousemove", onMove);
         };
 
-        el.addEventListener("mousedown", onDown);
+        const onPointerUp = (e) => {
+          if (activePointerId != null && e.pointerId != null && e.pointerId !== activePointerId) return;
+          e.preventDefault();
+          finishDrag();
+        };
+
+        const onPointerDown = (ev) => {
+          if (ev.button !== 0) return;
+          ev.preventDefault();
+          ev.stopPropagation();
+          dragging = true;
+          activePointerId = ev.pointerId ?? null;
+          restoreUserSelect = document.body.style.userSelect;
+          document.body.style.userSelect = "none";
+          document.body.style.cursor = "grabbing";
+          el.style.cursor = "grabbing";
+          if (activePointerId != null && typeof el.setPointerCapture === "function") {
+            try {
+              el.setPointerCapture(activePointerId);
+            } catch (_) {
+              void 0;
+            }
+          }
+          const { pctLocal, pctGlobal, pxToPct } = getMetrics(ev.clientX);
+          const { onStart } = getHandler();
+          if (onStart) onStart(pctLocal, pctGlobal, pxToPct);
+          window.addEventListener("pointermove", onPointerMove, true);
+          window.addEventListener("pointerup", onPointerUp, true);
+          window.addEventListener("pointercancel", onPointerUp, true);
+        };
+
+        el.addEventListener("pointerdown", onPointerDown);
+        el.__dragCleanup = () => {
+          finishDrag();
+          el.removeEventListener("pointerdown", onPointerDown);
+        };
+      },
+      unmounted(el) {
+        if (typeof el.__dragCleanup === "function") {
+          el.__dragCleanup();
+          delete el.__dragCleanup;
+        }
       },
     },
   },
@@ -862,6 +959,7 @@ export default {
   },
   setup(props) {
     const num = (v, d = 0) => (Number.isFinite(Number(v)) ? Number(v) : d);
+    const { currentTheme } = useTheme();
 
     function openTutorial() {
       window.dispatchEvent(
@@ -971,6 +1069,10 @@ export default {
     /* ---------- Table sizing (auto height; fixed row height) ---------- */
     const tableContainer = ref(null);
     const rowHeight = ref(40); // fixed row height; container grows to fit all rows
+
+    function getHoleDisplayColor(color) {
+      return currentTheme.value === "dark" ? "#ffffff" : "#000000";
+    }
 
   /* ---------- Top ruler alignment to Head..Tail columns ---------- */
   const headTh = ref(null);
@@ -1156,6 +1258,8 @@ export default {
     const isDoubleSupport = computed(
       () => String(props.sewingType || '').toLowerCase() === 'double'
     );
+  const recentlyAddedSupportId = ref(null);
+  let recentSupportGlowTimer = null;
   const supportHalfGapPx = 8; // pixel offset for double supports
   function moveSewingHolesForSupport(supportId, delta) {
     if (!delta) return;
@@ -1195,11 +1299,28 @@ export default {
       supportTypeChoice.value = (props.sewingType || 'single').toLowerCase() === 'double' ? 'double' : 'single';
       showAddSupportPopup.value = true;
     }
+    function highlightAddedSupport(id) {
+      recentlyAddedSupportId.value = id;
+      if (recentSupportGlowTimer) clearTimeout(recentSupportGlowTimer);
+      recentSupportGlowTimer = setTimeout(() => {
+        if (recentlyAddedSupportId.value === id) {
+          recentlyAddedSupportId.value = null;
+        }
+        recentSupportGlowTimer = null;
+      }, 3000);
+    }
     function confirmAddSupport() {
       const id = supportEntries.length + 1;
       supportEntries.push({ id, position: 50, color: '#e2b043', type: supportTypeChoice.value });
       showAddSupportPopup.value = false;
+      highlightAddedSupport(id);
     }
+    onUnmounted(() => {
+      if (recentSupportGlowTimer) {
+        clearTimeout(recentSupportGlowTimer);
+        recentSupportGlowTimer = null;
+      }
+    });
 
     /* ---------- Knots/Bows ---------- */
     const knotEntries = reactive([]);
@@ -1617,9 +1738,20 @@ export default {
             if (sides.length < 2) {
               const desired = [clampPct(sp.position - sideOffset), clampPct(sp.position + sideOffset)];
               for (let i = sides.length; i < 2; i++) {
-                row.push({ uid: nextUid.value++, position: desired[i], color: '#333', supportId: sp.id, role: 'side' });
+                row.push({
+                  uid: nextUid.value++,
+                  position: desired[i],
+                  color: '#333',
+                  supportId: sp.id,
+                  role: 'side',
+                  side: desired[i] < sp.position ? 'left' : 'right',
+                });
               }
             }
+            row.forEach((h) => {
+              if (h.supportId !== sp.id || h.role === 'center') return;
+              h.side = h.side || (h.position < sp.position ? 'left' : 'right');
+            });
           }
         }
       });
@@ -1641,10 +1773,11 @@ export default {
       if (hole.role !== 'center' && typeof pxToPct === 'function') {
         const sp = supportEntries.find((s) => s.id === hole.supportId);
         if (sp) {
-          const visualSide = adjustedPct >= sp.position ? 1 : -1;
+          const visualSide = hole.side === 'left' ? -1 : 1;
           adjustedPct = snapRulerPct(
             adjustedPct - visualSide * pxToPct(sewingSideMarginPx)
           );
+          hole.side = adjustedPct <= sp.position ? 'left' : 'right';
         }
       }
 
@@ -1669,7 +1802,8 @@ export default {
       if (hole.role === 'center' && sp) return `calc(${sp.position}% + 0px)`;
       const basePct = Number.isFinite(hole.position) ? hole.position : 0;
       if (!sp) return `${basePct}%`;
-      const dir = basePct >= sp.position ? 1 : -1;
+      const side = hole.side || (basePct < sp.position ? 'left' : 'right');
+      const dir = side === 'left' ? -1 : 1;
       return `calc(${basePct}% + ${dir * sewingSideMarginPx}px)`;
     }
   const selectedSupportIds = ref(new Set()); // supports (by id/index)
@@ -3822,14 +3956,21 @@ export default {
       }
     }
     function sanitizeFileStem(value) {
-      return String(value || "Untitled")
+      const raw = String(value || "").trim();
+      if (!raw) return "";
+      return raw
         .trim()
         .replace(/[<>:"/\\|?*\u0000-\u001F]/g, "")
         .replace(/\s+/g, " ")
-        .slice(0, 120) || "Untitled";
+        .slice(0, 120) || "";
     }
     function getExportBaseName() {
-      return sanitizeFileStem(props.title && String(props.title).trim());
+      const parts = [
+        sanitizeFileStem(props.location),
+        sanitizeFileStem(props.shelfmark),
+      ].filter(Boolean);
+      if (parts.length) return parts.join("_");
+      return sanitizeFileStem(props.title && String(props.title).trim()) || "Untitled";
     }
     function closeExportDialogs() {
       showExportPopup.value = false;
@@ -4391,6 +4532,7 @@ export default {
       dragDeltaLabel,
       tooltipLabel,
       clampPct,
+      snapRulerPct,
 
       // headbands / supports
       headbandLeftPositions,
@@ -4400,6 +4542,7 @@ export default {
       addHeadbandLeft,
       addHeadbandRight,
       supportEntries,
+      recentlyAddedSupportId,
       openAddSupportPopup,
       showAddSupportPopup,
       supportTypeChoice,
@@ -4476,6 +4619,7 @@ export default {
       onHoleClick,
       onSewingHoleClick,
       sewingHoleLeft,
+      getHoleDisplayColor,
       onSupportClick,
       finishSelection,
       cancelSelection,
@@ -4878,6 +5022,30 @@ export default {
 
 .support-bar.selected {
   outline: 2px solid #00b7ff;
+}
+.support-bar.recently-added {
+  outline: 2px solid rgba(255, 239, 170, 0.95);
+  box-shadow:
+    0 0 0 2px rgba(255, 230, 120, 0.65),
+    0 0 10px rgba(255, 215, 80, 0.95),
+    0 0 18px rgba(255, 215, 80, 0.7);
+  animation: support-added-glow 0.9s ease-in-out infinite;
+}
+
+@keyframes support-added-glow {
+  0%,
+  100% {
+    box-shadow:
+      0 0 0 2px rgba(255, 230, 120, 0.45),
+      0 0 8px rgba(255, 215, 80, 0.8),
+      0 0 14px rgba(255, 215, 80, 0.55);
+  }
+  50% {
+    box-shadow:
+      0 0 0 2px rgba(255, 244, 180, 0.9),
+      0 0 14px rgba(255, 225, 110, 1),
+      0 0 24px rgba(255, 225, 110, 0.85);
+  }
 }
 
 /* Dots */
@@ -5396,7 +5564,7 @@ export default {
   border-radius: 50%;
 }
 
-/* Rupture lightning bolt element */
+/* Rupture broken-line element */
 .rupture-element {
   position: absolute;
   top: 50%;
@@ -5405,43 +5573,44 @@ export default {
   display: flex;
   align-items: center;
   justify-content: center;
-  font-size: 14px;
   z-index: 5100; /* Extremely high to ensure it's above canvas drawings */
-  background: radial-gradient(circle at 30% 30%, #FF6B47, #CC3A1F, #991F0A);
-  border: 2px solid #661100;
-  border-radius: 2px;
-  box-shadow: 
-    0 2px 4px rgba(0, 0, 0, 0.4),
-    inset 0 1px 0 rgba(255, 107, 71, 0.4),
-    inset 0 -1px 0 rgba(102, 17, 0, 0.8),
-    0 0 8px rgba(255, 107, 71, 0.3);
+  background: transparent;
+  border: none;
+  box-shadow: none;
   transition: transform 0.1s ease;
-  text-shadow: 0 1px 2px rgba(0, 0, 0, 0.8);
 }
 
-.rupture-element::before {
-  content: '';
+.rupture-glyph {
+  position: relative;
+  display: block;
+  width: 100%;
+  height: 100%;
+}
+
+.rupture-segment {
   position: absolute;
-  top: 1px;
-  left: 1px;
-  right: 1px;
-  bottom: 1px;
-  background: linear-gradient(135deg, 
-    rgba(255, 107, 71, 0.3) 0%, 
-    transparent 25%, 
-    rgba(102, 17, 0, 0.4) 75%
-  );
-  border-radius: 0px;
-  pointer-events: none;
+  top: 50%;
+  height: 4px;
+  width: calc(50% - 4px);
+  transform: translateY(-50%);
+  border-radius: 999px;
+  background: linear-gradient(180deg, #ff8a6c, #d84924);
+  border: 1px solid #8b2107;
+  box-shadow:
+    0 1px 2px rgba(0, 0, 0, 0.35),
+    0 0 6px rgba(255, 107, 71, 0.25);
+}
+
+.rupture-segment-left {
+  left: 0;
+}
+
+.rupture-segment-right {
+  right: 0;
 }
 
 .rupture-container:hover .rupture-element {
   transform: translate(-50%, -50%) scale(1.1);
-  box-shadow: 
-    0 3px 8px rgba(0, 0, 0, 0.5),
-    inset 0 1px 0 rgba(255, 107, 71, 0.5),
-    inset 0 -1px 0 rgba(102, 17, 0, 0.9),
-    0 0 12px rgba(255, 107, 71, 0.5);
 }
 
 .rupture-container:hover .rupture-mask {
@@ -5458,19 +5627,35 @@ export default {
 
 .rupture-container:active .rupture-element {
   transform: translate(-50%, -50%) scale(0.95);
-  box-shadow: 
-    0 1px 3px rgba(0, 0, 0, 0.6),
-    inset 0 2px 4px rgba(102, 17, 0, 0.8),
-    0 0 6px rgba(255, 107, 71, 0.4);
 }
 
 /* Rupture swatch in legend */
 .swatch.rupture {
-  background: radial-gradient(circle at 30% 30%, #FF6B47, #CC3A1F);
-  border: 2px solid #661100;
-  box-shadow: 
-    inset 0 1px 0 rgba(255, 107, 71, 0.4),
-    0 0 4px rgba(255, 107, 71, 0.3);
+  position: relative;
+  background: hsl(var(--card));
+  border: 1px solid #c85b3e;
+  box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.55);
+}
+
+.swatch.rupture::before,
+.swatch.rupture::after {
+  content: '';
+  position: absolute;
+  top: 50%;
+  width: 4px;
+  height: 2px;
+  transform: translateY(-50%);
+  border-radius: 999px;
+  background: #d84924;
+  border: 1px solid #8b2107;
+}
+
+.swatch.rupture::before {
+  left: 2px;
+}
+
+.swatch.rupture::after {
+  right: 2px;
 }
 
 /* QuillApp-inspired visual layer */
@@ -5506,6 +5691,101 @@ export default {
 
 .footer .legend {
   background: transparent;
+  display: flex;
+  gap: 14px;
+  flex: 1 1 auto;
+  align-items: center;
+  flex-wrap: wrap;
+}
+
+.footer {
+  align-items: center;
+  gap: 24px;
+}
+
+.legend-group {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  flex-wrap: wrap;
+}
+
+.legend-static {
+  display: inline-flex;
+  align-items: center;
+  gap: 10px;
+  min-height: 34px;
+  padding: 6px 12px;
+  border-radius: 999px;
+  border: 1px solid hsl(var(--border));
+  background: hsl(var(--muted));
+  color: hsl(var(--card-foreground));
+  font-weight: 700;
+  white-space: nowrap;
+}
+
+.legend-static .swatch {
+  margin-right: 0;
+}
+
+.legend-static-text {
+  padding-inline: 14px;
+}
+
+.legend-buttons {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  flex-wrap: wrap;
+}
+
+.legend-buttons button {
+  margin-left: 0;
+}
+
+.legend-buttons-tools {
+  align-items: center;
+  justify-content: center;
+}
+
+.legend-tool-btn {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 10px;
+  min-height: 38px;
+  padding: 6px 14px;
+  border-radius: 999px;
+  white-space: nowrap;
+}
+
+.legend-tool-icon {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 4px;
+  min-width: 26px;
+}
+
+.legend-tool-btn .swatch {
+  margin-right: 0;
+  flex: 0 0 auto;
+}
+
+.legend-tool-plus {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 16px;
+  line-height: 1;
+  font-weight: 800;
+}
+
+.footer-export {
+  display: flex;
+  align-items: center;
+  justify-content: flex-end;
+  flex: 0 0 auto;
 }
 
 .breadcrumb,
@@ -5723,6 +6003,11 @@ export default {
 @media (max-width: 900px) {
   .header-bar {
     padding-left: 122px;
+  }
+
+  .footer {
+    align-items: flex-start;
+    gap: 12px;
   }
 }
 </style>

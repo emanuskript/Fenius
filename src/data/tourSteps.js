@@ -16,24 +16,59 @@ export const FLOW_TOUR_STEPS = {
       placement: "bottom",
     },
     {
-      id: "left-tools",
-      title: "Ruling Construction",
-      content: "Use this sidebar to add lines, circles, and prickings quickly.",
-      target: ".ruling-page .side-left",
+      id: "modes",
+      title: "Interaction Modes",
+      content:
+        "Switch between Draw, Erase, and Select here. Draw adds new features, Erase removes them with the rectangular eraser, and Select lets you inspect, recolor, and adjust existing items.",
+      target: ".ruling-page .side-left .panel:nth-of-type(1)",
       placement: "right",
+    },
+    {
+      id: "lines",
+      title: "Lines",
+      content:
+        "Build single horizontal lines or whole horizontal series here. This is the main control area for ruling lines before you refine them in Select mode.",
+      target: ".ruling-page .side-left .panel:nth-of-type(2)",
+      placement: "right",
+    },
+    {
+      id: "prickings",
+      title: "Prickings",
+      content:
+        "Add individual prickings or vertical groups from this section. In Draw mode you can also click directly inside the page to place them.",
+      target: ".ruling-page .side-left .panel:nth-of-type(3)",
+      placement: "right",
+    },
+    {
+      id: "circles",
+      title: "Circles and Ovals",
+      content:
+        "Use this section for compass impressions and irregular oval marks. After placing one, switch to Select mode to move the center and reshape its axes.",
+      target: ".ruling-page .side-left .panel:nth-of-type(4)",
+      placement: "right",
+    },
+    {
+      id: "canvas-controls",
+      title: "Canvas Controls",
+      content:
+        "These controls manage zoom, image visibility, opacity, and intersection labels so you can compare the ruling against the source image while you work.",
+      target: ".ruling-page .stage-header",
+      placement: "bottom",
     },
     {
       id: "canvas",
       title: "Main Canvas",
-      content: "Draw directly with rulers and guides; zoom and snapping controls sit above this area.",
-      target: ".ruling-page .center",
+      content:
+        "Use the rulers and page area to draw directly. The guides, millimetre snapping, and hover position readout all update here as you work.",
+      target: ".ruling-page .canvas-wrap",
       placement: "top",
-      spotlightPadding: 6,
+      spotlightPadding: 8,
     },
     {
       id: "right-panel",
       title: "Selection and Export",
-      content: "Inspect selected elements, tune image alignment, and export from this side panel.",
+      content:
+        "The right sidebar is where you edit selected features, align the image, keep notes, and export the finished ruling schema.",
       target: ".ruling-page .side-right",
       placement: "left",
     },

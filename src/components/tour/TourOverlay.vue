@@ -33,12 +33,13 @@ const props = defineProps({
 defineEmits(["next", "prev", "finish", "skip"]);
 
 const targetRect = ref(null);
+let frameId = 0;
 
 const isLast = computed(() => props.stepNumber === props.total);
 
 const clamp = (value, min, max) => Math.max(min, Math.min(max, value));
 
-function updateTargetRect() {
+function updateTargetRect({ shouldScroll = false } = {}) {
   if (!props.step?.target) {
     targetRect.value = null;
     return;
@@ -61,27 +62,36 @@ function updateTargetRect() {
     right: rect.right + pad,
   };
 
-  if (props.step.scrollIntoView !== false) {
+  if (shouldScroll && props.step.scrollIntoView !== false) {
     el.scrollIntoView({ behavior: "smooth", block: "center", inline: "center" });
   }
+}
+
+function scheduleTargetRectUpdate(options = {}) {
+  if (frameId) cancelAnimationFrame(frameId);
+  frameId = requestAnimationFrame(() => {
+    frameId = 0;
+    updateTargetRect(options);
+  });
 }
 
 watch(
   () => props.step,
   () => {
-    setTimeout(updateTargetRect, 20);
+    scheduleTargetRectUpdate({ shouldScroll: true });
   },
   { immediate: true }
 );
 
 onMounted(() => {
-  window.addEventListener("resize", updateTargetRect);
-  window.addEventListener("scroll", updateTargetRect, true);
+  window.addEventListener("resize", scheduleTargetRectUpdate);
+  window.addEventListener("scroll", scheduleTargetRectUpdate, true);
 });
 
 onUnmounted(() => {
-  window.removeEventListener("resize", updateTargetRect);
-  window.removeEventListener("scroll", updateTargetRect, true);
+  if (frameId) cancelAnimationFrame(frameId);
+  window.removeEventListener("resize", scheduleTargetRectUpdate);
+  window.removeEventListener("scroll", scheduleTargetRectUpdate, true);
 });
 
 const cutoutStyle = computed(() => {
@@ -157,7 +167,9 @@ const tooltipStyle = computed(() => {
   border: 2px solid hsl(var(--ring));
   box-shadow: 0 0 0 9999px rgb(3 9 18 / 0.72), 0 0 0 1px rgb(255 255 255 / 0.3) inset;
   pointer-events: none;
-  transition: all 0.22s ease;
+  transition: top 0.2s ease, left 0.2s ease, width 0.2s ease, height 0.2s ease,
+    border-radius 0.2s ease;
+  will-change: top, left, width, height;
 }
 
 .tour-tooltip {
@@ -165,6 +177,8 @@ const tooltipStyle = computed(() => {
   width: min(380px, calc(100vw - 24px));
   padding: 18px;
   z-index: 12910;
+  transition: top 0.18s ease, left 0.18s ease, transform 0.18s ease;
+  will-change: top, left, transform;
 }
 
 .tour-progress {
