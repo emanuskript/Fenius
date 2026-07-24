@@ -1,0 +1,24 @@
+cff-version: 1.2.0
+message: "If you use Fenius, please cite the software using the metadata in this file."
+type: software
+title: "Fenius: Manuscript Structure and Bookbinding Workflows"
+abstract: >-
+  Fenius is a Vue-based application for manuscript workflows, including
+  ruling-scheme creation, manuscript metadata processing, and interactive
+  book-spine visualization.
+authors:
+  - given-names: Mohamed
+    family-names: Basuony
+    affiliation: Georg-August-Universität Göttingen
+    orcid: "https://orcid.org/0009-0004-7819-0622"
+version: 0.1.0
+date-released: "2026-07-24"
+license: Apache-2.0
+repository-code: "https://github.com/emanuskript/Fenius"
+url: "https://github.com/emanuskript/Fenius"
+keywords:
+  - manuscript studies
+  - digital humanities
+  - codicology
+  - bookbinding
+  - ruling schemes
