@@ -2,6 +2,10 @@
 node_modules
 /dist
 
+# Book-paths: heavy source SVGs (Save-as-SVG source) and the unused legacy layer set
+/public/book-paths/originals/
+/public/book-paths/layers/
+
 
 # local env files
 .env.local
