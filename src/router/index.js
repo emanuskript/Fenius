@@ -6,6 +6,7 @@ import InputScreen from '@/components/InputScreen.vue'
 import BookBindingScreen from '@/components/BookBindingScreen.vue'
 import RulingMetadataScreen from '@/components/RulingMetadataScreen.vue'
 import RulingScreen from '@/components/RulingScreen.vue'
+import BookPathsRoute from '@/components/BookPathsRoute.vue'
 
 const routes = [
   { path: '/', name: 'landing', component: LandingPage },
@@ -43,6 +44,13 @@ const routes = [
     path: '/ruling-metadata',
     name: 'rulingMetadata',
     component: RulingMetadataScreen,
+  },
+
+  // Book paths wizard ("Build a bookbinding") — reads title/date/shelfmark/location from route.query
+  {
+    path: '/book-paths',
+    name: 'bookPaths',
+    component: BookPathsRoute,
   },
 
   // Ruling screen (takes metadata as props)

@@ -37,8 +37,8 @@
           </transition>
         </div>
 
-        <button type="button" class="action-button secondary-btn is-coming-soon" disabled>
-          Build a bookbinding • Coming soon!
+        <button type="button" class="action-button secondary-btn" @click="goToBookbinding">
+          Build a bookbinding
         </button>
       </div>
     </section>
@@ -62,6 +62,10 @@ function goToBookbindingCreate() {
 
 function goToRuling() {
   router.push({ name: "rulingMetadata" });
+}
+
+function goToBookbinding() {
+  router.push({ name: "bookPaths" });
 }
 
 function handleFileUpload(event) {
