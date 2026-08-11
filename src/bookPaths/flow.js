@@ -4,12 +4,12 @@ export const BOOK_PATHS_FLOW = {
     kind: "style",
     style: null,
     title: "Choose a Style",
-    body: "Start by choosing the historical tradition. Each step records your path and can be revised with Back/Restart.",
-    images: ["26", "35", "37"],
+    body: "Choose the historical binding tradition. Romanesque is available now; Carolingian and Gothic are coming soon.",
+    images: ["72"],
     options: [
-      { label: "Carolingian", next: "carolingian_board", set: { style: "Carolingian" } },
+      { label: "Carolingian", disabled: true },
       { label: "Romanesque", next: "romanesque_intro", set: { style: "Romanesque" } },
-      { label: "Gothic", next: "gothic_board", set: { style: "Gothic" } },
+      { label: "Gothic", disabled: true },
     ],
   },
 
