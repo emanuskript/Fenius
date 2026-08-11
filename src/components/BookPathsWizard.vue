@@ -4,7 +4,7 @@
     :class="{ fullscreen }"
     @click.self="handleClose"
   >
-    <section class="book-paths-modal surface-card" role="dialog" aria-modal="true" aria-label="Book Paths Wizard">
+    <section class="book-paths-modal surface-card" role="dialog" aria-modal="true" aria-label="Build a Bookbinding wizard">
       <header class="bp-header">
         <div>
           <h2>Build a Bookbinding</h2>
@@ -24,9 +24,9 @@
             <li>
               <button class="ghost-btn" @click="jumpToDecision(0)">Start</button>
             </li>
-            <li v-for="(entry, index) in answeredEntries" :key="entry.key">
-              <button class="ghost-btn" @click="jumpToDecision(index)">
-                {{ index + 1 }}. {{ entry.title }}
+            <li v-for="(entry, i) in answeredEntries" :key="entry.key">
+              <button class="ghost-btn" @click="jumpToDecision(entry.index)">
+                {{ i + 1 }}. {{ entry.title }}
                 <span class="crumb-choice">→ {{ entry.choiceLabel }}</span>
               </button>
             </li>
@@ -39,7 +39,7 @@
         <main class="bp-main">
           <template v-if="summary">
             <h3>Your Romanesque Binding</h3>
-            <p class="bp-copy">Here's the binding you built. Restart to explore alternatives, or close to return.</p>
+            <p class="bp-copy">Here's the binding you built. Click any step in the Path on the left to revise just that choice, or restart to begin again.</p>
             <div class="summary-grid">
               <div class="summary-recap surface-card">
                 <p class="recap-style"><strong>{{ summary.style || "—" }}</strong> binding</p>
@@ -51,8 +51,17 @@
                 </dl>
               </div>
               <figure class="summary-figure">
-                <img :src="finalModelSrc" alt="Your finished binding" />
-                <figcaption>Your finished binding</figcaption>
+                <figcaption class="figure-head">
+                  <span class="fig-title">Your finished binding</span>
+                  <span class="save-wrap">
+                    <button type="button" class="ghost-btn save-btn" aria-haspopup="menu" :aria-expanded="saveMenuKey === 'summary'" @click="toggleSaveMenu('summary')">Save ▾</button>
+                    <div v-if="saveMenuKey === 'summary'" class="save-menu" role="menu">
+                      <button type="button" role="menuitem" @click="saveModel('png')">PNG (transparent)</button>
+                      <button type="button" role="menuitem" @click="saveModel('jpg')">JPG (on white)</button>
+                    </div>
+                  </span>
+                </figcaption>
+                <img :src="finalModelSrc" alt="Your finished Romanesque binding" />
               </figure>
             </div>
           </template>
@@ -69,7 +78,7 @@
                 :key="`${currentNode.id}-${idx}`"
                 class="primary-btn"
                 :class="{ 'is-disabled': option.disabled }"
-                :disabled="option.disabled"
+                :aria-disabled="option.disabled ? 'true' : 'false'"
                 @click="choose(option)"
               >
                 {{ option.label }}<span v-if="option.disabled" class="soon"> — coming soon</span>
@@ -81,32 +90,33 @@
             </div>
 
             <!-- The evolving book, built up from every choice so far -->
-            <section class="bp-model-wrap">
+            <section class="bp-model-wrap" aria-live="polite">
               <div class="model-caption">
                 <span>{{ modelCaption }}</span>
                 <span class="save-wrap">
-                  <button type="button" class="ghost-btn save-btn" @click="toggleSaveMenu('model')">Save ▾</button>
-                  <div v-if="saveMenuKey === 'model'" class="save-menu">
-                    <button type="button" @click="saveModel('png')">PNG (transparent)</button>
-                    <button type="button" @click="saveModel('jpg')">JPG (on white)</button>
+                  <button type="button" class="ghost-btn save-btn" aria-haspopup="menu" :aria-expanded="saveMenuKey === 'model'" @click="toggleSaveMenu('model')">Save ▾</button>
+                  <div v-if="saveMenuKey === 'model'" class="save-menu" role="menu">
+                    <button type="button" role="menuitem" @click="saveModel('png')">PNG (transparent)</button>
+                    <button type="button" role="menuitem" @click="saveModel('jpg')">JPG (on white)</button>
                   </div>
                 </span>
               </div>
               <button
                 type="button"
                 class="model-stage"
-                title="Zoom the drawing"
+                :title="`Zoom: ${modelCaption}`"
                 @click="openLightbox"
               >
                 <img
                   v-for="layer in modelLayers"
                   :key="layer.key"
                   :src="layer.src"
-                  :alt="`Drawing ${layer.key}`"
+                  :alt="modelCaption"
                   class="model-layer"
                 />
                 <span class="zoom-hint" aria-hidden="true">⤢</span>
               </button>
+              <p class="model-hint">The drawing reflects your choices so far.</p>
             </section>
           </template>
 
@@ -119,7 +129,7 @@
       </div>
 
       <div v-if="lightbox" class="bp-lightbox" @click.self="closeLightbox">
-        <div class="bp-lightbox-card surface-card">
+        <div class="bp-lightbox-card surface-card" role="dialog" aria-modal="true" aria-label="Zoomed drawing">
           <div class="lightbox-head">
             <strong>{{ modelCaption }}</strong>
             <div class="lightbox-tools">
@@ -127,7 +137,7 @@
               <span class="zoom-label">{{ Math.round(lbZoom * 100) }}%</span>
               <button type="button" class="ghost-btn" title="Zoom in" @click="zoomIn">＋</button>
               <button type="button" class="ghost-btn" @click="resetZoom">Reset</button>
-              <button type="button" class="secondary-btn" @click="closeLightbox">Close</button>
+              <button ref="lightboxCloseBtn" type="button" class="secondary-btn" @click="closeLightbox">Close</button>
             </div>
           </div>
           <div
@@ -145,13 +155,13 @@
                 v-for="layer in modelLayers"
                 :key="layer.key"
                 :src="layer.src"
-                :alt="`Drawing ${layer.key}`"
+                :alt="modelCaption"
                 class="lightbox-layer"
                 draggable="false"
               />
             </div>
           </div>
-          <p class="lightbox-hint">Scroll to zoom · drag to pan · double-click to toggle</p>
+          <p class="lightbox-hint">Scroll to zoom · drag to pan · double-click to toggle · Esc to close</p>
         </div>
       </div>
     </section>
@@ -160,7 +170,7 @@
 
 <script setup>
 /* eslint-disable */
-import { computed, ref } from "vue";
+import { computed, ref, watch, onMounted, onBeforeUnmount, nextTick } from "vue";
 import { BOOK_PATHS_FLOW } from "@/bookPaths/flow";
 import { applyOption, buildSummary, createInitialWizardState, replayState } from "@/bookPaths/state";
 
@@ -171,10 +181,13 @@ const props = defineProps({
 
 const emit = defineEmits(["close", "finish"]);
 
+const STORAGE_KEY = "fenius-bookpaths-progress";
+
 const state = ref(createInitialWizardState(props.initialContext));
 const summary = ref(null);
 const lightbox = ref(null);
 const saveMenuKey = ref(null);
+const lightboxCloseBtn = ref(null);
 
 // lightbox zoom / pan
 const lbZoom = ref(1);
@@ -187,12 +200,12 @@ const lbImgStyle = computed(() => ({
 }));
 
 // ---------------------------------------------------------------------------
-// The evolving "book so far": one drawing that reflects every choice made so
-// far, so the binding is built up step by step. Most steps show a single
-// self-contained scene (block -> holed block -> sewn book -> covered -> fastened);
-// the one place two layers genuinely register is the block sitting on the frame.
-// The board-preparation steps show the board on its own (the book is set aside),
-// mirroring the source diagram.
+// The evolving "book so far": one drawing (or a registered layer stack) that
+// reflects every choice, so the binding is built up step by step:
+//   block -> holed block -> block on the sewing frame -> sewn book ->
+//   [boards prepared on their own] -> sewn book gains lining -> + endband ->
+//   + tab -> covered book -> fastened book.
+// Lining/endband/tab drawings register onto the sewn book, so they stack.
 // ---------------------------------------------------------------------------
 const displaySrc = (key) => `/book-paths/display/${key}.webp`;
 const layerSrc = (key) => `/book-paths/layers/${key}.webp`;
@@ -201,6 +214,9 @@ const HOLED = { cut: "9", pierced: "8" };
 const SEWN = { herringbone: "82", straight: "81", "packed-straight": "83" };
 const BOARD = { square: "26", bevelled: "27", rounded: "28" };
 const CORNER = { square: "29", bevelled: "30", rounded: "31B" };
+const LINING = { patch: "39B", slotted: "40B" };
+const ENDBAND = { "double-herringbone": "48", "double-straight-packed": "49", "single-straight-packed": "50" };
+const TAB = { square: "52", round: "53" };
 const FASTEN = { "short-strap": "63", "long-strap": "64" };
 const frameKey = (d) => (d.support === "twisted-leather" ? "14A" : "12A");
 const coverKey = (d) =>
@@ -208,14 +224,23 @@ const coverKey = (d) =>
     ? (d.coverStitch === "link" ? "55A" : "56B")
     : (d.coverStitch === "link" ? "55" : "56");
 
+const BOARD_PREP = new Set(["romanesque_channels", "romanesque_backcorner"]);
+
 function bookSoFar(d, cur) {
-  // board-preparation detour (book set aside, board being shaped)
+  // board-preparation detour: the board is shaped on its own (book set aside)
   if (cur === "romanesque_channels") return { keys: [d.board ? BOARD[d.board] : "26"], composite: false };
   if (cur === "romanesque_backcorner") return { keys: [d.board ? CORNER[d.board] : "29"], composite: false };
-  // cumulative book state
+  // finished states
   if (d.fastening) return { keys: [FASTEN[d.fastening]], composite: false };
   if (d.coverStitch) return { keys: [coverKey(d)], composite: false };
-  if (d.sewing) return { keys: [SEWN[d.sewing]], composite: false };
+  // the sewn book, accumulating lining -> endband -> tab (all register onto it)
+  if (d.sewing) {
+    const layers = [SEWN[d.sewing]];
+    if (LINING[d.lining]) layers.push(LINING[d.lining]);
+    if (ENDBAND[d.endband]) layers.push(ENDBAND[d.endband]);
+    if (TAB[d.endbandTab]) layers.push(TAB[d.endbandTab]);
+    return { keys: layers, composite: true }; // untrimmed layers so the pieces line up
+  }
   if (d.support) return { keys: [d.holes ? HOLED[d.holes] : "72", frameKey(d)], composite: true };
   if (d.holes) return { keys: [HOLED[d.holes]], composite: false };
   return { keys: ["72"], composite: false };
@@ -229,7 +254,6 @@ const modelLayers = computed(() => {
   return keys.filter(Boolean).map((k) => ({ key: k, src: composite ? layerSrc(k) : displaySrc(k) }));
 });
 
-const BOARD_PREP = new Set(["romanesque_board", "romanesque_channels", "romanesque_backcorner"]);
 const modelCaption = computed(() =>
   BOARD_PREP.has(state.value.currentNodeId) ? "Preparing the boards (the book is set aside)" : "Your book so far"
 );
@@ -241,12 +265,18 @@ const isTerminal = computed(() => {
 
 const styleLabel = computed(() => state.value.style || "");
 
+// pure forced-advance transitions are not shown as revisable path steps
+const HIDDEN_CRUMBS = new Set(["romanesque_intro", "romanesque_lacing"]);
 const answeredEntries = computed(() =>
-  state.value.steps.map((step, index) => ({
-    key: `${step.nodeId}-${index}`,
-    title: step.title || resolveNodeTitle(step.nodeId),
-    choiceLabel: step.choiceLabel,
-  }))
+  state.value.steps
+    .map((step, index) => ({
+      key: `${step.nodeId}-${index}`,
+      index,
+      nodeId: step.nodeId,
+      title: step.title || resolveNodeTitle(step.nodeId),
+      choiceLabel: step.choiceLabel,
+    }))
+    .filter((e) => !HIDDEN_CRUMBS.has(e.nodeId))
 );
 
 // ---- human-readable summary ----
@@ -309,6 +339,7 @@ function restartWizard() {
   summary.value = null;
   saveMenuKey.value = null;
   closeLightbox();
+  try { sessionStorage.removeItem(STORAGE_KEY); } catch (e) {}
 }
 
 function finishWizard() {
@@ -320,14 +351,66 @@ function resolveNodeTitle(nodeId) {
   return BOOK_PATHS_FLOW[nodeId]?.title || nodeId;
 }
 
+// ---- persistence (survive refresh / accidental reload) ----
+watch(
+  () => state.value.steps,
+  (steps) => {
+    try {
+      if (steps && steps.length) sessionStorage.setItem(STORAGE_KEY, JSON.stringify(steps));
+      else sessionStorage.removeItem(STORAGE_KEY);
+    } catch (e) {}
+  },
+  { deep: true }
+);
+
+function beforeUnloadGuard(e) {
+  if (state.value.steps.length && !summary.value) {
+    e.preventDefault();
+    e.returnValue = "";
+  }
+}
+
+onMounted(() => {
+  try {
+    const saved = sessionStorage.getItem(STORAGE_KEY);
+    if (saved) {
+      const steps = JSON.parse(saved);
+      if (Array.isArray(steps) && steps.length) {
+        state.value = replayState(steps, BOOK_PATHS_FLOW, props.initialContext);
+      }
+    }
+  } catch (e) {}
+  window.addEventListener("keydown", onKeydown);
+  window.addEventListener("beforeunload", beforeUnloadGuard);
+  window.addEventListener("click", onDocClick, true);
+});
+onBeforeUnmount(() => {
+  window.removeEventListener("keydown", onKeydown);
+  window.removeEventListener("beforeunload", beforeUnloadGuard);
+  window.removeEventListener("click", onDocClick, true);
+});
+
+function onKeydown(e) {
+  if (e.key !== "Escape") return;
+  if (lightbox.value) { closeLightbox(); return; }
+  if (saveMenuKey.value) { saveMenuKey.value = null; }
+}
+function onDocClick(e) {
+  if (saveMenuKey.value && !e.target.closest(".save-wrap")) saveMenuKey.value = null;
+}
+
 // ---- lightbox ----
-function openLightbox() {
+let lightboxOpener = null;
+function openLightbox(e) {
+  lightboxOpener = e && e.currentTarget ? e.currentTarget : null;
   lightbox.value = true;
   resetZoom();
+  nextTick(() => { if (lightboxCloseBtn.value) lightboxCloseBtn.value.focus(); });
 }
 function closeLightbox() {
   lightbox.value = null;
   resetZoom();
+  if (lightboxOpener && lightboxOpener.focus) lightboxOpener.focus();
 }
 function resetZoom() { lbZoom.value = 1; lbPanX.value = 0; lbPanY.value = 0; lbDragging.value = false; dragStart = null; }
 function clampZoom(z) { return Math.min(8, Math.max(0.25, +z.toFixed(3))); }
@@ -351,7 +434,9 @@ function loadImage(src) {
 }
 async function saveModel(fmt) {
   saveMenuKey.value = null;
-  const layers = modelLayers.value;
+  const layers = summary.value
+    ? [{ key: "final", src: finalModelSrc.value }]
+    : modelLayers.value;
   if (!layers.length) return;
   try {
     const imgs = await Promise.all(layers.map((l) => loadImage(l.src)));
@@ -533,6 +618,13 @@ function handleClose() { emit("close"); }
   object-fit: contain;
 }
 
+.model-hint {
+  margin: 8px 0 0;
+  text-align: center;
+  font-size: 12px;
+  color: hsl(var(--muted-foreground));
+}
+
 .zoom-hint {
   position: absolute;
   right: 8px; bottom: 8px;
@@ -609,8 +701,19 @@ function handleClose() { emit("close"); }
   border: 1px solid hsl(var(--border));
   border-radius: 12px;
   overflow: hidden;
-  background: #fff;
+  background: hsl(var(--card));
 }
+
+.figure-head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+  padding: 8px 10px;
+  border-bottom: 1px solid hsl(var(--border));
+}
+
+.figure-head .fig-title { font-size: 12px; color: hsl(var(--muted-foreground)); }
 
 .summary-figure img {
   width: 100%;
@@ -618,13 +721,6 @@ function handleClose() { emit("close"); }
   object-fit: contain;
   display: block;
   background: #fff;
-}
-
-.summary-figure figcaption {
-  padding: 8px 10px;
-  font-size: 12px;
-  color: hsl(var(--muted-foreground));
-  border-top: 1px solid hsl(var(--border));
 }
 
 /* ---- lightbox ---- */
