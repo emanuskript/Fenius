@@ -2,9 +2,8 @@
 node_modules
 /dist
 
-# Book-paths: heavy source SVGs (Save-as-SVG source) and the unused legacy layer set
+# Book-paths: heavy source SVGs used only as the Save-as-SVG download source
 /public/book-paths/originals/
-/public/book-paths/layers/
 
 
 # local env files

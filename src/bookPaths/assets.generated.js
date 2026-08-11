@@ -158,6 +158,8 @@ export const BOOK_PATHS_ASSETS = {
   "56": "/book-paths/56_Perimeter_Sewing_round_tab_saddle_stitch.svg",
   "56 Perimeter Sewing - saddle stitch": "/book-paths/56_Perimeter_Sewing_-_saddle_stitch.svg",
   "56 Perimeter Sewing, round tab, saddle stitch": "/book-paths/56_Perimeter_Sewing_round_tab_saddle_stitch.svg",
+  "56B": "/book-paths/56B_Perimeter_Sewing_-_square_tab_saddle.svg",
+  "56B Perimeter Sewing - square tab saddle": "/book-paths/56B_Perimeter_Sewing_-_square_tab_saddle.svg",
   "57": "/book-paths/57_Mitred_Corners.svg",
   "57 Mitred Corners": "/book-paths/57_Mitred_Corners.svg",
   "58": "/book-paths/58_Mitred_Corners_with_stitching.webp",

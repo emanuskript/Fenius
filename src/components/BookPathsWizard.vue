@@ -7,10 +7,10 @@
     <section class="book-paths-modal surface-card" role="dialog" aria-modal="true" aria-label="Book Paths Wizard">
       <header class="bp-header">
         <div>
-          <h2>Book Paths</h2>
+          <h2>Build a Bookbinding</h2>
           <p class="bp-subtitle">
-            <span v-if="styleLabel">Style: {{ styleLabel }}</span>
-            <span v-else>Style not selected</span>
+            <span v-if="styleLabel">{{ styleLabel }} binding</span>
+            <span v-else>Choose a style to begin</span>
             <span v-if="state.context?.title"> | {{ state.context.title }}</span>
           </p>
         </div>
@@ -25,7 +25,7 @@
               <button class="ghost-btn" @click="jumpToDecision(0)">Start</button>
             </li>
             <li v-for="(entry, index) in answeredEntries" :key="entry.key">
-              <button class="ghost-btn" @click="jumpToDecision(index + 1)">
+              <button class="ghost-btn" @click="jumpToDecision(index)">
                 {{ index + 1 }}. {{ entry.title }}
                 <span class="crumb-choice">→ {{ entry.choiceLabel }}</span>
               </button>
@@ -38,18 +38,22 @@
 
         <main class="bp-main">
           <template v-if="summary">
-            <h3>Chosen Path Summary</h3>
-            <p class="bp-copy">Review the result, restart to explore alternatives, or close to return.</p>
-            <div class="summary-box">
-              <p><strong>Style:</strong> {{ summary.style || "Not set" }}</p>
-              <p><strong>Steps:</strong></p>
-              <ul>
-                <li v-for="(step, idx) in summary.steps" :key="`${step.nodeId}-${idx}`">
-                  {{ idx + 1 }}. {{ step.title || resolveNodeTitle(step.nodeId) }} — {{ step.choiceLabel }}
-                </li>
-              </ul>
-              <p><strong>Derived:</strong></p>
-              <pre>{{ formattedDerived }}</pre>
+            <h3>Your Romanesque Binding</h3>
+            <p class="bp-copy">Here's the binding you built. Restart to explore alternatives, or close to return.</p>
+            <div class="summary-grid">
+              <div class="summary-recap surface-card">
+                <p class="recap-style"><strong>{{ summary.style || "—" }}</strong> binding</p>
+                <dl>
+                  <template v-for="row in recapRows" :key="row.field">
+                    <dt>{{ row.title }}</dt>
+                    <dd>{{ row.value }}</dd>
+                  </template>
+                </dl>
+              </div>
+              <figure class="summary-figure">
+                <img :src="finalModelSrc" alt="Your finished binding" />
+                <figcaption>Your finished binding</figcaption>
+              </figure>
             </div>
           </template>
 
@@ -64,52 +68,45 @@
                 v-for="(option, idx) in currentNode.options"
                 :key="`${currentNode.id}-${idx}`"
                 class="primary-btn"
+                :class="{ 'is-disabled': option.disabled }"
+                :disabled="option.disabled"
                 @click="choose(option)"
               >
-                {{ option.label }}
+                {{ option.label }}<span v-if="option.disabled" class="soon"> — coming soon</span>
               </button>
             </div>
 
             <div v-else class="bp-terminal-note">
-              Terminal node reached. Click Finish to store this path in summary.
+              Your binding is complete. Click Finish to review it.
             </div>
 
-            <!-- The drawing(s) the chart specifies for this step -->
-            <section class="bp-figures-wrap">
-              <p v-if="compositeMissingNote" class="composite-note">{{ compositeMissingNote }}</p>
-              <div
-                class="bp-figures"
-                :class="{ single: renderedImages.length === 1 && renderedImages[0] && renderedImages[0].src }"
-              >
-                <template v-if="renderedImages.length">
-                  <figure v-for="image in renderedImages" :key="image.key" class="figure-card">
-                    <button
-                      v-if="image.src"
-                      type="button"
-                      class="figure-img"
-                      @click="openLightbox(image.key, image.src)"
-                      :title="`Zoom ${image.key}`"
-                    >
-                      <img :src="image.src" :alt="`Drawing ${image.key}`" loading="lazy" />
-                      <span class="zoom-hint" aria-hidden="true">⤢</span>
-                    </button>
-                    <div v-else class="figure-img missing">
-                      <span>Missing asset: {{ image.key }}</span>
-                    </div>
-                    <figcaption class="figure-cap">
-                      <span class="fig-key">{{ image.key }}</span>
-                      <span v-if="image.src" class="save-wrap">
-                        <button type="button" class="ghost-btn save-btn" @click="toggleSaveMenu(image.key)">Save ▾</button>
-                        <div v-if="saveMenuKey === image.key" class="save-menu">
-                          <button type="button" @click="saveImage(image, 'svg')">SVG (vector)</button>
-                          <button type="button" @click="saveImage(image, 'jpg')">JPG (image)</button>
-                        </div>
-                      </span>
-                    </figcaption>
-                  </figure>
-                </template>
-                <div v-else class="gallery-empty">No drawing for this step.</div>
+            <!-- The evolving book, built up from every choice so far -->
+            <section class="bp-model-wrap">
+              <div class="model-caption">
+                <span>{{ modelCaption }}</span>
+                <span class="save-wrap">
+                  <button type="button" class="ghost-btn save-btn" @click="toggleSaveMenu('model')">Save ▾</button>
+                  <div v-if="saveMenuKey === 'model'" class="save-menu">
+                    <button type="button" @click="saveModel('png')">PNG (transparent)</button>
+                    <button type="button" @click="saveModel('jpg')">JPG (on white)</button>
+                  </div>
+                </span>
               </div>
+              <button
+                type="button"
+                class="model-stage"
+                title="Zoom the drawing"
+                @click="openLightbox"
+              >
+                <img
+                  v-for="layer in modelLayers"
+                  :key="layer.key"
+                  :src="layer.src"
+                  :alt="`Drawing ${layer.key}`"
+                  class="model-layer"
+                />
+                <span class="zoom-hint" aria-hidden="true">⤢</span>
+              </button>
             </section>
           </template>
 
@@ -124,15 +121,12 @@
       <div v-if="lightbox" class="bp-lightbox" @click.self="closeLightbox">
         <div class="bp-lightbox-card surface-card">
           <div class="lightbox-head">
-            <strong>{{ lightbox.key }}</strong>
+            <strong>{{ modelCaption }}</strong>
             <div class="lightbox-tools">
               <button type="button" class="ghost-btn" title="Zoom out" @click="zoomOut">−</button>
               <span class="zoom-label">{{ Math.round(lbZoom * 100) }}%</span>
               <button type="button" class="ghost-btn" title="Zoom in" @click="zoomIn">＋</button>
               <button type="button" class="ghost-btn" @click="resetZoom">Reset</button>
-              <span class="tool-sep" aria-hidden="true"></span>
-              <button type="button" class="ghost-btn" @click="saveImage(lightbox, 'svg')">SVG</button>
-              <button type="button" class="ghost-btn" @click="saveImage(lightbox, 'jpg')">JPG</button>
               <button type="button" class="secondary-btn" @click="closeLightbox">Close</button>
             </div>
           </div>
@@ -146,12 +140,16 @@
             @pointerleave="onPointerUp"
             @dblclick="toggleDoubleZoom"
           >
-            <img
-              :src="lightbox.src"
-              :alt="`Drawing ${lightbox.key}`"
-              :style="lbImgStyle"
-              draggable="false"
-            />
+            <div class="lightbox-canvas" :style="lbImgStyle">
+              <img
+                v-for="layer in modelLayers"
+                :key="layer.key"
+                :src="layer.src"
+                :alt="`Drawing ${layer.key}`"
+                class="lightbox-layer"
+                draggable="false"
+              />
+            </div>
           </div>
           <p class="lightbox-hint">Scroll to zoom · drag to pan · double-click to toggle</p>
         </div>
@@ -165,7 +163,6 @@
 import { computed, ref } from "vue";
 import { BOOK_PATHS_FLOW } from "@/bookPaths/flow";
 import { applyOption, buildSummary, createInitialWizardState, replayState } from "@/bookPaths/state";
-import { resolveBookPathAsset } from "@/bookPaths/assets.generated";
 
 const props = defineProps({
   initialContext: { type: Object, default: () => ({}) },
@@ -185,28 +182,64 @@ const lbPanX = ref(0);
 const lbPanY = ref(0);
 const lbDragging = ref(false);
 let dragStart = null;
-
 const lbImgStyle = computed(() => ({
   transform: `translate(${lbPanX.value}px, ${lbPanY.value}px) scale(${lbZoom.value})`,
 }));
 
-// Keys that have a trimmed, uniformly-framed "display" image (the delivered Romanesque set).
-const DISPLAY_KEYS = new Set([
-  "2B","3B","8","9","12A","14A","26","27","28","29","30","31B","35C","36C","35R",
-  "39B","40B","48","49","50","52","53","55","55A","56","59","63","63A","64","64A","72","81","82","83","90",
-]);
+// ---------------------------------------------------------------------------
+// The evolving "book so far": one drawing that reflects every choice made so
+// far, so the binding is built up step by step. Most steps show a single
+// self-contained scene (block -> holed block -> sewn book -> covered -> fastened);
+// the one place two layers genuinely register is the block sitting on the frame.
+// The board-preparation steps show the board on its own (the book is set aside),
+// mirroring the source diagram.
+// ---------------------------------------------------------------------------
 const displaySrc = (key) => `/book-paths/display/${key}.webp`;
-// Use the trimmed display drawing when we have one, else fall back to the raw asset.
-const bestSrc = (key) => (DISPLAY_KEYS.has(key) ? displaySrc(key) : resolveBookPathAsset(key));
+const layerSrc = (key) => `/book-paths/layers/${key}.webp`;
+
+const HOLED = { cut: "9", pierced: "8" };
+const SEWN = { herringbone: "82", straight: "81", "packed-straight": "83" };
+const BOARD = { square: "26", bevelled: "27", rounded: "28" };
+const CORNER = { square: "29", bevelled: "30", rounded: "31B" };
+const FASTEN = { "short-strap": "63", "long-strap": "64" };
+const frameKey = (d) => (d.support === "twisted-leather" ? "14A" : "12A");
+const coverKey = (d) =>
+  d.endbandTab === "square"
+    ? (d.coverStitch === "link" ? "55A" : "56B")
+    : (d.coverStitch === "link" ? "55" : "56");
+
+function bookSoFar(d, cur) {
+  // board-preparation detour (book set aside, board being shaped)
+  if (cur === "romanesque_channels") return { keys: [d.board ? BOARD[d.board] : "26"], composite: false };
+  if (cur === "romanesque_backcorner") return { keys: [d.board ? CORNER[d.board] : "29"], composite: false };
+  // cumulative book state
+  if (d.fastening) return { keys: [FASTEN[d.fastening]], composite: false };
+  if (d.coverStitch) return { keys: [coverKey(d)], composite: false };
+  if (d.sewing) return { keys: [SEWN[d.sewing]], composite: false };
+  if (d.support) return { keys: [d.holes ? HOLED[d.holes] : "72", frameKey(d)], composite: true };
+  if (d.holes) return { keys: [HOLED[d.holes]], composite: false };
+  return { keys: ["72"], composite: false };
+}
 
 const currentNode = computed(() => BOOK_PATHS_FLOW[state.value.currentNodeId] || null);
+
+const modelLayers = computed(() => {
+  if (state.value.style !== "Romanesque") return [{ key: "72", src: displaySrc("72") }];
+  const { keys, composite } = bookSoFar(state.value.derived || {}, state.value.currentNodeId);
+  return keys.filter(Boolean).map((k) => ({ key: k, src: composite ? layerSrc(k) : displaySrc(k) }));
+});
+
+const BOARD_PREP = new Set(["romanesque_board", "romanesque_channels", "romanesque_backcorner"]);
+const modelCaption = computed(() =>
+  BOARD_PREP.has(state.value.currentNodeId) ? "Preparing the boards (the book is set aside)" : "Your book so far"
+);
 
 const isTerminal = computed(() => {
   if (!currentNode.value) return true;
   return currentNode.value.kind === "end" || !Array.isArray(currentNode.value.options) || currentNode.value.options.length === 0;
 });
 
-const styleLabel = computed(() => state.value.style || currentNode.value?.style || "");
+const styleLabel = computed(() => state.value.style || "");
 
 const answeredEntries = computed(() =>
   state.value.steps.map((step, index) => ({
@@ -216,40 +249,43 @@ const answeredEntries = computed(() =>
   }))
 );
 
-const compositeMissingNote = computed(() => {
-  if (!currentNode.value?.compositeKey) return "";
-  const compositeSrc = resolveBookPathAsset(currentNode.value.compositeKey);
-  if (compositeSrc) return "";
-  const parts = (currentNode.value.compositeOf || []).join(", ");
-  return `Composite missing: ${currentNode.value.compositeKey}. Showing components: ${parts || currentNode.value.compositeKey}.`;
+// ---- human-readable summary ----
+const LABELS = {
+  holes: { cut: "Cut holes (knife/chisel)", pierced: "Pierced holes (awl/needle)" },
+  endleaves: { none: "No endleaves", "first-last-pages": "First & last pages of the block", "added-quire": "Added thin quire", "wrapped-bifolium": "Wrapped in a large bifolium" },
+  support: { "slit-leather": "Slit leather strap", "twisted-leather": "Twisted strap" },
+  sewing: { herringbone: "Herringbone", straight: "Straight", "packed-straight": "Packed straight" },
+  board: { square: "Squared edge", bevelled: "Slightly bevelled edge", rounded: "Rounded edge" },
+  channels: { "type-1": "Type I (short channel)", "type-2": "Type II (long channel)" },
+  lining: { none: "No lining", patch: "Patch lining", slotted: "Full-length slotted lining" },
+  endband: { "double-straight-packed": "Double support, straight packed", "double-herringbone": "Double support, herringbone", "single-straight-packed": "Single support, straight packed" },
+  endbandTab: { square: "Square tab", round: "Round tab" },
+  coverStitch: { link: "Link stitch", saddle: "Saddle stitch" },
+  fastening: { "short-strap": "Short strap", "long-strap": "Long strap" },
+};
+const FIELD_ORDER = ["holes", "endleaves", "support", "sewing", "board", "channels", "lining", "endband", "endbandTab", "coverStitch", "fastening"];
+const FIELD_TITLES = {
+  holes: "Sewing holes", endleaves: "Endleaves", support: "Sewing support", sewing: "Sewing stitch",
+  board: "Board edge", channels: "Lacing channels", lining: "Spine lining", endband: "Endbands",
+  endbandTab: "Endband tab", coverStitch: "Cover stitch", fastening: "Fastening",
+};
+const recapRows = computed(() => {
+  const d = summary.value?.derived || {};
+  return FIELD_ORDER.filter((f) => d[f] != null).map((f) => ({
+    field: f,
+    title: FIELD_TITLES[f],
+    value: (LABELS[f] && LABELS[f][d[f]]) || String(d[f]),
+  }));
 });
-
-// The drawing(s) the chart pairs with the current step.
-const renderedImages = computed(() => {
-  const node = currentNode.value;
-  if (!node) return [];
-  if (node.compositeKey) {
-    const compositeSrc = bestSrc(node.compositeKey);
-    if (compositeSrc) return [{ key: node.compositeKey, src: compositeSrc }];
-    const fallbackKeys = (node.compositeOf && node.compositeOf.length) ? node.compositeOf : [node.compositeKey];
-    return fallbackKeys.map((key) => ({ key, src: bestSrc(key) }));
-  }
-  if (node.imagesFromDerived) {
-    const { key, map, fallback } = node.imagesFromDerived;
-    const value = state.value.derived?.[key];
-    const list = (value && map && map[value]) ? map[value] : (fallback || []);
-    return list.map((k) => ({ key: k, src: bestSrc(k) }));
-  }
-  return (node.images || []).map((key) => ({ key, src: bestSrc(key) }));
-});
-
-const formattedDerived = computed(() => {
-  if (!summary.value) return "{}";
-  return JSON.stringify(summary.value.derived, null, 2);
+const finalModelSrc = computed(() => {
+  const d = summary.value?.derived || {};
+  const layers = bookSoFar(d, "romanesque_end");
+  const k = layers.keys[layers.keys.length - 1];
+  return displaySrc(k);
 });
 
 function choose(option) {
-  if (!currentNode.value) return;
+  if (!currentNode.value || option.disabled) return;
   summary.value = null;
   saveMenuKey.value = null;
   state.value = applyOption(state.value, currentNode.value, option);
@@ -284,114 +320,58 @@ function resolveNodeTitle(nodeId) {
   return BOOK_PATHS_FLOW[nodeId]?.title || nodeId;
 }
 
-// ---- lightbox zoom / pan ----
-function openLightbox(key, src) {
-  lightbox.value = { key, src };
+// ---- lightbox ----
+function openLightbox() {
+  lightbox.value = true;
   resetZoom();
 }
-
 function closeLightbox() {
   lightbox.value = null;
   resetZoom();
 }
-
-function resetZoom() {
-  lbZoom.value = 1;
-  lbPanX.value = 0;
-  lbPanY.value = 0;
-  lbDragging.value = false;
-  dragStart = null;
-}
-
-function clampZoom(z) {
-  return Math.min(8, Math.max(0.25, +z.toFixed(3)));
-}
-
+function resetZoom() { lbZoom.value = 1; lbPanX.value = 0; lbPanY.value = 0; lbDragging.value = false; dragStart = null; }
+function clampZoom(z) { return Math.min(8, Math.max(0.25, +z.toFixed(3))); }
 function zoomIn() { lbZoom.value = clampZoom(lbZoom.value + 0.25); }
-
-function zoomOut() {
-  lbZoom.value = clampZoom(lbZoom.value - 0.25);
-  if (lbZoom.value <= 1) { lbPanX.value = 0; lbPanY.value = 0; }
-}
-
-function toggleDoubleZoom() {
-  if (lbZoom.value > 1) resetZoom();
-  else lbZoom.value = 2;
-}
-
-function onWheel(e) {
-  const factor = e.deltaY < 0 ? 1.12 : 1 / 1.12;
-  lbZoom.value = clampZoom(lbZoom.value * factor);
-  if (lbZoom.value <= 1) { lbPanX.value = 0; lbPanY.value = 0; }
-}
-
-function onPointerDown(e) {
-  if (lbZoom.value <= 1) return;
-  lbDragging.value = true;
-  dragStart = { x: e.clientX - lbPanX.value, y: e.clientY - lbPanY.value };
-}
-
-function onPointerMove(e) {
-  if (!lbDragging.value || !dragStart) return;
-  lbPanX.value = e.clientX - dragStart.x;
-  lbPanY.value = e.clientY - dragStart.y;
-}
-
+function zoomOut() { lbZoom.value = clampZoom(lbZoom.value - 0.25); if (lbZoom.value <= 1) { lbPanX.value = 0; lbPanY.value = 0; } }
+function toggleDoubleZoom() { if (lbZoom.value > 1) resetZoom(); else lbZoom.value = 2; }
+function onWheel(e) { lbZoom.value = clampZoom(lbZoom.value * (e.deltaY < 0 ? 1.12 : 1 / 1.12)); if (lbZoom.value <= 1) { lbPanX.value = 0; lbPanY.value = 0; } }
+function onPointerDown(e) { if (lbZoom.value <= 1) return; lbDragging.value = true; dragStart = { x: e.clientX - lbPanX.value, y: e.clientY - lbPanY.value }; }
+function onPointerMove(e) { if (!lbDragging.value || !dragStart) return; lbPanX.value = e.clientX - dragStart.x; lbPanY.value = e.clientY - dragStart.y; }
 function onPointerUp() { lbDragging.value = false; dragStart = null; }
 
-// ---- save / download ----
-function toggleSaveMenu(key) {
-  saveMenuKey.value = saveMenuKey.value === key ? null : key;
-}
-
-function svgUrlFor(src) {
-  if (!src) return null;
-  if (src.toLowerCase().endsWith(".svg")) return src;
-  const file = src.split("/").pop().replace(/\.(webp|png|jpe?g)$/i, ".svg");
-  return `/book-paths/originals/${file}`;
-}
-
+// ---- save the model ----
+function toggleSaveMenu(key) { saveMenuKey.value = saveMenuKey.value === key ? null : key; }
 function triggerDownload(href, filename) {
   const a = document.createElement("a");
-  a.href = href;
-  a.download = filename;
-  document.body.appendChild(a);
-  a.click();
-  a.remove();
+  a.href = href; a.download = filename;
+  document.body.appendChild(a); a.click(); a.remove();
 }
-
-function saveImage(image, fmt) {
+function loadImage(src) {
+  return new Promise((resolve, reject) => { const i = new Image(); i.onload = () => resolve(i); i.onerror = reject; i.src = src; });
+}
+async function saveModel(fmt) {
   saveMenuKey.value = null;
-  if (!image || !image.src) return;
-  if (fmt === "svg") {
-    triggerDownload(svgUrlFor(image.src), `${image.key}.svg`);
-    return;
-  }
-  const img = new Image();
-  img.onload = () => {
-    const w = img.naturalWidth || 1600;
-    const h = img.naturalHeight || Math.round(w * (841.9 / 1190.6));
+  const layers = modelLayers.value;
+  if (!layers.length) return;
+  try {
+    const imgs = await Promise.all(layers.map((l) => loadImage(l.src)));
+    const w = imgs[0].naturalWidth || 1600;
+    const h = imgs[0].naturalHeight || Math.round(w * (841.9 / 1190.6));
     const canvas = document.createElement("canvas");
-    canvas.width = w;
-    canvas.height = h;
+    canvas.width = w; canvas.height = h;
     const ctx = canvas.getContext("2d");
-    ctx.fillStyle = "#ffffff";
-    ctx.fillRect(0, 0, w, h);
-    ctx.drawImage(img, 0, 0, w, h);
+    if (fmt === "jpg") { ctx.fillStyle = "#fff"; ctx.fillRect(0, 0, w, h); }
+    imgs.forEach((img) => ctx.drawImage(img, 0, 0, w, h));
     canvas.toBlob((blob) => {
       if (!blob) return;
       const url = URL.createObjectURL(blob);
-      triggerDownload(url, `${image.key}.jpg`);
+      triggerDownload(url, `bookbinding.${fmt === "jpg" ? "jpg" : "png"}`);
       setTimeout(() => URL.revokeObjectURL(url), 5000);
-    }, "image/jpeg", 0.92);
-  };
-  img.onerror = () => triggerDownload(image.src, `${image.key}`);
-  img.src = image.src;
+    }, fmt === "jpg" ? "image/jpeg" : "image/png", 0.92);
+  } catch (e) { /* ignore */ }
 }
 
-function handleClose() {
-  emit("close");
-}
+function handleClose() { emit("close"); }
 </script>
 
 <style scoped>
@@ -466,11 +446,8 @@ function handleClose() {
 
 .bp-crumbs ul {
   list-style: none;
-  margin: 0;
-  padding: 0;
-  display: flex;
-  flex-direction: column;
-  gap: 8px;
+  margin: 0; padding: 0;
+  display: flex; flex-direction: column; gap: 8px;
 }
 
 .bp-crumbs button { width: 100%; text-align: left; font-weight: 600; }
@@ -504,75 +481,71 @@ function handleClose() {
   margin: 12px 0 6px;
 }
 
+.primary-btn.is-disabled {
+  opacity: 0.5;
+  cursor: not-allowed;
+  filter: grayscale(0.4);
+}
+
+.soon { font-size: 12px; opacity: 0.85; }
+
 .bp-terminal-note {
   margin: 14px 0 6px;
   color: hsl(var(--muted-foreground));
   font-size: 14px;
 }
 
-.bp-figures-wrap { margin: 16px 0 4px; }
+/* ---- evolving model ---- */
+.bp-model-wrap { margin: 16px auto 4px; width: min(820px, 100%); }
 
-.bp-figures {
-  display: grid;
-  grid-template-columns: repeat(auto-fit, minmax(240px, 360px));
-  gap: 16px;
-  justify-content: center;
-  align-items: start;
-}
-
-.bp-figures.single { grid-template-columns: min(760px, 100%); }
-
-.figure-card {
-  margin: 0;
-  border: 1px solid hsl(var(--border));
-  border-radius: 12px;
-  overflow: hidden;
-  background: hsl(var(--card));
-  box-shadow: var(--shadow-sm);
-}
-
-.figure-img {
-  position: relative;
-  display: block;
-  width: 100%;
-  border: 0;
-  padding: 0;
-  cursor: zoom-in;
-  background: #fff;
-}
-
-.figure-img img {
-  width: 100%;
-  height: 300px;
-  object-fit: contain;
-  background: #fff;
-  display: block;
-}
-
-.bp-figures.single .figure-img img { height: min(60vh, 560px); }
-
-.figure-img.missing {
-  cursor: default;
-  min-height: 200px;
-  display: grid;
-  place-items: center;
-  border: 1px dashed hsl(var(--border));
-  background: hsl(var(--muted));
-  color: hsl(var(--muted-foreground));
-  padding: 12px;
-  text-align: center;
-}
-
-.figure-cap {
+.model-caption {
   display: flex;
   align-items: center;
   justify-content: space-between;
-  gap: 8px;
-  padding: 8px 10px;
-  border-top: 1px solid hsl(var(--border));
+  margin-bottom: 8px;
 }
 
-.fig-key { font-size: 13px; font-weight: 600; color: hsl(var(--card-foreground)); }
+.model-caption > span:first-child {
+  font-size: 14px;
+  font-weight: 700;
+  color: hsl(var(--card-foreground));
+}
+
+.model-stage {
+  position: relative;
+  display: block;
+  width: 100%;
+  aspect-ratio: 1190.6 / 841.9;
+  border: 1px solid hsl(var(--border));
+  border-radius: 12px;
+  overflow: hidden;
+  background: #fff;
+  padding: 0;
+  cursor: zoom-in;
+  box-shadow: var(--shadow-sm);
+}
+
+.model-layer {
+  position: absolute;
+  inset: 0;
+  width: 100%;
+  height: 100%;
+  object-fit: contain;
+}
+
+.zoom-hint {
+  position: absolute;
+  right: 8px; bottom: 8px;
+  width: 26px; height: 26px;
+  display: grid; place-items: center;
+  border-radius: 8px;
+  background: rgb(6 14 25 / 0.6);
+  color: #fff; font-size: 14px;
+  opacity: 0;
+  transition: opacity 0.15s ease;
+}
+
+.model-stage:hover .zoom-hint { opacity: 1; }
 
 .save-wrap { position: relative; }
 .save-btn { font-size: 12px; padding: 4px 10px; }
@@ -593,38 +566,13 @@ function handleClose() {
 }
 
 .save-menu button {
-  border: 0;
-  background: transparent;
+  border: 0; background: transparent;
   color: hsl(var(--card-foreground));
-  text-align: left;
-  padding: 9px 12px;
-  font-size: 13px;
-  cursor: pointer;
+  text-align: left; padding: 9px 12px;
+  font-size: 13px; cursor: pointer;
 }
 
 .save-menu button:hover { background: hsl(var(--muted)); }
-
-.zoom-hint {
-  position: absolute;
-  right: 8px;
-  bottom: 8px;
-  width: 26px;
-  height: 26px;
-  display: grid;
-  place-items: center;
-  border-radius: 8px;
-  background: rgb(6 14 25 / 0.6);
-  color: #fff;
-  font-size: 14px;
-  opacity: 0;
-  transition: opacity 0.15s ease;
-}
-
-.figure-img:hover .zoom-hint { opacity: 1; }
-
-.gallery-empty { color: hsl(var(--muted-foreground)); font-size: 14px; }
-
-.composite-note { margin: 0 0 10px; font-size: 12px; color: hsl(var(--muted-foreground)); }
 
 .bp-footer {
   margin-top: auto;
@@ -635,25 +583,51 @@ function handleClose() {
   gap: 10px;
 }
 
-.summary-box {
+/* ---- summary ---- */
+.summary-grid {
+  display: grid;
+  grid-template-columns: minmax(240px, 1fr) minmax(280px, 1.2fr);
+  gap: 18px;
+  align-items: start;
+}
+
+.summary-recap { padding: 14px 16px; }
+.recap-style { margin: 0 0 10px; font-size: 16px; }
+
+.summary-recap dl {
+  margin: 0;
+  display: grid;
+  grid-template-columns: auto 1fr;
+  gap: 6px 14px;
+}
+
+.summary-recap dt { color: hsl(var(--muted-foreground)); font-size: 13px; }
+.summary-recap dd { margin: 0; font-size: 13px; font-weight: 600; color: hsl(var(--card-foreground)); }
+
+.summary-figure {
+  margin: 0;
   border: 1px solid hsl(var(--border));
   border-radius: 12px;
-  padding: 12px;
-  background: hsl(var(--card) / 0.84);
+  overflow: hidden;
+  background: #fff;
 }
 
-.summary-box ul { margin: 6px 0 10px; padding-left: 18px; }
+.summary-figure img {
+  width: 100%;
+  aspect-ratio: 1190.6 / 841.9;
+  object-fit: contain;
+  display: block;
+  background: #fff;
+}
 
-.summary-box pre {
-  margin: 0;
+.summary-figure figcaption {
+  padding: 8px 10px;
   font-size: 12px;
-  padding: 10px;
-  border-radius: 8px;
-  background: hsl(var(--muted));
-  overflow: auto;
+  color: hsl(var(--muted-foreground));
+  border-top: 1px solid hsl(var(--border));
 }
 
-/* ---- zoomable lightbox ---- */
+/* ---- lightbox ---- */
 .bp-lightbox {
   position: fixed;
   inset: 0;
@@ -684,13 +658,9 @@ function handleClose() {
 .lightbox-tools .ghost-btn { padding: 5px 10px; font-size: 13px; }
 
 .zoom-label {
-  min-width: 48px;
-  text-align: center;
-  font-size: 13px;
-  color: hsl(var(--muted-foreground));
+  min-width: 48px; text-align: center;
+  font-size: 13px; color: hsl(var(--muted-foreground));
 }
-
-.tool-sep { width: 1px; height: 20px; background: hsl(var(--border)); margin: 0 4px; }
 
 .lightbox-stage {
   flex: 1;
@@ -706,12 +676,19 @@ function handleClose() {
 .lightbox-stage.zoomable { cursor: grab; }
 .lightbox-stage.grabbing { cursor: grabbing; }
 
-.lightbox-stage img {
-  max-width: 100%;
-  max-height: 100%;
-  display: block;
+.lightbox-canvas {
+  position: relative;
+  width: min(100%, 92vh * 1190.6 / 841.9);
+  aspect-ratio: 1190.6 / 841.9;
   transform-origin: center center;
   will-change: transform;
+}
+
+.lightbox-layer {
+  position: absolute;
+  inset: 0;
+  width: 100%; height: 100%;
+  object-fit: contain;
   user-select: none;
 }
 
@@ -725,5 +702,6 @@ function handleClose() {
 @media (max-width: 1120px) {
   .bp-layout { grid-template-columns: 1fr; grid-template-rows: auto 1fr; }
   .bp-crumbs { border-right: 0; border-bottom: 1px solid hsl(var(--border)); }
+  .summary-grid { grid-template-columns: 1fr; }
 }
 </style>
