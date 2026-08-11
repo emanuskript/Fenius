@@ -142,7 +142,7 @@ export const BOOK_PATHS_FLOW = {
     kind: "step",
     style: "Romanesque",
     title: "Sewing Supports & Holes",
-    body: "Your quires are stacked on top of one another. This book block is designed for three equally-spaced sewing supports — the most common Romanesque design. Because the supports are sewn to the block, the quires need holes for the thread. Were the holes cut (with a knife or chisel) or pierced (with an awl or needle)? This was probably done while the quires were held tight in a press.",
+    body: "Your quires are stacked on top of one another. This book block is designed for three equally-spaced sewing supports — the most common Romanesque design. Because each quire is sewn around the supports, the fold of every quire needs holes for the needle and thread. Were the holes cut (with a knife or chisel) or pierced (with an awl or needle)? This was probably done while the quires were held tight in a press.",
     images: ["9", "8"],
     options: [
       { label: "Cut (knife or chisel)", next: "romanesque_endleaves", set: { holes: "cut" } },
@@ -196,10 +196,10 @@ export const BOOK_PATHS_FLOW = {
     kind: "step",
     style: "Romanesque",
     title: "Sewing Stitch",
-    body: "The supports are suspended on the crossbar of the sewing frame. The needle draws thread through each quire and wraps around the support; at the change-over station the thread reverses direction, generally with a link stitch. With a twisted leather support, the stitch is:",
+    body: "The supports are suspended on the crossbar of the sewing frame. The needle draws thread through each quire and wraps around the support; at the change-over station the thread reverses direction, generally with a link stitch. With a twisted leather support, the only attested Romanesque stitch is the packed straight stitch.",
     images: ["83"],
     options: [
-      { label: "Packed straight", next: "romanesque_board", set: { sewing: "packed-straight" } },
+      { label: "Continue with packed straight stitch", next: "romanesque_board", set: { sewing: "packed-straight" } },
     ],
   },
 
@@ -343,7 +343,7 @@ export const BOOK_PATHS_FLOW = {
     kind: "end",
     style: "Romanesque",
     title: "Your Romanesque Binding",
-    body: "Here is your cover. Sometimes a fixed or loose overcover was added to wrap the book, and the cover could be painted, embellished or decorated in various ways. Your Romanesque path is complete — review the summary, revise with Back, or restart.",
+    body: "Here is your cover. Sometimes a fixed or loose overcover was added to wrap the book, and the cover could be painted, embellished or decorated in various ways. Your Romanesque path is complete — click Finish to review it, revise any earlier choice from the Path on the left, or restart.",
     images: ["59"],
     options: [],
   },
