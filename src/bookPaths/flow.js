@@ -343,10 +343,10 @@ export const BOOK_PATHS_FLOW = {
     style: "Romanesque",
     title: "Fastening",
     body: "Finally, a fastening could be fashioned — usually a leather strap of two pieces, nailed near the free edge of one cover (generally the upper) with a bronze or iron eyelet or hasp that fits over a peg on the opposite cover. A short strap joins a peg on the opposite board's edge (inherited from the Carolingian period, favoured in Germany and Central Europe); a long strap wraps around to a peg on the side of the opposite cover (dominant after 1200 and in French and English bindings).",
-    images: ["63", "64"],
+    images: ["63A", "64A"],
     options: [
-      { label: "Short strap", image: "63", next: "romanesque_end", set: { fastening: "short-strap" } },
-      { label: "Long strap", image: "64", next: "romanesque_end", set: { fastening: "long-strap" } },
+      { label: "Short strap", image: "63A", next: "romanesque_end", set: { fastening: "short-strap" } },
+      { label: "Long strap", image: "64A", next: "romanesque_end", set: { fastening: "long-strap" } },
     ],
   },
 
@@ -358,6 +358,13 @@ export const BOOK_PATHS_FLOW = {
     body: "Here is your cover. Sometimes a fixed or loose overcover was added to wrap the book, and the cover could be painted, embellished or decorated in various ways. Your Romanesque path is complete — click Finish to review it, revise any earlier choice from the Path on the left, or restart.",
     images: ["59"],
     supplementalImages: [{ key: "59", label: "Example of an optional overcover" }],
+    supplementalImagesFromDerived: {
+      key: "fastening",
+      map: {
+        "short-strap": [{ key: "63", label: "Completed short-strap fastening" }],
+        "long-strap": [{ key: "64", label: "Completed long-strap fastening" }],
+      },
+    },
     options: [],
   },
 

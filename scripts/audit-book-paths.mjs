@@ -95,6 +95,30 @@ for (const field of ROMANESQUE_VISUAL_FIELDS) {
   );
 }
 
+// Construction geometry must remain joined rather than regressing to a stack
+// of unrelated reference-image fragments. Back-cornering changes the board
+// polygon itself; the lower board is a complete plane; and cover sewing follows
+// the selected endband-tab edge rather than decorating the whole upper cover.
+for (const geometryFeature of [
+  "const boardThickness = 16",
+  "backCorneredBoardPoints",
+  "const lowerBoardTopPoints",
+  "const headTabStitchPath",
+  "const tailTabStitchPath",
+  "const lowerBoardForeStart = lowerBoardFront",
+]) {
+  assert.ok(
+    modelComponent.includes(geometryFeature),
+    `The connected model is missing required construction geometry: ${geometryFeature}`
+  );
+}
+assert.ok(
+  !modelComponent.includes("headBackCornerPath") &&
+    !modelComponent.includes("tailBackCornerPath") &&
+    !modelComponent.includes("coverPerimeterPath"),
+  "Back-cornering and cover stitching must not be simulated with detached overlays"
+);
+
 const romanNodes = Object.values(BOOK_PATHS_FLOW).filter((node) =>
   node.id === "start" || node.style === "Romanesque"
 );
@@ -106,12 +130,33 @@ const endleafNode = BOOK_PATHS_FLOW.romanesque_endleaves;
 assert.deepEqual(endleafNode.imagesFromDerived?.map?.cut?.slice(0, 2), ["9", "9"]);
 assert.deepEqual(endleafNode.imagesFromDerived?.map?.pierced?.slice(0, 2), ["8", "8"]);
 
+// The chart distinguishes the small fastening option drawings (63A/64A)
+// from the resulting binding drawings (63/64). Do not collapse them again.
+const fasteningNode = BOOK_PATHS_FLOW.romanesque_fastening;
+assert.deepEqual(fasteningNode.options.map((option) => option.image), ["63A", "64A"]);
+const endNode = BOOK_PATHS_FLOW.romanesque_end;
+assert.deepEqual(
+  endNode.supplementalImagesFromDerived?.map?.["short-strap"]?.map((image) => image.key),
+  ["63"]
+);
+assert.deepEqual(
+  endNode.supplementalImagesFromDerived?.map?.["long-strap"]?.map((image) => image.key),
+  ["64"]
+);
+
 const flowAssetKeys = new Set();
 for (const node of romanNodes) {
   for (const key of node.images || []) flowAssetKeys.add(key);
   for (const option of node.options || []) if (option.image) flowAssetKeys.add(option.image);
   for (const image of node.supplementalImages || []) {
     flowAssetKeys.add(typeof image === "string" ? image : image.key);
+  }
+  if (node.supplementalImagesFromDerived) {
+    for (const images of Object.values(node.supplementalImagesFromDerived.map || {})) {
+      for (const image of images) {
+        flowAssetKeys.add(typeof image === "string" ? image : image.key);
+      }
+    }
   }
   if (node.imagesFromDerived) {
     for (const keys of Object.values(node.imagesFromDerived.map || {})) {
