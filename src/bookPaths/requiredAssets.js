@@ -66,7 +66,26 @@ const flowReferencedKeys = Object.values(BOOK_PATHS_FLOW).flatMap((node) => {
   const images = node.images || [];
   const compositeKey = node.compositeKey ? [node.compositeKey] : [];
   const compositeOf = node.compositeOf || [];
-  return [...images, ...compositeKey, ...compositeOf];
+  const optionImages = (node.options || [])
+    .map((option) => option.image)
+    .filter(Boolean);
+  const supplementalImages = (node.supplementalImages || [])
+    .map((image) => (typeof image === "string" ? image : image.key))
+    .filter(Boolean);
+  const derivedImages = node.imagesFromDerived
+    ? [
+        ...Object.values(node.imagesFromDerived.map || {}).flat(),
+        ...(node.imagesFromDerived.fallback || []),
+      ]
+    : [];
+  return [
+    ...images,
+    ...compositeKey,
+    ...compositeOf,
+    ...optionImages,
+    ...supplementalImages,
+    ...derivedImages,
+  ];
 });
 
 export const REQUIRED_BOOK_PATHS_ASSET_KEYS = Array.from(

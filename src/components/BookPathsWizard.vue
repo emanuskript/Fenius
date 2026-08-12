@@ -61,7 +61,13 @@
                     </div>
                   </span>
                 </figcaption>
-                <img :src="finalModelSrc" alt="Your finished Romanesque binding" />
+                <div class="summary-model-stage" aria-label="Your finished Romanesque binding">
+                  <RomanesqueBookModel
+                    :derived="summary.derived || {}"
+                    node-id="romanesque_end"
+                    class="summary-model-layer"
+                  />
+                </div>
               </figure>
             </div>
           </template>
@@ -73,28 +79,47 @@
             </p>
 
             <div v-if="!isTerminal" class="bp-options">
-              <button
+              <article
                 v-for="(option, idx) in currentNode.options"
                 :key="`${currentNode.id}-${idx}`"
-                class="primary-btn"
-                :class="{ 'is-disabled': option.disabled }"
-                :aria-disabled="option.disabled ? 'true' : 'false'"
-                @click="choose(option)"
+                class="bp-option-card surface-card"
               >
-                {{ option.label }}<span v-if="option.disabled" class="soon"> — coming soon</span>
-              </button>
+                <button
+                  type="button"
+                  class="primary-btn bp-option-button"
+                  :class="{ 'is-disabled': option.disabled }"
+                  :aria-disabled="option.disabled ? 'true' : 'false'"
+                  @click="choose(option)"
+                >
+                  {{ option.label }}<span v-if="option.disabled" class="soon"> — coming soon</span>
+                </button>
+                <img
+                  v-if="optionImage(option, idx)"
+                  :src="drawingSrc(optionImage(option, idx))"
+                  :alt="`Drawing ${optionImage(option, idx)}: ${option.label}`"
+                  class="bp-option-image"
+                />
+                <p v-else-if="option.imageNote" class="bp-option-note">{{ option.imageNote }}</p>
+              </article>
             </div>
 
             <div v-else class="bp-terminal-note">
               Your binding is complete. Click Finish to review it.
             </div>
 
+            <section v-if="supplementalImages.length" class="bp-supplemental" aria-label="Supporting illustrations">
+              <figure v-for="image in supplementalImages" :key="image.key">
+                <img :src="drawingSrc(image.key)" :alt="`Drawing ${image.key}: ${image.label}`" />
+                <figcaption>{{ image.label }}</figcaption>
+              </figure>
+            </section>
+
             <!-- The evolving book, built up from every choice so far -->
             <section class="bp-model-wrap" aria-live="polite">
               <div class="model-caption">
                 <span>{{ modelCaption }}</span>
                 <span class="save-wrap">
-                  <button type="button" class="ghost-btn save-btn" aria-haspopup="menu" :aria-expanded="saveMenuKey === 'model'" @click="toggleSaveMenu('model')">Save ▾</button>
+                  <button v-if="showModel" type="button" class="ghost-btn save-btn" aria-haspopup="menu" :aria-expanded="saveMenuKey === 'model'" @click="toggleSaveMenu('model')">Save ▾</button>
                   <div v-if="saveMenuKey === 'model'" class="save-menu" role="menu">
                     <button type="button" role="menuitem" @click="saveModel('png')">PNG (transparent)</button>
                     <button type="button" role="menuitem" @click="saveModel('jpg')">JPG (on white)</button>
@@ -102,21 +127,21 @@
                 </span>
               </div>
               <button
+                v-if="showModel"
                 type="button"
                 class="model-stage"
                 :title="`Zoom: ${modelCaption}`"
                 @click="openLightbox"
               >
-                <img
-                  v-for="layer in modelLayers"
-                  :key="layer.key"
-                  :src="layer.src"
-                  :alt="modelCaption"
+                <RomanesqueBookModel
+                  :derived="state.derived || {}"
+                  :node-id="state.currentNodeId"
                   class="model-layer"
                 />
                 <span class="zoom-hint" aria-hidden="true">⤢</span>
               </button>
-              <p class="model-hint">The drawing reflects your choices so far.</p>
+              <p v-if="showModel" class="model-hint">One connected reconstruction, updated from your choices.</p>
+              <p v-else class="model-paused">The sewn book is set aside while you prepare the boards.</p>
             </section>
           </template>
 
@@ -151,13 +176,10 @@
             @dblclick="toggleDoubleZoom"
           >
             <div class="lightbox-canvas" :style="lbImgStyle">
-              <img
-                v-for="layer in modelLayers"
-                :key="layer.key"
-                :src="layer.src"
-                :alt="modelCaption"
+              <RomanesqueBookModel
+                :derived="state.derived || {}"
+                :node-id="state.currentNodeId"
                 class="lightbox-layer"
-                draggable="false"
               />
             </div>
           </div>
@@ -171,8 +193,10 @@
 <script setup>
 /* eslint-disable */
 import { computed, ref, watch, onMounted, onBeforeUnmount, nextTick } from "vue";
+import { resolveBookPathAsset } from "@/bookPaths/assets.generated";
 import { BOOK_PATHS_FLOW } from "@/bookPaths/flow";
 import { applyOption, buildSummary, createInitialWizardState, replayState } from "@/bookPaths/state";
+import RomanesqueBookModel from "@/components/bookPaths/RomanesqueBookModel.vue";
 
 const props = defineProps({
   initialContext: { type: Object, default: () => ({}) },
@@ -199,60 +223,30 @@ const lbImgStyle = computed(() => ({
   transform: `translate(${lbPanX.value}px, ${lbPanY.value}px) scale(${lbZoom.value})`,
 }));
 
-// ---------------------------------------------------------------------------
-// The evolving "book so far": one drawing (or a registered layer stack) that
-// reflects every choice, so the binding is built up step by step:
-//   block -> holed block -> block on the sewing frame -> sewn book ->
-//   [boards prepared on their own] -> sewn book gains lining -> + endband ->
-//   + tab -> covered book -> fastened book.
-// Lining/endband/tab drawings register onto the sewn book, so they stack.
-// ---------------------------------------------------------------------------
 const displaySrc = (key) => `/book-paths/display/${key}.webp`;
-const layerSrc = (key) => `/book-paths/layers/${key}.webp`;
+const drawingSrc = (key) => resolveBookPathAsset(key) || displaySrc(key);
 
-const HOLED = { cut: "9", pierced: "8" };
-const SEWN = { herringbone: "82", straight: "81", "packed-straight": "83" };
-const BOARD = { square: "26", bevelled: "27", rounded: "28" };
-const CORNER = { square: "29", bevelled: "30", rounded: "31B" };
-const LINING = { patch: "39B", slotted: "40B" };
-const ENDBAND = { "double-herringbone": "48", "double-straight-packed": "49", "single-straight-packed": "50" };
-const TAB = { square: "52", round: "53" };
-const FASTEN = { "short-strap": "63", "long-strap": "64" };
-const frameKey = (d) => (d.support === "twisted-leather" ? "14A" : "12A");
-const coverKey = (d) =>
-  d.endbandTab === "square"
-    ? (d.coverStitch === "link" ? "55A" : "56B")
-    : (d.coverStitch === "link" ? "55" : "56");
-
-const BOARD_PREP = new Set(["romanesque_channels", "romanesque_backcorner"]);
-
-function bookSoFar(d, cur) {
-  // board-preparation detour: the board is shaped on its own (book set aside)
-  if (cur === "romanesque_channels") return { keys: [d.board ? BOARD[d.board] : "26"], composite: false };
-  if (cur === "romanesque_backcorner") return { keys: [d.board ? CORNER[d.board] : "29"], composite: false };
-  // finished states
-  if (d.fastening) return { keys: [FASTEN[d.fastening]], composite: false };
-  if (d.coverStitch) return { keys: [coverKey(d)], composite: false };
-  // the sewn book, accumulating lining -> endband -> tab (all register onto it)
-  if (d.sewing) {
-    const layers = [SEWN[d.sewing]];
-    if (LINING[d.lining]) layers.push(LINING[d.lining]);
-    if (ENDBAND[d.endband]) layers.push(ENDBAND[d.endband]);
-    if (TAB[d.endbandTab]) layers.push(TAB[d.endbandTab]);
-    return { keys: layers, composite: true }; // untrimmed layers so the pieces line up
-  }
-  if (d.support) return { keys: [d.holes ? HOLED[d.holes] : "72", frameKey(d)], composite: true };
-  if (d.holes) return { keys: [HOLED[d.holes]], composite: false };
-  return { keys: ["72"], composite: false };
-}
+const BOARD_PREP = new Set(["romanesque_board", "romanesque_channels", "romanesque_backcorner"]);
 
 const currentNode = computed(() => BOOK_PATHS_FLOW[state.value.currentNodeId] || null);
 
-const modelLayers = computed(() => {
-  if (state.value.style !== "Romanesque") return [{ key: "72", src: displaySrc("72") }];
-  const { keys, composite } = bookSoFar(state.value.derived || {}, state.value.currentNodeId);
-  return keys.filter(Boolean).map((k) => ({ key: k, src: composite ? layerSrc(k) : displaySrc(k) }));
-});
+const showModel = computed(() =>
+  !(state.value.style === "Romanesque" && state.value.currentNodeId === "romanesque_board")
+);
+
+function optionImage(option, index) {
+  if (option?.image) return option.image;
+  const source = currentNode.value?.imagesFromDerived;
+  if (!source) return null;
+  const selected = source.map?.[state.value.derived?.[source.key]] || source.fallback || [];
+  return selected[index] || selected[0] || null;
+}
+
+const supplementalImages = computed(() =>
+  (currentNode.value?.supplementalImages || []).map((image) =>
+    typeof image === "string" ? { key: image, label: `Drawing ${image}` } : image
+  )
+);
 
 const modelCaption = computed(() =>
   BOARD_PREP.has(state.value.currentNodeId) ? "Preparing the boards (the book is set aside)" : "Your book so far"
@@ -307,13 +301,6 @@ const recapRows = computed(() => {
     value: (LABELS[f] && LABELS[f][d[f]]) || String(d[f]),
   }));
 });
-const finalModelSrc = computed(() => {
-  const d = summary.value?.derived || {};
-  const layers = bookSoFar(d, "romanesque_end");
-  const k = layers.keys[layers.keys.length - 1];
-  return displaySrc(k);
-});
-
 function choose(option) {
   if (!currentNode.value || option.disabled) return;
   summary.value = null;
@@ -434,19 +421,28 @@ function loadImage(src) {
 }
 async function saveModel(fmt) {
   saveMenuKey.value = null;
-  const layers = summary.value
-    ? [{ key: "final", src: finalModelSrc.value }]
-    : modelLayers.value;
-  if (!layers.length) return;
+  const selector = summary.value
+    ? ".summary-model-stage svg.roman-model"
+    : ".model-stage svg.roman-model";
+  const renderedSvg = document.querySelector(selector);
+  if (!renderedSvg) return;
   try {
-    const imgs = await Promise.all(layers.map((l) => loadImage(l.src)));
-    const w = imgs[0].naturalWidth || 1600;
-    const h = imgs[0].naturalHeight || Math.round(w * (841.9 / 1190.6));
+    const svg = renderedSvg.cloneNode(true);
+    svg.setAttribute("xmlns", "http://www.w3.org/2000/svg");
+    svg.setAttribute("width", "1200");
+    svg.setAttribute("height", "850");
+    if (fmt === "png") svg.querySelector("[data-model-background]")?.remove();
+    const source = new XMLSerializer().serializeToString(svg);
+    const sourceUrl = URL.createObjectURL(new Blob([source], { type: "image/svg+xml;charset=utf-8" }));
+    const img = await loadImage(sourceUrl);
+    const w = 1600;
+    const h = 1133;
     const canvas = document.createElement("canvas");
     canvas.width = w; canvas.height = h;
     const ctx = canvas.getContext("2d");
     if (fmt === "jpg") { ctx.fillStyle = "#fff"; ctx.fillRect(0, 0, w, h); }
-    imgs.forEach((img) => ctx.drawImage(img, 0, 0, w, h));
+    ctx.drawImage(img, 0, 0, w, h);
+    URL.revokeObjectURL(sourceUrl);
     canvas.toBlob((blob) => {
       if (!blob) return;
       const url = URL.createObjectURL(blob);
@@ -566,6 +562,36 @@ function handleClose() { emit("close"); }
   margin: 12px 0 6px;
 }
 
+.bp-option-card {
+  min-width: 0;
+  padding: 10px;
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+}
+
+.bp-option-button { width: 100%; }
+
+.bp-option-image {
+  width: 100%;
+  height: 150px;
+  object-fit: contain;
+  display: block;
+  border-radius: 8px;
+  background: #fff;
+}
+
+.bp-option-note {
+  min-height: 72px;
+  margin: 0;
+  display: grid;
+  place-items: center;
+  border: 1px dashed hsl(var(--border));
+  border-radius: 8px;
+  color: hsl(var(--muted-foreground));
+  font-size: 13px;
+}
+
 .primary-btn.is-disabled {
   opacity: 0.5;
   cursor: not-allowed;
@@ -578,6 +604,36 @@ function handleClose() { emit("close"); }
   margin: 14px 0 6px;
   color: hsl(var(--muted-foreground));
   font-size: 14px;
+}
+
+.bp-supplemental {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 12px;
+  margin: 12px 0 4px;
+}
+
+.bp-supplemental figure {
+  width: min(260px, 100%);
+  margin: 0;
+  overflow: hidden;
+  border: 1px solid hsl(var(--border));
+  border-radius: 10px;
+  background: hsl(var(--card));
+}
+
+.bp-supplemental img {
+  width: 100%;
+  height: 150px;
+  object-fit: contain;
+  display: block;
+  background: #fff;
+}
+
+.bp-supplemental figcaption {
+  padding: 7px 9px;
+  color: hsl(var(--muted-foreground));
+  font-size: 12px;
 }
 
 /* ---- evolving model ---- */
@@ -622,6 +678,15 @@ function handleClose() { emit("close"); }
   margin: 8px 0 0;
   text-align: center;
   font-size: 12px;
+  color: hsl(var(--muted-foreground));
+}
+
+.model-paused {
+  margin: 0;
+  padding: 24px;
+  border: 1px dashed hsl(var(--border));
+  border-radius: 12px;
+  text-align: center;
   color: hsl(var(--muted-foreground));
 }
 
@@ -715,12 +780,19 @@ function handleClose() { emit("close"); }
 
 .figure-head .fig-title { font-size: 12px; color: hsl(var(--muted-foreground)); }
 
-.summary-figure img {
+.summary-model-stage {
+  position: relative;
   width: 100%;
   aspect-ratio: 1190.6 / 841.9;
-  object-fit: contain;
-  display: block;
   background: #fff;
+}
+
+.summary-model-layer {
+  position: absolute;
+  inset: 0;
+  width: 100%;
+  height: 100%;
+  object-fit: contain;
 }
 
 /* ---- lightbox ---- */
