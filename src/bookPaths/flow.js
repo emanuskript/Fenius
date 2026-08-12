@@ -145,8 +145,8 @@ export const BOOK_PATHS_FLOW = {
     body: "Your quires are stacked on top of one another. This book block is designed for three equally-spaced sewing supports — the most common Romanesque design. Because each quire is sewn around the supports, the fold of every quire needs holes for the needle and thread. Were the holes cut (with a knife or chisel) or pierced (with an awl or needle)? This was probably done while the quires were held tight in a press.",
     images: ["9", "8"],
     options: [
-      { label: "Cut (knife or chisel)", next: "romanesque_endleaves", set: { holes: "cut" } },
-      { label: "Pierced (awl or needle)", next: "romanesque_endleaves", set: { holes: "pierced" } },
+      { label: "Cut (knife or chisel)", image: "9", next: "romanesque_endleaves", set: { holes: "cut" } },
+      { label: "Pierced (awl or needle)", image: "8", next: "romanesque_endleaves", set: { holes: "pierced" } },
     ],
   },
 
@@ -157,11 +157,21 @@ export const BOOK_PATHS_FLOW = {
     title: "Endleaves",
     body: "Decide whether to add endleaves — additional wraps for the book block, sometimes glued down to the inside cover (almost always after the boards were covered). The form could vary, especially of an added quire (sometimes a folio with a stub), and front and back endleaves could be treated differently.",
     images: ["2B", "3B"],
+    // The chart's first two circles say "no change": keep showing the book
+    // block selected in the preceding holes step instead of an empty card.
+    imagesFromDerived: {
+      key: "holes",
+      map: {
+        cut: ["9", "9"],
+        pierced: ["8", "8"],
+      },
+      fallback: ["9", "9"],
+    },
     options: [
       { label: "Use no endleaves", next: "romanesque_support", set: { endleaves: "none" } },
       { label: "Use the first & last pages of the block", next: "romanesque_support", set: { endleaves: "first-last-pages" } },
-      { label: "Add a thin additional quire", next: "romanesque_support", set: { endleaves: "added-quire" } },
-      { label: "Wrap in a large bifolium", next: "romanesque_support", set: { endleaves: "wrapped-bifolium" } },
+      { label: "Add a thin additional quire", image: "2B", next: "romanesque_support", set: { endleaves: "added-quire" } },
+      { label: "Wrap in a large bifolium", image: "3B", next: "romanesque_support", set: { endleaves: "wrapped-bifolium" } },
     ],
   },
 
@@ -173,8 +183,8 @@ export const BOOK_PATHS_FLOW = {
     body: "The quires are sewn along three sewing supports that will later be laced into the boards. These supports are alum-tawed leather, about 8–20 mm wide. Choose the support form.",
     images: ["12A", "14A"],
     options: [
-      { label: "A strap slit down the middle", next: "romanesque_stitch_slit", set: { support: "slit-leather" } },
-      { label: "A twisted strap", next: "romanesque_stitch_twisted", set: { support: "twisted-leather" } },
+      { label: "A strap slit down the middle", image: "12A", next: "romanesque_stitch_slit", set: { support: "slit-leather" } },
+      { label: "A twisted strap", image: "14A", next: "romanesque_stitch_twisted", set: { support: "twisted-leather" } },
     ],
   },
 
@@ -186,8 +196,8 @@ export const BOOK_PATHS_FLOW = {
     body: "The supports are suspended on the crossbar of the sewing frame. The needle draws thread through each quire and wraps around the support; at the change-over station at either end of the spine the thread reverses direction — in the Romanesque period generally with a link stitch. With a slit leather support, which main stitch will you use?",
     images: ["82", "81"],
     options: [
-      { label: "Herringbone", next: "romanesque_board", set: { sewing: "herringbone" } },
-      { label: "Straight", next: "romanesque_board", set: { sewing: "straight" } },
+      { label: "Herringbone", image: "82", next: "romanesque_board", set: { sewing: "herringbone" } },
+      { label: "Straight", image: "81", next: "romanesque_board", set: { sewing: "straight" } },
     ],
   },
 
@@ -199,7 +209,7 @@ export const BOOK_PATHS_FLOW = {
     body: "The supports are suspended on the crossbar of the sewing frame. The needle draws thread through each quire and wraps around the support; at the change-over station the thread reverses direction, generally with a link stitch. With a twisted leather support, the only attested Romanesque stitch is the packed straight stitch.",
     images: ["83"],
     options: [
-      { label: "Continue with packed straight stitch", next: "romanesque_board", set: { sewing: "packed-straight" } },
+      { label: "Continue with packed straight stitch", image: "83", next: "romanesque_board", set: { sewing: "packed-straight" } },
     ],
   },
 
@@ -211,9 +221,9 @@ export const BOOK_PATHS_FLOW = {
     body: "The book block is laid aside and the boards are prepared. Oak was common, and Romanesque boards were typically a little thicker at the spine. Choose the edge profile of the board.",
     images: ["26", "27", "28"],
     options: [
-      { label: "Squared", next: "romanesque_channels", set: { board: "square" } },
-      { label: "Slightly beveled", next: "romanesque_channels", set: { board: "bevelled" } },
-      { label: "Rounded", next: "romanesque_channels", set: { board: "rounded" } },
+      { label: "Squared", image: "26", next: "romanesque_channels", set: { board: "square" } },
+      { label: "Slightly beveled", image: "27", next: "romanesque_channels", set: { board: "bevelled" } },
+      { label: "Rounded", image: "28", next: "romanesque_channels", set: { board: "rounded" } },
     ],
   },
 
@@ -223,10 +233,10 @@ export const BOOK_PATHS_FLOW = {
     style: "Romanesque",
     title: "Lacing Channels",
     body: "Channels are drilled into the boards so the sewing supports can be laced through the spine edge and held with a wedge, peg or nail. Both patterns enter the board on the side: in Type I the lacing channel is relatively short; in Type II, relatively long. (The endband support cable could also be laced in.)",
-    images: ["35R"],
+    images: ["35C", "36C"],
     options: [
-      { label: "Type I (short channel)", next: "romanesque_backcorner", set: { channels: "type-1" } },
-      { label: "Type II (long channel)", next: "romanesque_backcorner", set: { channels: "type-2" } },
+      { label: "Type I (short channel)", image: "35C", next: "romanesque_backcorner", set: { channels: "type-1" } },
+      { label: "Type II (long channel)", image: "36C", next: "romanesque_backcorner", set: { channels: "type-2" } },
     ],
   },
 
@@ -254,7 +264,7 @@ export const BOOK_PATHS_FLOW = {
     body: "The sewing supports are laced into the drilled channels and pegged in place. As in earlier Carolingian binding, the rough edges of the book block and the wooden boards are trimmed at the same time (perhaps with a drawknife).",
     images: ["90"],
     options: [
-      { label: "Continue", next: "romanesque_lining" },
+      { label: "Continue", image: "90", next: "romanesque_lining" },
     ],
   },
 
@@ -266,9 +276,9 @@ export const BOOK_PATHS_FLOW = {
     body: "As reinforcement, a lining of chamois leather, textile or parchment could be pasted along the spine (wooden pegs could also fasten it to the board). In reality several linings could be combined, even layered on top of one another.",
     images: ["39B", "40B"],
     options: [
-      { label: "No lining", next: "romanesque_endbands", set: { lining: "none" } },
-      { label: "Patch lining", next: "romanesque_endbands", set: { lining: "patch" } },
-      { label: "Full-length slotted lining", next: "romanesque_endbands", set: { lining: "slotted" } },
+      { label: "No lining", imageNote: "No visual change", next: "romanesque_endbands", set: { lining: "none" } },
+      { label: "Patch lining", image: "39B", next: "romanesque_endbands", set: { lining: "patch" } },
+      { label: "Full-length slotted lining", image: "40B", next: "romanesque_endbands", set: { lining: "slotted" } },
     ],
   },
 
@@ -280,9 +290,9 @@ export const BOOK_PATHS_FLOW = {
     body: "The spine edges are reinforced with endbands, which link the quires together at the head and tail. A tab lines each end, often supported along the spine corner by one or two cables of the same material as the sewing support (e.g. alum-tawed leather). Before the fourteenth century the stitching was rarely embroidered with coloured linen or silk.",
     images: ["49", "48", "50"],
     options: [
-      { label: "Double support, straight packed", next: "romanesque_tab", set: { endband: "double-straight-packed" } },
-      { label: "Double support, herringbone", next: "romanesque_tab", set: { endband: "double-herringbone" } },
-      { label: "Single support, straight packed", next: "romanesque_tab", set: { endband: "single-straight-packed" } },
+      { label: "Double support, straight packed", image: "49", next: "romanesque_tab", set: { endband: "double-straight-packed" } },
+      { label: "Double support, herringbone", image: "48", next: "romanesque_tab", set: { endband: "double-herringbone" } },
+      { label: "Single support, straight packed", image: "50", next: "romanesque_tab", set: { endband: "single-straight-packed" } },
     ],
   },
 
@@ -294,8 +304,8 @@ export const BOOK_PATHS_FLOW = {
     body: "The top of the endband tab is trimmed — mostly round, but sometimes squared. Which will you choose?",
     images: ["52", "53"],
     options: [
-      { label: "Square tab", next: "romanesque_cover_square", set: { endbandTab: "square" } },
-      { label: "Round tab", next: "romanesque_cover_round", set: { endbandTab: "round" } },
+      { label: "Square tab", image: "52", next: "romanesque_cover_square", set: { endbandTab: "square" } },
+      { label: "Round tab", image: "53", next: "romanesque_cover_round", set: { endbandTab: "round" } },
     ],
   },
 
@@ -306,9 +316,10 @@ export const BOOK_PATHS_FLOW = {
     title: "Covering & Perimeter Sewing",
     body: "The boards are covered — most often in pale chamois or alum-tawed leather, or red/brown vegetable-tanned leather (preferred if the book was to be blind-tooled), pasted with starch. On the inside boards the covering is cut at the corners (\"mitred\") and the edges sewn together, along with the endband tab. With your square tab, choose the perimeter stitch.",
     images: ["55A", "56B", "58"],
+    supplementalImages: [{ key: "58", label: "Mitred corners with stitching" }],
     options: [
-      { label: "Link stitch", next: "romanesque_fastening", set: { coverStitch: "link" } },
-      { label: "Saddle stitch", next: "romanesque_fastening", set: { coverStitch: "saddle" } },
+      { label: "Link stitch", image: "55A", next: "romanesque_fastening", set: { coverStitch: "link" } },
+      { label: "Saddle stitch", image: "56B", next: "romanesque_fastening", set: { coverStitch: "saddle" } },
     ],
   },
 
@@ -319,9 +330,10 @@ export const BOOK_PATHS_FLOW = {
     title: "Covering & Perimeter Sewing",
     body: "The boards are covered — most often in pale chamois or alum-tawed leather, or red/brown vegetable-tanned leather (preferred if the book was to be blind-tooled), pasted with starch. On the inside boards the covering is cut at the corners (\"mitred\") and the edges sewn together, along with the endband tab. With your round tab, choose the perimeter stitch.",
     images: ["55", "56", "58"],
+    supplementalImages: [{ key: "58", label: "Mitred corners with stitching" }],
     options: [
-      { label: "Link stitch", next: "romanesque_fastening", set: { coverStitch: "link" } },
-      { label: "Saddle stitch", next: "romanesque_fastening", set: { coverStitch: "saddle" } },
+      { label: "Link stitch", image: "55", next: "romanesque_fastening", set: { coverStitch: "link" } },
+      { label: "Saddle stitch", image: "56", next: "romanesque_fastening", set: { coverStitch: "saddle" } },
     ],
   },
 
@@ -333,8 +345,8 @@ export const BOOK_PATHS_FLOW = {
     body: "Finally, a fastening could be fashioned — usually a leather strap of two pieces, nailed near the free edge of one cover (generally the upper) with a bronze or iron eyelet or hasp that fits over a peg on the opposite cover. A short strap joins a peg on the opposite board's edge (inherited from the Carolingian period, favoured in Germany and Central Europe); a long strap wraps around to a peg on the side of the opposite cover (dominant after 1200 and in French and English bindings).",
     images: ["63", "64"],
     options: [
-      { label: "Short strap", next: "romanesque_end", set: { fastening: "short-strap" } },
-      { label: "Long strap", next: "romanesque_end", set: { fastening: "long-strap" } },
+      { label: "Short strap", image: "63", next: "romanesque_end", set: { fastening: "short-strap" } },
+      { label: "Long strap", image: "64", next: "romanesque_end", set: { fastening: "long-strap" } },
     ],
   },
 
@@ -345,6 +357,7 @@ export const BOOK_PATHS_FLOW = {
     title: "Your Romanesque Binding",
     body: "Here is your cover. Sometimes a fixed or loose overcover was added to wrap the book, and the cover could be painted, embellished or decorated in various ways. Your Romanesque path is complete — click Finish to review it, revise any earlier choice from the Path on the left, or restart.",
     images: ["59"],
+    supplementalImages: [{ key: "59", label: "Example of an optional overcover" }],
     options: [],
   },
 
