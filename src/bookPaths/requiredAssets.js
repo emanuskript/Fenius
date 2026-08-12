@@ -72,6 +72,12 @@ const flowReferencedKeys = Object.values(BOOK_PATHS_FLOW).flatMap((node) => {
   const supplementalImages = (node.supplementalImages || [])
     .map((image) => (typeof image === "string" ? image : image.key))
     .filter(Boolean);
+  const derivedSupplementalImages = node.supplementalImagesFromDerived
+    ? Object.values(node.supplementalImagesFromDerived.map || {})
+        .flat()
+        .map((image) => (typeof image === "string" ? image : image.key))
+        .filter(Boolean)
+    : [];
   const derivedImages = node.imagesFromDerived
     ? [
         ...Object.values(node.imagesFromDerived.map || {}).flat(),
@@ -84,6 +90,7 @@ const flowReferencedKeys = Object.values(BOOK_PATHS_FLOW).flatMap((node) => {
     ...compositeOf,
     ...optionImages,
     ...supplementalImages,
+    ...derivedSupplementalImages,
     ...derivedImages,
   ];
 });

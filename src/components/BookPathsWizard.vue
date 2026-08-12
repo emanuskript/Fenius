@@ -243,7 +243,14 @@ function optionImage(option, index) {
 }
 
 const supplementalImages = computed(() =>
-  (currentNode.value?.supplementalImages || []).map((image) =>
+  [
+    ...(() => {
+      const source = currentNode.value?.supplementalImagesFromDerived;
+      if (!source) return [];
+      return source.map?.[state.value.derived?.[source.key]] || [];
+    })(),
+    ...(currentNode.value?.supplementalImages || []),
+  ].map((image) =>
     typeof image === "string" ? { key: image, label: `Drawing ${image}` } : image
   )
 );

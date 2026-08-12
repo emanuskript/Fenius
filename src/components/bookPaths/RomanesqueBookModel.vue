@@ -47,6 +47,7 @@
         <path :d="boardTopPath" fill="url(#wood)" :stroke="ink" stroke-width="2.3" stroke-linejoin="round" />
         <path :d="boardFrontEdgePath" fill="#cfbea1" :stroke="ink" stroke-width="2" stroke-linejoin="round" />
         <path v-if="boardBevelled" :d="boardInsetPath" fill="none" stroke="#9c8768" stroke-width="2" />
+        <path v-if="boardRounded" :d="boardEdgeHighlightPath" fill="none" stroke="#f3eadb" stroke-width="5" opacity=".9" />
         <g v-if="showChannels" aria-label="Lacing channels on the selected board">
           <g v-for="station in supportStations" :key="`board-channel-${station.t}`">
             <path :d="channelPath(station, channelLength)" fill="none" stroke="#6f5b42" stroke-width="10" stroke-linecap="round" opacity=".34" />
@@ -55,15 +56,15 @@
             <circle :cx="station.x + channelLength" :cy="station.y - channelLength * 0.56" r="4.5" fill="#8b7658" :stroke="ink" stroke-width="1.7" />
           </g>
         </g>
-        <path v-if="derived.backCornered" :d="headBackCornerPath" fill="#fff" :stroke="ink" stroke-width="2" />
-        <path v-if="derived.backCornered" :d="tailBackCornerPath" fill="#fff" :stroke="ink" stroke-width="2" />
       </g>
 
       <g v-else>
         <!-- Lower board, visible beneath the trimmed block. -->
         <g v-if="hasBoards">
+          <polygon :points="lowerBoardTopPoints" :fill="covered ? 'url(#leather)' : 'url(#wood)'" :stroke="ink" stroke-width="2.2" stroke-linejoin="round" />
           <polygon :points="lowerBoardSpinePoints" :fill="covered ? 'url(#leather)' : 'url(#wood)'" :stroke="ink" stroke-width="2.2" />
           <polygon :points="lowerBoardForePoints" :fill="covered ? '#cdbb9d' : '#cfbea1'" :stroke="ink" stroke-width="2.2" />
+          <path v-if="boardRounded" :d="lowerBoardEdgeHighlightPath" fill="none" stroke="#f3eadb" stroke-width="5" opacity=".9" />
         </g>
 
         <!-- The book block is always one continuous solid. -->
@@ -219,6 +220,7 @@
           <path :d="boardTopPath" :fill="covered ? 'url(#leather)' : 'url(#wood)'" :stroke="ink" stroke-width="2.5" stroke-linejoin="round" />
           <path :d="boardFrontEdgePath" :fill="covered ? '#cdbb9d' : '#cfbea1'" :stroke="ink" stroke-width="2" />
           <path v-if="boardBevelled" :d="boardInsetPath" fill="none" stroke="#9c8768" stroke-width="2" />
+          <path v-if="boardRounded" :d="boardEdgeHighlightPath" fill="none" stroke="#f3eadb" stroke-width="5" opacity=".9" />
 
           <g v-if="showChannels && !covered" aria-label="Supports laced through channels">
             <g v-for="station in supportStations" :key="`laced-${station.t}`">
@@ -229,8 +231,6 @@
             </g>
           </g>
 
-          <path v-if="derived.backCornered" :d="headBackCornerPath" fill="#fff" :stroke="ink" stroke-width="2" />
-          <path v-if="derived.backCornered" :d="tailBackCornerPath" fill="#fff" :stroke="ink" stroke-width="2" />
         </g>
 
         <!-- Covering is an exterior state: the leather wraps the spine and
@@ -245,22 +245,27 @@
           aria-label="Leather spine covering"
         />
 
-        <!-- Endbands reinforce the actual head and tail of the spine. -->
-        <g v-if="derived.endband" :aria-label="`${derived.endband} endbands`">
-          <path :d="headEndbandPath" fill="none" stroke="#c3a56f" stroke-width="12" stroke-linecap="round" />
-          <path :d="headEndbandPath" fill="none" :stroke="ink" stroke-width="2.2" :stroke-dasharray="endbandDash" />
-          <path :d="tailEndbandPath" fill="none" stroke="#c3a56f" stroke-width="12" stroke-linecap="round" />
-          <path :d="tailEndbandPath" fill="none" :stroke="ink" stroke-width="2.2" :stroke-dasharray="endbandDash" />
+        <!-- The endband tab is an integrated head/tail spine cap, not a loose
+             triangle laid on top of the board. -->
+        <g v-if="derived.endbandTab" :aria-label="`${derived.endbandTab} endband tabs`">
+          <path :d="headTabPath" :fill="tabFill" :stroke="ink" stroke-width="2" stroke-linejoin="round" />
+          <path :d="tailTabPath" :fill="tabFill" :stroke="ink" stroke-width="2" stroke-linejoin="round" />
         </g>
 
-        <g v-if="derived.endbandTab" :aria-label="`${derived.endbandTab} endband tabs`">
-          <path :d="headTabPath" fill="url(#leather)" :stroke="ink" stroke-width="2" />
-          <path :d="tailTabPath" fill="url(#leather)" :stroke="ink" stroke-width="2" />
+        <!-- Endband cores cross the full thickness at the head and tail. -->
+        <g v-if="derived.endband" :aria-label="`${derived.endband} endbands`">
+          <template v-for="offset in endbandCoreOffsets" :key="`endband-core-${offset}`">
+            <path :d="headEndbandPath(offset)" fill="none" stroke="#c3a56f" stroke-width="8" stroke-linecap="round" />
+            <path :d="headEndbandPath(offset)" fill="none" :stroke="ink" stroke-width="1.8" :stroke-dasharray="endbandDash" />
+            <path :d="tailEndbandPath(offset)" fill="none" stroke="#c3a56f" stroke-width="8" stroke-linecap="round" />
+            <path :d="tailEndbandPath(offset)" fill="none" :stroke="ink" stroke-width="1.8" :stroke-dasharray="endbandDash" />
+          </template>
         </g>
 
         <!-- Cover stitching follows the connected perimeter of the same cover. -->
         <g v-if="covered" :aria-label="`${derived.coverStitch} perimeter stitching`">
-          <path :d="coverPerimeterPath" fill="none" stroke="#5d5144" stroke-width="3" :stroke-dasharray="coverDash" stroke-linecap="round" />
+          <path :d="headTabStitchPath" fill="none" stroke="#5d5144" stroke-width="2.2" :stroke-dasharray="coverDash" stroke-linecap="round" />
+          <path :d="tailTabStitchPath" fill="none" stroke="#5d5144" stroke-width="2.2" :stroke-dasharray="coverDash" stroke-linecap="round" />
         </g>
 
         <!-- The fastening is constructed on this book, so every previous choice remains visible. -->
@@ -321,6 +326,7 @@ const showFrame = computed(() => !!derived.value.support && !derived.value.sewin
 const showSewnSupports = computed(() => !!derived.value.sewing);
 const showHoles = computed(() => !!derived.value.holes && !covered.value);
 const boardBevelled = computed(() => derived.value.board === "bevelled");
+const boardRounded = computed(() => derived.value.board === "rounded");
 const channelLength = computed(() => derived.value.channels === "type-2" ? 148 : 78);
 const sceneTransform = computed(() => boardOnly.value ? "translate(72 78) scale(.88)" : "translate(0 0)");
 
@@ -328,14 +334,40 @@ const topPlanePoints = `${spineBack.x},${spineBack.y} ${foreBack.x},${foreBack.y
 const spineFacePoints = `${spineBack.x},${spineBack.y} ${spineFront.x},${spineFront.y} ${spineFront.x},${spineFront.y + blockHeight} ${spineBack.x},${spineBack.y + blockHeight}`;
 const foreFacePoints = `${spineFront.x},${spineFront.y} ${foreFront.x},${foreFront.y} ${foreFront.x},${foreFront.y + blockHeight} ${spineFront.x},${spineFront.y + blockHeight}`;
 
-const boardBack = { x: 191, y: 239 };
-const boardFarBack = { x: 610, y: 49 };
-const boardFarFront = { x: 1034, y: 293 };
-const boardFront = { x: 610, y: 538 };
+// A medium square projects approximately one board thickness beyond the
+// bookblock. Keep that projection consistent at head, tail, and fore-edge.
+const boardThickness = 16;
+const boardBack = { x: 193, y: 248 };
+const boardFarBack = { x: 611, y: 59 };
+const boardFarFront = { x: 1040, y: 306 };
+const boardFront = { x: 622, y: 500 };
+
+// The same parallel expansion is applied around the block's bottom plane, so
+// the lower board cannot cross the textblock edge or create triangular gaps.
+const lowerBoardBack = { x: 193, y: 424 };
+const lowerBoardFarBack = { x: 611, y: 235 };
+const lowerBoardFarFront = { x: 1040, y: 482 };
+const lowerBoardFront = { x: 622, y: 676 };
 
 const point = (p) => `${p.x},${p.y}`;
 const polygon = (points) => points.map(point).join(" ");
 const interpolate = (a, b, t) => ({ x: a.x + (b.x - a.x) * t, y: a.y + (b.y - a.y) * t });
+const offsetY = (p, amount) => ({ x: p.x, y: p.y + amount });
+const pointsPath = (points) => `${points.map((p, index) => `${index ? "L" : "M"} ${p.x} ${p.y}`).join(" ")} Z`;
+
+function backCorneredBoardPoints(points) {
+  if (!derived.value.backCornered) return points;
+  const [headSpine, headFore, tailFore, tailSpine] = points;
+  const cut = 0.045;
+  return [
+    interpolate(headSpine, headFore, cut),
+    headFore,
+    tailFore,
+    interpolate(tailFore, tailSpine, 1 - cut),
+    interpolate(tailSpine, headSpine, cut),
+    interpolate(headSpine, tailSpine, cut),
+  ];
+}
 
 const supportStations = [0.27, 0.5, 0.73].map((t) => ({ t, ...interpolate(spineBack, spineFront, t) }));
 const changeoverStations = [0.075, 0.925].map((t) => ({ t, ...interpolate(spineBack, spineFront, t) }));
@@ -395,27 +427,42 @@ function stitchPath(station, offset) {
   return `M ${station.x - 16} ${y} L ${station.x + 16} ${y}`;
 }
 
-const lowerBoardSpinePoints = polygon([
-  { x: boardBack.x, y: boardBack.y + blockHeight + 2 },
-  { x: boardFront.x, y: boardFront.y + blockHeight + 2 },
-  { x: boardFront.x, y: boardFront.y + blockHeight + 21 },
-  { x: boardBack.x, y: boardBack.y + blockHeight + 21 },
-]);
-const lowerBoardForePoints = polygon([
-  { x: boardFront.x, y: boardFront.y + blockHeight + 2 },
-  { x: boardFarFront.x, y: boardFarFront.y + blockHeight + 2 },
-  { x: boardFarFront.x, y: boardFarFront.y + blockHeight + 21 },
-  { x: boardFront.x, y: boardFront.y + blockHeight + 21 },
-]);
+const topBoardPoints = [boardBack, boardFarBack, boardFarFront, boardFront];
+const lowerBoardPoints = [lowerBoardBack, lowerBoardFarBack, lowerBoardFarFront, lowerBoardFront];
 
-const boardTopPath = computed(() => {
-  if (derived.value.board === "rounded") {
-    return `M ${boardBack.x + 14} ${boardBack.y - 8} Q ${boardBack.x - 10} ${boardBack.y} ${boardBack.x} ${boardBack.y + 25} L ${boardFront.x - 13} ${boardFront.y + 9} Q ${boardFront.x} ${boardFront.y + 19} ${boardFront.x + 16} ${boardFront.y + 9} L ${boardFarFront.x} ${boardFarFront.y} L ${boardFarBack.x} ${boardFarBack.y} Z`;
-  }
-  return `M ${boardBack.x} ${boardBack.y} L ${boardFarBack.x} ${boardFarBack.y} L ${boardFarFront.x} ${boardFarFront.y} L ${boardFront.x} ${boardFront.y} Z`;
-});
-const boardFrontEdgePath = computed(() => `M ${boardFront.x} ${boardFront.y} L ${boardFarFront.x} ${boardFarFront.y} L ${boardFarFront.x} ${boardFarFront.y + 16} L ${boardFront.x} ${boardFront.y + 16} Z`);
+const boardTopPath = computed(() => pointsPath(backCorneredBoardPoints(topBoardPoints)));
+// The lower board's back corners are concealed by the closed bookblock in this
+// viewpoint. Keeping its exposed square continuous avoids inventing a notch.
+const lowerBoardTopPoints = polygon(lowerBoardPoints);
+
+const boardForeStart = computed(() => derived.value.backCornered
+  ? interpolate(boardFront, boardFarFront, 0.045)
+  : boardFront);
+const lowerBoardForeStart = lowerBoardFront;
+const lowerBoardSpineHead = lowerBoardBack;
+const lowerBoardSpineTail = lowerBoardFront;
+
+const boardFrontEdgePath = computed(() => pointsPath([
+  boardForeStart.value,
+  boardFarFront,
+  offsetY(boardFarFront, boardThickness),
+  offsetY(boardForeStart.value, boardThickness),
+]));
+const lowerBoardSpinePoints = computed(() => polygon([
+  lowerBoardSpineHead,
+  lowerBoardSpineTail,
+  offsetY(lowerBoardSpineTail, boardThickness),
+  offsetY(lowerBoardSpineHead, boardThickness),
+]));
+const lowerBoardForePoints = computed(() => polygon([
+  lowerBoardForeStart,
+  lowerBoardFarFront,
+  offsetY(lowerBoardFarFront, boardThickness),
+  offsetY(lowerBoardForeStart, boardThickness),
+]));
 const boardInsetPath = computed(() => `M ${boardBack.x + 13} ${boardBack.y + 5} L ${boardFarBack.x} ${boardFarBack.y + 8} L ${boardFarFront.x - 15} ${boardFarFront.y} L ${boardFront.x} ${boardFront.y - 9} Z`);
+const boardEdgeHighlightPath = computed(() => `M ${boardForeStart.value.x} ${boardForeStart.value.y + boardThickness / 2} L ${boardFarFront.x} ${boardFarFront.y + boardThickness / 2}`);
+const lowerBoardEdgeHighlightPath = computed(() => `M ${lowerBoardForeStart.x} ${lowerBoardForeStart.y + boardThickness / 2} L ${lowerBoardFarFront.x} ${lowerBoardFarFront.y + boardThickness / 2}`);
 
 function channelPath(station, length) {
   return `M ${station.x} ${station.y - 8} L ${station.x + length} ${station.y - 8 - length * 0.56}`;
@@ -425,26 +472,45 @@ function lacedSupportPath(station) {
   return `M ${station.x} ${station.y + blockHeight + 26} L ${station.x} ${station.y - 8} L ${station.x + length} ${station.y - 8 - length * 0.56}`;
 }
 
-const headBackCornerPath = computed(() => `M ${boardBack.x - 1} ${boardBack.y - 1} L ${boardBack.x + 24} ${boardBack.y + 13} L ${boardBack.x + 1} ${boardBack.y + 27} Z`);
-const tailBackCornerPath = computed(() => `M ${boardFront.x - 26} ${boardFront.y - 14} L ${boardFront.x + 1} ${boardFront.y} L ${boardFront.x - 1} ${boardFront.y - 28} Z`);
-
-const headEndbandPath = computed(() => `M ${spineBack.x - 3} ${spineBack.y + 1} L ${spineBack.x + 36} ${spineBack.y + 24}`);
-const tailEndbandPath = computed(() => `M ${spineFront.x - 36} ${spineFront.y - 22} L ${spineFront.x + 3} ${spineFront.y + 1}`);
+const spineVectorLength = Math.hypot(spineFront.x - spineBack.x, spineFront.y - spineBack.y);
+const spineUnit = {
+  x: (spineFront.x - spineBack.x) / spineVectorLength,
+  y: (spineFront.y - spineBack.y) / spineVectorLength,
+};
+const endbandCoreOffsets = computed(() =>
+  derived.value.endband === "single-straight-packed" ? [0] : [-5, 5]
+);
+function headEndbandPath(offset) {
+  const x = spineBack.x + spineUnit.x * offset;
+  const y = spineBack.y + spineUnit.y * offset;
+  return `M ${x} ${y + 9} L ${x} ${y + blockHeight - 9}`;
+}
+function tailEndbandPath(offset) {
+  const x = spineFront.x + spineUnit.x * offset;
+  const y = spineFront.y + spineUnit.y * offset;
+  return `M ${x} ${y + 9} L ${x} ${y + blockHeight - 9}`;
+}
 const endbandDash = computed(() => {
   if (derived.value.endband === "double-herringbone") return "3 3";
   if (derived.value.endband === "double-straight-packed") return "1 2";
   return "2 5";
 });
 
+const tabFill = computed(() => covered.value ? "url(#leather)" : "#f4ecdc");
 const headTabPath = computed(() => derived.value.endbandTab === "round"
-  ? `M ${spineBack.x - 18} ${spineBack.y - 3} Q ${spineBack.x + 2} ${spineBack.y - 32} ${spineBack.x + 34} ${spineBack.y + 15} L ${spineBack.x + 16} ${spineBack.y + 28} Z`
-  : `M ${spineBack.x - 16} ${spineBack.y - 4} L ${spineBack.x + 17} ${spineBack.y - 22} L ${spineBack.x + 39} ${spineBack.y + 15} L ${spineBack.x + 14} ${spineBack.y + 29} Z`);
+  ? `M ${spineBack.x} ${spineBack.y + 10} L ${spineBack.x} ${spineBack.y + blockHeight - 10} Q ${spineBack.x - 38} ${spineBack.y + blockHeight / 2} ${spineBack.x} ${spineBack.y + 10} Z`
+  : `M ${spineBack.x} ${spineBack.y + 10} L ${spineBack.x} ${spineBack.y + blockHeight - 10} L ${spineBack.x - 17} ${spineBack.y + blockHeight - 20} L ${spineBack.x - 17} ${spineBack.y + 1} Z`);
 const tailTabPath = computed(() => derived.value.endbandTab === "round"
-  ? `M ${spineFront.x - 36} ${spineFront.y - 22} Q ${spineFront.x - 2} ${spineFront.y - 5} ${spineFront.x + 17} ${spineFront.y + 25} L ${spineFront.x - 17} ${spineFront.y + 35} Z`
-  : `M ${spineFront.x - 40} ${spineFront.y - 21} L ${spineFront.x - 9} ${spineFront.y - 38} L ${spineFront.x + 17} ${spineFront.y + 24} L ${spineFront.x - 15} ${spineFront.y + 38} Z`);
+  ? `M ${spineFront.x} ${spineFront.y + 10} L ${spineFront.x} ${spineFront.y + blockHeight - 10} Q ${spineFront.x + 38} ${spineFront.y + blockHeight / 2} ${spineFront.x} ${spineFront.y + 10} Z`
+  : `M ${spineFront.x} ${spineFront.y + 10} L ${spineFront.x} ${spineFront.y + blockHeight - 10} L ${spineFront.x + 17} ${spineFront.y + blockHeight - 1} L ${spineFront.x + 17} ${spineFront.y + 20} Z`);
 
-const coverPerimeterPath = computed(() => `M ${boardBack.x + 6} ${boardBack.y + 4} L ${boardFarBack.x} ${boardFarBack.y + 5} L ${boardFarFront.x - 6} ${boardFarFront.y} L ${boardFront.x} ${boardFront.y - 6} L ${boardBack.x + 6} ${boardBack.y + 4}`);
-const coverDash = computed(() => derived.value.coverStitch === "link" ? "2 8" : "11 7");
+const headTabStitchPath = computed(() => derived.value.endbandTab === "round"
+  ? `M ${spineBack.x - 2} ${spineBack.y + 20} Q ${spineBack.x - 26} ${spineBack.y + blockHeight / 2} ${spineBack.x - 2} ${spineBack.y + blockHeight - 20}`
+  : `M ${spineBack.x - 4} ${spineBack.y + 20} L ${spineBack.x - 12} ${spineBack.y + 25} L ${spineBack.x - 12} ${spineBack.y + blockHeight - 25} L ${spineBack.x - 4} ${spineBack.y + blockHeight - 20}`);
+const tailTabStitchPath = computed(() => derived.value.endbandTab === "round"
+  ? `M ${spineFront.x + 2} ${spineFront.y + 20} Q ${spineFront.x + 26} ${spineFront.y + blockHeight / 2} ${spineFront.x + 2} ${spineFront.y + blockHeight - 20}`
+  : `M ${spineFront.x + 4} ${spineFront.y + 20} L ${spineFront.x + 12} ${spineFront.y + 25} L ${spineFront.x + 12} ${spineFront.y + blockHeight - 25} L ${spineFront.x + 4} ${spineFront.y + blockHeight - 20}`);
+const coverDash = computed(() => derived.value.coverStitch === "link" ? "2 7" : "10 6");
 
 function edgePoint(t) {
   return interpolate(boardFront, boardFarFront, t);
@@ -452,15 +518,17 @@ function edgePoint(t) {
 
 const shortEdge = edgePoint(0.47);
 const shortPeg = { x: shortEdge.x - 84, y: shortEdge.y - 55 };
-const shortStrapPath = computed(() => `M ${shortEdge.x} ${shortEdge.y + 112} L ${shortEdge.x} ${shortEdge.y + 8} L ${shortPeg.x} ${shortPeg.y}`);
+const shortLowerEdge = interpolate(lowerBoardFront, lowerBoardFarFront, 0.47);
+const shortStrapPath = computed(() => `M ${shortLowerEdge.x} ${shortLowerEdge.y + boardThickness / 2} L ${shortEdge.x} ${shortEdge.y + 8} L ${shortPeg.x} ${shortPeg.y}`);
 
 const longStraps = [0.28, 0.68].map((t) => {
   const edge = edgePoint(t);
+  const lowerEdge = interpolate(lowerBoardFront, lowerBoardFarFront, t);
   const peg = { x: edge.x - 250, y: edge.y - 148 };
   return {
     t,
     peg,
-    path: `M ${edge.x} ${edge.y + blockHeight + 24} L ${edge.x} ${edge.y + 7} L ${peg.x} ${peg.y}`,
+    path: `M ${lowerEdge.x} ${lowerEdge.y + boardThickness / 2} L ${edge.x} ${edge.y + 7} L ${peg.x} ${peg.y}`,
   };
 });
 
