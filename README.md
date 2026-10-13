@@ -33,7 +33,7 @@ Core workflows:
 
 ## Prerequisites
 
-- Node.js 18+
+- Node.js 18-22 (Node.js 20 LTS recommended)
 - npm 9+
 
 ---
@@ -70,8 +70,14 @@ npm run lint
 Sync generated book-path assets:
 
 ```bash
+BOOK_PATHS_DRAWINGS_DIR=/absolute/path/to/reviewed-assets \
+BOOK_PATHS_SYNC_CONFIRM=replace-checked-assets \
 npm run sync:book-paths-assets
 ```
+
+The sync is intentionally destructive inside `public/book-paths` and therefore
+requires both explicit variables. Run `npm run audit:book-paths` and review the
+Git diff before committing generated assets.
 
 ---
 
@@ -84,54 +90,21 @@ npm run sync:book-paths-assets
 
 ## Deployment (Server)
 
-This section covers deploying the built app to a Linux server with Nginx.
+The complete production runbook is [DEPLOYMENT.md](DEPLOYMENT.md).
 
 ### Option A: Nginx static hosting (recommended)
 
-1. Build the app:
+From a clean, committed checkout on an Nginx host, use the atomic deployment
+script:
 
 ```bash
-npm ci
-npm run build
+APP_HOST=fenius.example.org ./ops/deploy.sh
 ```
 
-2. Copy `dist/` to your server (example path):
-- `/var/www/fenius/dist`
-
-3. Use an Nginx site config like:
-
-```nginx
-server {
-   listen 80;
-   server_name your-domain.example;
-
-   root /var/www/fenius/dist;
-   index index.html;
-
-   location / {
-      try_files $uri $uri/ /index.html;
-   }
-
-   location ~* \.(js|css|png|jpg|jpeg|gif|svg|ico|woff2?)$ {
-      expires 30d;
-      add_header Cache-Control "public, max-age=2592000";
-      try_files $uri =404;
-   }
-}
-```
-
-4. Validate and reload Nginx:
-
-```bash
-sudo nginx -t
-sudo systemctl reload nginx
-```
-
-5. (Recommended) Add TLS with Certbot:
-
-```bash
-sudo certbot --nginx -d your-domain.example
-```
+It performs a locked install, SVG security audit, lint, production build,
+precompression, immutable release staging, atomic symlink switch, Nginx
+validation, rollback on invalid configuration, and a local smoke test. It does
+not alter firewall or TLS configuration.
 
 ### Option B: Vercel
 
@@ -155,11 +128,10 @@ If `8080` is busy, stop the running process or set a custom port in Vue CLI conf
 
 ### Dependency issues after updates
 
-Try a clean install:
+Reinstall the committed dependency graph without changing the lockfile:
 
 ```bash
-rm -rf node_modules package-lock.json
-npm install
+npm ci
 ```
 
 ---
@@ -167,4 +139,3 @@ npm install
 ## License
 
 This project is licensed under the Apache License 2.0. See [LICENSE](LICENSE).
-
