@@ -1,7 +1,10 @@
 import fs from "node:fs/promises";
 import os from "node:os";
 import path from "node:path";
-import { pathToFileURL } from "node:url";
+import { fileURLToPath, pathToFileURL } from "node:url";
+
+const scriptDirectory = path.dirname(fileURLToPath(import.meta.url));
+const repoRoot = path.resolve(scriptDirectory, "..");
 
 const SUPPORTED_EXTENSIONS = new Set([".png", ".jpg", ".jpeg", ".svg", ".webp"]);
 
@@ -83,7 +86,7 @@ async function ensureDirectory(dirPath) {
 
 async function loadRequiredKeys() {
   try {
-    const modulePath = pathToFileURL(path.resolve("src", "bookPaths", "requiredAssets.js")).href;
+    const modulePath = pathToFileURL(path.join(repoRoot, "src", "bookPaths", "requiredAssets.js")).href;
     const mod = await import(modulePath);
     if (Array.isArray(mod.REQUIRED_BOOK_PATHS_ASSET_KEYS)) {
       return mod.REQUIRED_BOOK_PATHS_ASSET_KEYS;
@@ -105,10 +108,22 @@ async function clearDestination(destDir) {
 }
 
 async function run() {
-  const defaultSourceDir = path.join(os.homedir(), "Desktop", "drawings", "Drawings");
-  const sourceDir = path.resolve(expandHomeDir(process.env.BOOK_PATHS_DRAWINGS_DIR || defaultSourceDir));
-  const destinationDir = path.resolve("public", "book-paths");
-  const generatedModulePath = path.resolve("src", "bookPaths", "assets.generated.js");
+  if (!process.env.BOOK_PATHS_DRAWINGS_DIR) {
+    throw new Error("BOOK_PATHS_DRAWINGS_DIR is required; no machine-specific source is assumed");
+  }
+  if (process.env.BOOK_PATHS_SYNC_CONFIRM !== "replace-checked-assets") {
+    throw new Error(
+      "This command replaces public/book-paths. Set BOOK_PATHS_SYNC_CONFIRM=replace-checked-assets to continue"
+    );
+  }
+
+  const sourceDir = path.resolve(expandHomeDir(process.env.BOOK_PATHS_DRAWINGS_DIR));
+  const destinationDir = path.join(repoRoot, "public", "book-paths");
+  const generatedModulePath = path.join(repoRoot, "src", "bookPaths", "assets.generated.js");
+
+  if (sourceDir === destinationDir || sourceDir.startsWith(`${destinationDir}${path.sep}`)) {
+    throw new Error("Source drawings must not be inside the destination directory");
+  }
 
   await ensureDirectory(destinationDir);
   await ensureDirectory(path.dirname(generatedModulePath));

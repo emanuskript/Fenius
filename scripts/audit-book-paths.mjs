@@ -171,6 +171,27 @@ for (const key of flowAssetKeys) {
   assert.ok(publicPath, `Drawing ${key} is not registered`);
   await fs.access(path.join(repoRoot, "public", publicPath.replace(/^\/book-paths\//, "book-paths/")));
 }
+
+const publicAssetDirectory = path.join(repoRoot, "public", "book-paths");
+const publicAssets = await fs.readdir(publicAssetDirectory, { withFileTypes: true });
+let checkedSvgCount = 0;
+for (const entry of publicAssets) {
+  if (!entry.isFile() || path.extname(entry.name).toLowerCase() !== ".svg") continue;
+  const source = await fs.readFile(path.join(publicAssetDirectory, entry.name), "utf8");
+  const forbidden = [
+    [/<script\b/i, "script element"],
+    [/javascript\s*:/i, "javascript URL"],
+    [/\son[a-z][\w:-]*\s*=/i, "event-handler attribute"],
+    [/<!DOCTYPE\b/i, "external-capable DOCTYPE"],
+    [/(?:href|xlink:href)\s*=\s*["']https?:\/\//i, "external linked resource"],
+  ];
+  for (const [pattern, label] of forbidden) {
+    assert.ok(!pattern.test(source), `${entry.name} contains a forbidden ${label}`);
+  }
+  checkedSvgCount += 1;
+}
+
 console.log(`Book-path audit passed: ${terminalStates.length} valid Romanesque paths.`);
 console.log(`Verified ${visitedNodeIds.size} reachable nodes and ${flowAssetKeys.size} chart drawings.`);
 console.log(`Verified ${finalSignatures.size} distinct state-driven final model signatures.`);
+console.log(`Security-checked ${checkedSvgCount} public SVG files for active or external content.`);

@@ -2,9 +2,14 @@
   "name": "my-vue-app",
   "version": "0.1.0",
   "private": true,
+  "engines": {
+    "node": ">=18 <23",
+    "npm": ">=9"
+  },
   "scripts": {
     "serve": "vue-cli-service serve",
-    "build": "vue-cli-service build",
+    "build": "npm run audit:book-paths && vue-cli-service build",
+    "verify": "npm run audit:book-paths && npm run lint && vue-cli-service build",
     "lint": "vue-cli-service lint",
     "audit:book-paths": "node scripts/audit-book-paths.mjs",
     "sync:book-paths-assets": "node scripts/sync-book-paths-assets.mjs"
@@ -12,8 +17,7 @@
   "dependencies": {
     "core-js": "^3.8.3",
     "html2canvas": "^1.4.1",
-    "jspdf": "^3.0.1",
-    "vercel": "^48.10.3",
+    "jspdf": "^4.2.1",
     "vue": "^3.2.13",
     "vue-router": "^4.5.1"
   },
