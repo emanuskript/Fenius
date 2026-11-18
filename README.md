@@ -15,7 +15,7 @@ Fenius helps users move from manuscript metadata to visual workflow outputs.
 Core workflows:
 - **Create a ruling scheme**
 - **Visualise a book spine** (create new or import VCEditor JSON)
-- **Bookbinding pathway** (currently shown as Coming soon in the UI)
+- **Build a bookbinding** (Romanesque is available; Carolingian and Gothic are in preparation)
 
 ---
 
@@ -24,7 +24,9 @@ Core workflows:
 - [src/App.vue](src/App.vue) — root application shell
 - [src/router/index.js](src/router/index.js) — route definitions
 - [src/components](src/components) — UI screens and feature components
-- [src/bookPaths](src/bookPaths) — book paths state/flow/assets
+- [src/bookPaths](src/bookPaths) — book paths data: the Romanesque activity
+  ([src/bookPaths/romanesque/activity.json](src/bookPaths/romanesque/activity.json), drawings in
+  `public/book-paths/romanesque/`), its compositor, and the legacy flow/asset index
 - [src/assets/styles/theme.css](src/assets/styles/theme.css) — shared theme tokens and global styling
 - [public](public) — static app assets
 - [scripts/sync-book-paths-assets.mjs](scripts/sync-book-paths-assets.mjs) — asset sync utility

@@ -1,0 +1,1417 @@
+{
+ "title": "Binding a Romanesque Book",
+ "subtitle": "Make each decision a binder made, and watch the book take shape.",
+ "canvas": [
+  1190.6,
+  841.9
+ ],
+ "drawings": {
+  "72": {
+   "file": "svg/72-bookblock-starting.svg",
+   "size": [
+    1190.6,
+    841.9
+   ],
+   "at": [
+    0,
+    0
+   ],
+   "name": "Book block, quires stacked",
+   "label": "72"
+  },
+  "09": {
+   "file": "svg/09-cut-option-2-five-rows.svg",
+   "size": [
+    1190.55,
+    841.89
+   ],
+   "at": [
+    23.9,
+    68.1
+   ],
+   "name": "Book block with cut sewing holes",
+   "label": "09"
+  },
+  "08": {
+   "file": "svg/08-pierced-option-2-five-rows.svg",
+   "size": [
+    1190.55,
+    841.89
+   ],
+   "at": [
+    13.8,
+    55.9
+   ],
+   "name": "Book block with pierced sewing holes",
+   "label": "08"
+  },
+  "09h": {
+   "file": "svg/09-holes-only.svg",
+   "size": [
+    1190.55,
+    841.89
+   ],
+   "at": [
+    23.9,
+    68.1
+   ],
+   "name": "Cut sewing holes",
+   "label": "09 (holes)"
+  },
+  "08h": {
+   "file": "svg/08-holes-only.svg",
+   "size": [
+    1190.55,
+    841.89
+   ],
+   "at": [
+    13.8,
+    55.9
+   ],
+   "name": "Pierced sewing holes",
+   "label": "08 (holes)"
+  },
+  "02B": {
+   "file": "svg/02b-endleaf-top-and-bottom.svg",
+   "size": [
+    1190.6,
+    841.9
+   ],
+   "at": [
+    0,
+    0
+   ],
+   "name": "Endleaves, top and bottom",
+   "label": "02B"
+  },
+  "03B": {
+   "file": "svg/03b-wrapped-endleaf.svg",
+   "size": [
+    1190.6,
+    841.9
+   ],
+   "at": [
+    26.1,
+    68.4
+   ],
+   "name": "Wrapped endleaf",
+   "label": "03B"
+  },
+  "81": {
+   "file": "svg/81-sewing-overlay.svg",
+   "size": [
+    833.12,
+    712.38
+   ],
+   "at": [
+    210.8,
+    160.4
+   ],
+   "name": "Slit supports, straight sewing",
+   "label": "81"
+  },
+  "82": {
+   "file": "svg/82-sewing-overlay.svg",
+   "size": [
+    833.1,
+    718.9
+   ],
+   "at": [
+    210.8,
+    160.4
+   ],
+   "name": "Slit supports, herringbone sewing",
+   "label": "82"
+  },
+  "83": {
+   "file": "svg/83-sewing-overlay.svg",
+   "size": [
+    833.12,
+    646.37
+   ],
+   "at": [
+    210.8,
+    160.4
+   ],
+   "name": "Twisted supports, packed straight sewing",
+   "label": "83"
+  },
+  "90": {
+   "file": "svg/90-bookblock-side-trimmed-corner-cut.svg",
+   "size": [
+    1190.6,
+    841.9
+   ],
+   "at": [
+    30.6,
+    61.8
+   ],
+   "name": "Book block, trimmed and back-cornered",
+   "label": "90"
+  },
+  "39B": {
+   "file": "svg/39b-patch-lining.svg",
+   "size": [
+    1190.6,
+    841.9
+   ],
+   "at": [
+    30.5,
+    68.4
+   ],
+   "name": "Patch lining",
+   "label": "39B"
+  },
+  "40B": {
+   "file": "svg/40b-slotted-lining.svg",
+   "size": [
+    1190.6,
+    841.9
+   ],
+   "at": [
+    30.5,
+    68.4
+   ],
+   "name": "Slotted lining",
+   "label": "40B"
+  },
+  "48": {
+   "file": "svg/48-supported-2-cables-herringbone.svg",
+   "size": [
+    1190.6,
+    841.9
+   ],
+   "at": [
+    34.5,
+    55.4
+   ],
+   "name": "Endband, two cables, herringbone",
+   "label": "48"
+  },
+  "49": {
+   "file": "svg/49-supported-2-cables-straight-packed.svg",
+   "size": [
+    1190.6,
+    841.9
+   ],
+   "at": [
+    30.5,
+    68.4
+   ],
+   "name": "Endband, two cables, straight packed",
+   "label": "49"
+  },
+  "50": {
+   "file": "svg/50-supported-1-cable-straight-packed.svg",
+   "size": [
+    1190.6,
+    841.9
+   ],
+   "at": [
+    41.7,
+    69.3
+   ],
+   "name": "Endband, one cable, straight packed",
+   "label": "50"
+  },
+  "55": {
+   "file": "svg/55-perimeter-sewing-round-tab-link-stitch.svg",
+   "size": [
+    1190.6,
+    841.9
+   ],
+   "at": [
+    29.1,
+    73.5
+   ],
+   "name": "Cover, round tab, link stitch",
+   "label": "55"
+  },
+  "55A": {
+   "file": "svg/55a-perimeter-sewing-square-link-stitch.svg",
+   "size": [
+    1190.6,
+    841.9
+   ],
+   "at": [
+    11.8,
+    60.3
+   ],
+   "name": "Cover, square tab, link stitch",
+   "label": "55A"
+  },
+  "56": {
+   "file": "svg/56-perimeter-sewing-round-tab-saddle-stitch.svg",
+   "size": [
+    1190.6,
+    841.9
+   ],
+   "at": [
+    78.3,
+    104.6
+   ],
+   "name": "Cover, round tab, saddle stitch",
+   "label": "56"
+  },
+  "56B": {
+   "file": "svg/56b-perimeter-sewing-square-tab-saddle.svg",
+   "size": [
+    1190.6,
+    841.9
+   ],
+   "at": [
+    21.0,
+    95.9
+   ],
+   "name": "Cover, square tab, saddle stitch",
+   "label": "56B"
+  },
+  "63A": {
+   "file": "svg/63a-carolingian-fastening-short-strap.svg",
+   "size": [
+    1190.6,
+    841.9
+   ],
+   "at": [
+    16.4,
+    36.8
+   ],
+   "name": "Fastening, short strap",
+   "label": "63A"
+  },
+  "64A": {
+   "file": "svg/64a-romanesque-fastening-long-strap.svg",
+   "size": [
+    1190.6,
+    841.9
+   ],
+   "at": [
+    11.8,
+    59.5
+   ],
+   "name": "Fastening, long strap",
+   "label": "64A"
+  },
+  "12A": {
+   "file": "svg/12a-slit-leather-thong-a.svg",
+   "size": [
+    771.72,
+    623.38
+   ],
+   "at": [
+    209.6,
+    110.6
+   ],
+   "name": "Sewing frame with slit thong",
+   "label": "12A"
+  },
+  "14A": {
+   "file": "svg/14a-twisted-single-thong-a.svg",
+   "size": [
+    1190.55,
+    841.89
+   ],
+   "at": [
+    0,
+    0
+   ],
+   "name": "Sewing frame with twisted thong",
+   "label": "14A"
+  },
+  "26": {
+   "file": "svg/26-square-board.svg",
+   "size": [
+    1190.55,
+    841.89
+   ],
+   "at": [
+    207.5,
+    97.5
+   ],
+   "name": "Square board",
+   "label": "26"
+  },
+  "27": {
+   "file": "svg/27-bevelled-board.svg",
+   "size": [
+    1190.55,
+    841.89
+   ],
+   "at": [
+    228.5,
+    265.4
+   ],
+   "name": "Bevelled board",
+   "label": "27"
+  },
+  "28": {
+   "file": "svg/28-rounded-board.svg",
+   "size": [
+    1190.55,
+    841.89
+   ],
+   "at": [
+    151.8,
+    83.1
+   ],
+   "name": "Rounded board",
+   "label": "28"
+  },
+  "29": {
+   "file": "svg/29-square-board-triangle-cut-out.svg",
+   "size": [
+    1190.6,
+    841.9
+   ],
+   "at": [
+    0,
+    0
+   ],
+   "name": "Square board, back-cornered",
+   "label": "29"
+  },
+  "30": {
+   "file": "svg/30-bevelled-board-triangle-cut-out.svg",
+   "size": [
+    1190.6,
+    841.9
+   ],
+   "at": [
+    43.5,
+    10.0
+   ],
+   "name": "Bevelled board, back-cornered",
+   "label": "30"
+  },
+  "31B": {
+   "file": "svg/31b-rounded-board-triangle-cut-out.svg",
+   "size": [
+    1190.6,
+    841.9
+   ],
+   "at": [
+    37.0,
+    120.0
+   ],
+   "name": "Rounded board, back-cornered",
+   "label": "31B"
+  },
+  "29w": {
+   "file": "svg/29-backing.svg",
+   "size": [
+    1190.6,
+    841.9
+   ],
+   "at": [
+    0,
+    0
+   ],
+   "name": "Backing for board 29",
+   "label": null
+  },
+  "30w": {
+   "file": "svg/30-backing.svg",
+   "size": [
+    1190.6,
+    841.9
+   ],
+   "at": [
+    43.5,
+    10.0
+   ],
+   "name": "Backing for board 30",
+   "label": null
+  },
+  "31Bw": {
+   "file": "svg/31b-backing.svg",
+   "size": [
+    1190.6,
+    841.9
+   ],
+   "at": [
+    37.0,
+    120.0
+   ],
+   "name": "Backing for board 31B",
+   "label": null
+  },
+  "35C": {
+   "file": "svg/35c-romanesque-drilling-channels-type-1.svg",
+   "size": [
+    1190.6,
+    841.9
+   ],
+   "at": [
+    0,
+    0
+   ],
+   "name": "Lacing channels, type I",
+   "label": "35C"
+  },
+  "36C": {
+   "file": "svg/36c-romanesque-drilling-channels.svg",
+   "size": [
+    1190.6,
+    841.9
+   ],
+   "at": [
+    0,
+    0
+   ],
+   "name": "Lacing channels, type II",
+   "label": "36C"
+  },
+  "52": {
+   "file": "svg/52-square-endband-tab.svg",
+   "size": [
+    1190.55,
+    841.89
+   ],
+   "at": [
+    0,
+    0
+   ],
+   "name": "Square endband tab",
+   "label": "52"
+  },
+  "53": {
+   "file": "svg/53-round-endband-tab.svg",
+   "size": [
+    1190.55,
+    841.89
+   ],
+   "at": [
+    0,
+    0
+   ],
+   "name": "Round endband tab",
+   "label": "53"
+  },
+  "63": {
+   "file": "svg/63-carolingian-fastening.svg",
+   "size": [
+    1190.55,
+    841.89
+   ],
+   "at": [
+    0,
+    0
+   ],
+   "name": "Carolingian fastening",
+   "label": "63"
+  },
+  "64": {
+   "file": "svg/64-romanesque-fastening.svg",
+   "size": [
+    1190.55,
+    841.89
+   ],
+   "at": [
+    0,
+    0
+   ],
+   "name": "Romanesque fastening",
+   "label": "64"
+  },
+  "59": {
+   "file": "svg/59-overcover.svg",
+   "size": [
+    1190.6,
+    841.9
+   ],
+   "at": [
+    0,
+    0
+   ],
+   "name": "Overcover",
+   "label": "59"
+  },
+  "58": {
+   "file": "img/58-mitred-corners-with-stitching.png",
+   "size": [
+    1190.55,
+    841.89
+   ],
+   "at": [
+    0,
+    0
+   ],
+   "name": "Mitred corners with stitching",
+   "label": "58"
+  }
+ },
+ "scenes": {
+  "block": {
+   "view": [
+    90,
+    55,
+    1195,
+    845
+   ],
+   "caption": "The book block",
+   "layers": [
+    {
+     "draw": "72",
+     "when": {
+      "holes": null
+     }
+    },
+    {
+     "draw": "09",
+     "when": {
+      "holes": "cut"
+     }
+    },
+    {
+     "draw": "08",
+     "when": {
+      "holes": "pierced"
+     }
+    },
+    {
+     "draw": "02B",
+     "when": {
+      "endleaves": "quire"
+     }
+    },
+    {
+     "draw": "03B",
+     "when": {
+      "endleaves": "wrap"
+     }
+    }
+   ]
+  },
+  "frame": {
+   "view": [
+    185,
+    95,
+    820,
+    655
+   ],
+   "caption": "The book block on the sewing frame",
+   "layers": [
+    {
+     "scene": "block",
+     "transform": [
+      0.598,
+      0,
+      0,
+      0.634,
+      169.9504,
+      144.891
+     ]
+    },
+    {
+     "draw": "12A",
+     "when": {
+      "support": "slit"
+     }
+    },
+    {
+     "draw": "14A",
+     "when": {
+      "support": "twisted"
+     }
+    }
+   ]
+  },
+  "sewn": {
+   "view": [
+    90,
+    55,
+    1195,
+    845
+   ],
+   "caption": "The quires sewn to their supports",
+   "layers": [
+    {
+     "scene": "block"
+    },
+    {
+     "draw": "82",
+     "when": {
+      "stitch": "herringbone"
+     }
+    },
+    {
+     "draw": "81",
+     "when": {
+      "stitch": "straight"
+     }
+    },
+    {
+     "draw": "83",
+     "when": {
+      "stitch": "packed"
+     }
+    }
+   ]
+  },
+  "board": {
+   "view": [
+    425,
+    305,
+    560,
+    350
+   ],
+   "caption": "A book board",
+   "layers": [
+    {
+     "draw": "26",
+     "when": {
+      "board": "square",
+      "corner": null
+     }
+    },
+    {
+     "draw": "27",
+     "when": {
+      "board": "bevelled",
+      "corner": null
+     }
+    },
+    {
+     "draw": "28",
+     "when": {
+      "board": "rounded",
+      "corner": null
+     }
+    },
+    {
+     "draw": "29",
+     "when": {
+      "board": "square",
+      "corner": "yes"
+     }
+    },
+    {
+     "draw": "30",
+     "when": {
+      "board": "bevelled",
+      "corner": "yes"
+     }
+    },
+    {
+     "draw": "31B",
+     "when": {
+      "board": "rounded",
+      "corner": "yes"
+     }
+    },
+    {
+     "draw": "35C",
+     "when": {
+      "channels": "type1",
+      "corner": "yes"
+     }
+    },
+    {
+     "draw": "35C",
+     "when": {
+      "channels": "type1",
+      "board": "square",
+      "corner": null
+     },
+     "transform": [
+      1,
+      0,
+      0,
+      1,
+      9.02,
+      3.73
+     ]
+    },
+    {
+     "draw": "35C",
+     "when": {
+      "channels": "type1",
+      "board": "bevelled",
+      "corner": null
+     },
+     "transform": [
+      1,
+      0,
+      0,
+      1,
+      10.27,
+      5.29
+     ]
+    },
+    {
+     "draw": "35C",
+     "when": {
+      "channels": "type1",
+      "board": "rounded",
+      "corner": null
+     },
+     "transform": [
+      1,
+      0,
+      0,
+      1,
+      9.64,
+      5.13
+     ]
+    },
+    {
+     "draw": "36C",
+     "when": {
+      "channels": "type2",
+      "corner": "yes"
+     }
+    },
+    {
+     "draw": "36C",
+     "when": {
+      "channels": "type2",
+      "board": "square",
+      "corner": null
+     },
+     "transform": [
+      1,
+      0,
+      0,
+      1,
+      9.02,
+      3.73
+     ]
+    },
+    {
+     "draw": "36C",
+     "when": {
+      "channels": "type2",
+      "board": "bevelled",
+      "corner": null
+     },
+     "transform": [
+      1,
+      0,
+      0,
+      1,
+      10.27,
+      5.29
+     ]
+    },
+    {
+     "draw": "36C",
+     "when": {
+      "channels": "type2",
+      "board": "rounded",
+      "corner": null
+     },
+     "transform": [
+      1,
+      0,
+      0,
+      1,
+      9.64,
+      5.13
+     ]
+    }
+   ]
+  },
+  "boardBacked": {
+   "layers": [
+    {
+     "draw": "29w",
+     "when": {
+      "board": "square"
+     }
+    },
+    {
+     "draw": "30w",
+     "when": {
+      "board": "bevelled"
+     }
+    },
+    {
+     "draw": "31Bw",
+     "when": {
+      "board": "rounded"
+     }
+    },
+    {
+     "scene": "board"
+    }
+   ]
+  },
+  "assembled": {
+   "view": [
+    90,
+    55,
+    1195,
+    845
+   ],
+   "caption": "Boards laced on, edges trimmed",
+   "layers": [
+    {
+     "draw": "90"
+    },
+    {
+     "draw": "09h",
+     "when": {
+      "holes": "cut"
+     }
+    },
+    {
+     "draw": "08h",
+     "when": {
+      "holes": "pierced"
+     }
+    },
+    {
+     "draw": "02B",
+     "when": {
+      "endleaves": "quire"
+     }
+    },
+    {
+     "draw": "03B",
+     "when": {
+      "endleaves": "wrap"
+     }
+    },
+    {
+     "draw": "39B",
+     "when": {
+      "lining": "patch"
+     }
+    },
+    {
+     "draw": "40B",
+     "when": {
+      "lining": "slotted"
+     }
+    },
+    {
+     "draw": "82",
+     "when": {
+      "stitch": "herringbone"
+     }
+    },
+    {
+     "draw": "81",
+     "when": {
+      "stitch": "straight"
+     }
+    },
+    {
+     "draw": "83",
+     "when": {
+      "stitch": "packed"
+     }
+    },
+    {
+     "scene": "boardBacked",
+     "transform": [
+      1.66747,
+      0.01673,
+      -0.0493,
+      1.59076,
+      -521.44718,
+      -402.44755
+     ]
+    },
+    {
+     "draw": "49",
+     "when": {
+      "endband": "double-straight"
+     }
+    },
+    {
+     "draw": "48",
+     "when": {
+      "endband": "double-herringbone"
+     }
+    },
+    {
+     "draw": "50",
+     "when": {
+      "endband": "single-straight"
+     }
+    }
+   ]
+  },
+  "covered": {
+   "view": [
+    90,
+    55,
+    1195,
+    845
+   ],
+   "caption": "The covered book",
+   "layers": [
+    {
+     "draw": "90"
+    },
+    {
+     "draw": "55A",
+     "when": {
+      "tab": "square",
+      "cover": "link"
+     }
+    },
+    {
+     "draw": "56B",
+     "when": {
+      "tab": "square",
+      "cover": "saddle"
+     }
+    },
+    {
+     "draw": "55",
+     "when": {
+      "tab": "round",
+      "cover": "link"
+     }
+    },
+    {
+     "draw": "56",
+     "when": {
+      "tab": "round",
+      "cover": "saddle"
+     }
+    },
+    {
+     "draw": "63A",
+     "when": {
+      "fastening": "short"
+     }
+    },
+    {
+     "draw": "64A",
+     "when": {
+      "fastening": "long"
+     }
+    }
+   ]
+  }
+ },
+ "steps": [
+  {
+   "id": "style",
+   "key": "style",
+   "short": "Style",
+   "title": "Choose a binding style",
+   "hideInSummary": true,
+   "text": [
+    "Medieval bindings changed over the centuries. Each style has its own way of sewing, boarding and covering a book."
+   ],
+   "question": "Which style do you want to choose?",
+   "options": [
+    {
+     "value": "carolingian",
+     "label": "Carolingian",
+     "disabled": "in preparation"
+    },
+    {
+     "value": "romanesque",
+     "label": "Romanesque"
+    },
+    {
+     "value": "gothic",
+     "label": "Gothic",
+     "disabled": "in preparation"
+    }
+   ],
+   "scene": "block"
+  },
+  {
+   "id": "holes",
+   "key": "holes",
+   "short": "Sewing holes",
+   "title": "Holes for the thread",
+   "text": [
+    "Your quires are stacked on top of one another. It is time to decide how many sewing supports you will bind the book with. This book block will be designed for three sewing supports, and they will be equally spaced, since that was the most common design.",
+    "Since the supports will be sewn to the book block, the book block has to have holes in it for the thread. This was probably done while the quires were held tight in a press."
+   ],
+   "question": "Will the holes be cut in, as with a knife or chisel, or pierced, as with an awl or needle?",
+   "options": [
+    {
+     "value": "cut",
+     "label": "Cut"
+    },
+    {
+     "value": "pierced",
+     "label": "Pierced"
+    }
+   ],
+   "scene": "block"
+  },
+  {
+   "id": "endleaves",
+   "key": "endleaves",
+   "short": "Endleaves",
+   "title": "Endleaves",
+   "text": [
+    "Now you have to decide whether to add endleaves. When included, these were additional wraps for the book block. Sometimes they were glued down to the inside cover, almost always after the book board had been covered with leather or another material."
+   ],
+   "question": "Will you:",
+   "options": [
+    {
+     "value": "none",
+     "label": "Use no endleaves"
+    },
+    {
+     "value": "own",
+     "label": "Use the first and last pages of the book block"
+    },
+    {
+     "value": "quire",
+     "label": "Add a thin additional quire"
+    },
+    {
+     "value": "wrap",
+     "label": "Wrap the whole book block in a large bifolium"
+    }
+   ],
+   "after": [
+    "The form could vary, particularly of the additional quire. Sometimes it was a folio with a stub. Finally, front and back endleaves could be treated differently."
+   ],
+   "scene": "block"
+  },
+  {
+   "id": "support",
+   "key": "support",
+   "short": "Supports",
+   "title": "Sewing supports",
+   "text": [
+    "The quires are now ready to be sewn together. They will be sewn together along three sewing supports, which will later be laced into the book boards. These sewing supports are made of alum-tawed leather and measured about 8–20 mm in width."
+   ],
+   "question": "Will you choose:",
+   "options": [
+    {
+     "value": "slit",
+     "label": "A strap that has been slit down the middle"
+    },
+    {
+     "value": "twisted",
+     "label": "A strap that has been twisted"
+    }
+   ],
+   "before": "block",
+   "scene": "frame"
+  },
+  {
+   "id": "stitch",
+   "key": "stitch",
+   "short": "Sewing",
+   "title": "Sewing the quires",
+   "text": [
+    "The sewing supports are suspended on the crossbar of the sewing frame. We are not quite sure how they were suspended, but some supports show slits or holes with traces of iron rust. The needle will draw thread through each quire and wrap around the sewing support.",
+    "The change-over station at either end of the spine is where the thread shifts direction and travels back. In the Romanesque period, the change-over seems to have generally been done with a link stitch."
+   ],
+   "question": "What kind of stitch will you choose for the main sewing support?",
+   "options": [
+    {
+     "value": "herringbone",
+     "label": "Herringbone",
+     "when": {
+      "support": "slit"
+     },
+     "because": "You chose a slit leather strap, so you can now choose:"
+    },
+    {
+     "value": "straight",
+     "label": "Straight",
+     "when": {
+      "support": "slit"
+     }
+    },
+    {
+     "value": "packed",
+     "label": "Packed straight",
+     "when": {
+      "support": "twisted"
+     },
+     "because": "You chose a twisted leather strap, so you can choose:"
+    }
+   ],
+   "before": "frame",
+   "scene": "sewn"
+  },
+  {
+   "id": "board",
+   "key": "board",
+   "short": "Boards",
+   "title": "The boards",
+   "text": [
+    "The book block is laid aside as preparing the book boards begins. Oak was common. Romanesque boards were typically slightly thicker at the spine."
+   ],
+   "question": "The edges of the board could be squared, slightly bevelled or rounded. Which will you choose?",
+   "options": [
+    {
+     "value": "square",
+     "label": "Squared"
+    },
+    {
+     "value": "bevelled",
+     "label": "Slightly bevelled"
+    },
+    {
+     "value": "rounded",
+     "label": "Rounded"
+    }
+   ],
+   "before": null,
+   "emptyText": "The book block is laid aside. Choose a board.",
+   "scene": "board"
+  },
+  {
+   "id": "channels",
+   "key": "channels",
+   "short": "Channels",
+   "title": "Lacing channels",
+   "text": [
+    "Channels must now be drilled into the boards so that the sewing supports can be laced through the board's spine edge and held in place with a wedge, peg or nail."
+   ],
+   "question": "Choose between two patterns found repeatedly in one study of Romanesque binding:",
+   "options": [
+    {
+     "value": "type1",
+     "label": "Type I"
+    },
+    {
+     "value": "type2",
+     "label": "Type II"
+    }
+   ],
+   "after": [
+    "Both lacing channels enter the board on the side. In Type I, the lacing channel is relatively short; in Type II, relatively long. The endband support cable could also be laced into the board. These support cables are then laced into the boards and pegged in place."
+   ],
+   "scene": "board"
+  },
+  {
+   "id": "corner",
+   "key": "corner",
+   "short": "Back-cornering",
+   "title": "Back-cornering",
+   "hideInSummary": true,
+   "text": [
+    "Now, the corners of the spine head and tail were cut, or “back-cornered”, at a slant to accommodate the endbands, which would be added later."
+   ],
+   "question": "Are you ready?",
+   "options": [
+    {
+     "value": "yes",
+     "label": "Yes"
+    }
+   ],
+   "scene": "board"
+  },
+  {
+   "id": "lacing",
+   "short": "Lacing",
+   "title": "Lacing on and trimming",
+   "text": [
+    "The sewing supports are now laced into the channels drilled into the boards and pegged in place. As in earlier Carolingian binding, the rough edges of the book block and the wooden covers were trimmed, perhaps by a drawknife, at the same time."
+   ],
+   "scene": "assembled"
+  },
+  {
+   "id": "lining",
+   "key": "lining",
+   "short": "Spine lining",
+   "title": "Spine lining",
+   "text": [
+    "As reinforcement, a lining of chamois leather, textile or parchment could be pasted down along the spine. Wooden pegs could also be used if the lining was being fastened into the wooden board."
+   ],
+   "question": "What will you choose?",
+   "options": [
+    {
+     "value": "none",
+     "label": "No lining"
+    },
+    {
+     "value": "patch",
+     "label": "Patch lining, made up of material “patches” placed between the sewing supports"
+    },
+    {
+     "value": "slotted",
+     "label": "A full-length, slotted lining with spaces cut out for the sewing supports"
+    }
+   ],
+   "after": [
+    "In reality, multiple linings could be used, even on top of one another."
+   ],
+   "scene": "assembled"
+  },
+  {
+   "id": "endband",
+   "key": "endband",
+   "short": "Endbands",
+   "title": "Endbands",
+   "text": [
+    "Now that the book block is sewn together and the boards laced, the spine edges will be reinforced with endbands. Endband sewing links the quires together at the spine's top and bottom.",
+    "A tab is placed at the top and bottom of the spine as a lining. It was often supported along the spine corner by a single or by a double cable, often of the same material as the sewing support, such as alum-tawed leather."
+   ],
+   "question": "Here are three options:",
+   "options": [
+    {
+     "value": "double-straight",
+     "label": "Double support with straight packed stitching"
+    },
+    {
+     "value": "double-herringbone",
+     "label": "Double support with herringbone stitching"
+    },
+    {
+     "value": "single-straight",
+     "label": "Single support with straight packed stitching"
+    }
+   ],
+   "after": [
+    "Sometimes the stitching could be embroidered with a second layer of coloured linen or silk, but this was less common before the fourteenth century."
+   ],
+   "scene": "assembled"
+  },
+  {
+   "id": "tab",
+   "key": "tab",
+   "short": "Tab",
+   "title": "Trimming the endband tab",
+   "text": [
+    "The top of the endband tab is then trimmed, perhaps mostly round, but sometimes squared."
+   ],
+   "question": "Which will you choose?",
+   "options": [
+    {
+     "value": "square",
+     "label": "Square",
+     "thumb": {
+      "draw": "52",
+      "box": [
+       425,
+       340,
+       220,
+       150
+      ]
+     }
+    },
+    {
+     "value": "round",
+     "label": "Round",
+     "thumb": {
+      "draw": "53",
+      "box": [
+       493,
+       275,
+       220,
+       150
+      ]
+     }
+    }
+   ],
+   "scene": "assembled"
+  },
+  {
+   "id": "cover",
+   "key": "cover",
+   "short": "Covering",
+   "title": "Covering the boards",
+   "text": [
+    "The book boards were then covered, most often in a pale white or grey chamois or alum-tawed leather or with a red or brown vegetable-tanned leather. The latter was preferred if the book was to receive blind-tooled decoration. A starch paste was common.",
+    "On the inside boards, the covering was typically cut at the corners, or “mitred”, and the edges were sewn together, as shown below. In addition, the covering was sewn together with the endband tab."
+   ],
+   "figures": [
+    {
+     "draw": "58",
+     "box": [
+      80,
+      55,
+      960,
+      640
+     ],
+     "caption": "Mitred corners with stitching, seen on the inside of the boards.",
+     "place": "afterText"
+    }
+   ],
+   "question": "What stitching style will you choose?",
+   "options": [
+    {
+     "value": "link",
+     "label": "Link stitch"
+    },
+    {
+     "value": "saddle",
+     "label": "Saddle stitch"
+    }
+   ],
+   "before": "assembled",
+   "scene": "covered"
+  },
+  {
+   "id": "fastening",
+   "key": "fastening",
+   "short": "Fastening",
+   "title": "Fastening",
+   "text": [
+    "Finally, a fastening could be fashioned. A leather strap, sewn together of two leather pieces, was generally used. It was nailed into the side near the free edge of one of the covers, generally the upper cover. An eyelet or hasp of bronze or iron was attached to the end. Sometimes it was decorated with geometric, floral or animal designs. It had a hole that fit around a peg on the opposite cover.",
+    "If a short strap is used, it joins to a peg projecting from the edge of the opposite board. This edge-fastening is inherited from the Carolingian period and preferred in Germany and Central Europe. If a long strap is used, it wraps around to a peg set in the side of the opposite cover. This form dominates after 1200 and in French and English bindings."
+   ],
+   "question": "Which will you choose?",
+   "options": [
+    {
+     "value": "short",
+     "label": "Short strap"
+    },
+    {
+     "value": "long",
+     "label": "Long strap"
+    }
+   ],
+   "figures": [
+    {
+     "draw": "63",
+     "box": [
+      160,
+      60,
+      870,
+      730
+     ],
+     "caption": "The short strap, a fastening inherited from Carolingian binding.",
+     "when": {
+      "fastening": "short"
+     }
+    },
+    {
+     "draw": "64",
+     "box": [
+      175,
+      65,
+      870,
+      730
+     ],
+     "caption": "The long strap, the Romanesque fastening.",
+     "when": {
+      "fastening": "long"
+     }
+    }
+   ],
+   "scene": "covered"
+  },
+  {
+   "id": "finish",
+   "short": "Finished",
+   "title": "Your binding",
+   "text": [
+    "Here you have your cover. Sometimes a fixed or loose overcover was added to wrap the book in, as illustrated below. The cover could also be painted, embellished or decorated in various ways."
+   ],
+   "figures": [
+    {
+     "draw": "59",
+     "box": [
+      135,
+      90,
+      895,
+      635
+     ],
+     "caption": "An overcover wrapped around the bound book."
+    }
+   ],
+   "summary": true,
+   "scene": "covered"
+  }
+ ]
+}

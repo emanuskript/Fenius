@@ -9,154 +9,148 @@
         <div>
           <h2>Build a Bookbinding</h2>
           <p class="bp-subtitle">
-            <span v-if="styleLabel">{{ styleLabel }} binding</span>
+            <template v-if="styleLabel">
+              <span class="bp-activity-title">{{ ACTIVITY.title }}</span>
+              <span v-if="ACTIVITY.subtitle" class="bp-activity-sub"><span class="bp-sep" aria-hidden="true"> · </span>{{ ACTIVITY.subtitle }}</span>
+            </template>
             <span v-else>Choose a style to begin</span>
-            <span v-if="state.context?.title"> | {{ state.context.title }}</span>
+            <span v-if="initialContext?.title" class="bp-context"><span class="bp-sep" aria-hidden="true"> | </span>{{ initialContext.title }}</span>
           </p>
         </div>
-        <button class="secondary-btn" @click="handleClose">Close</button>
+        <button type="button" class="secondary-btn" @click="handleClose">Close</button>
       </header>
 
-      <div class="bp-layout">
-        <aside class="bp-crumbs">
-          <h3>Path</h3>
-          <ul>
-            <li>
-              <button class="ghost-btn" @click="jumpToDecision(0)">Start</button>
-            </li>
-            <li v-for="(entry, i) in answeredEntries" :key="entry.key">
-              <button class="ghost-btn" @click="jumpToDecision(entry.index)">
-                {{ i + 1 }}. {{ entry.title }}
-                <span class="crumb-choice">→ {{ entry.choiceLabel }}</span>
-              </button>
-            </li>
-            <li class="current-step">
-              Current: {{ summary ? "Summary" : (currentNode?.title || "Missing node") }}
-            </li>
-          </ul>
-        </aside>
+      <div ref="scrollArea" class="bp-body">
+        <ol class="bp-rail" aria-label="Stages of the binding">
+          <li
+            v-for="(s, i) in steps"
+            :key="s.id"
+            :class="{ current: i === stepIndex, done: i !== stepIndex && i < reach }"
+          >
+            <button
+              type="button"
+              :disabled="i > reach"
+              :aria-current="i === stepIndex ? 'step' : undefined"
+              @click="go(i)"
+            >
+              <span class="rail-num" aria-hidden="true">{{ i + 1 }}</span>
+              <span>{{ s.short || s.title }}</span>
+            </button>
+          </li>
+        </ol>
 
-        <main class="bp-main">
-          <template v-if="summary">
-            <h3>Your Romanesque Binding</h3>
-            <p class="bp-copy">Here's the binding you built. Click any step in the Path on the left to revise just that choice, or restart to begin again.</p>
-            <div class="summary-grid">
-              <div class="summary-recap surface-card">
-                <p class="recap-style"><strong>{{ summary.style || "—" }}</strong> binding</p>
-                <dl>
-                  <template v-for="row in recapRows" :key="row.field">
-                    <dt>{{ row.title }}</dt>
-                    <dd>{{ row.value }}</dd>
-                  </template>
-                </dl>
-              </div>
-              <figure class="summary-figure">
-                <figcaption class="figure-head">
-                  <span class="fig-title">Your finished binding</span>
-                  <span class="save-wrap">
-                    <button type="button" class="ghost-btn save-btn" aria-haspopup="menu" :aria-expanded="saveMenuKey === 'summary'" @click="toggleSaveMenu('summary')">Save ▾</button>
-                    <div v-if="saveMenuKey === 'summary'" class="save-menu" role="menu">
-                      <button type="button" role="menuitem" @click="saveModel('png')">PNG (transparent)</button>
-                      <button type="button" role="menuitem" @click="saveModel('jpg')">JPG (on white)</button>
-                    </div>
-                  </span>
-                </figcaption>
-                <div class="summary-model-stage" aria-label="Your finished Romanesque binding">
-                  <RomanesqueBookModel
-                    :derived="summary.derived || {}"
-                    node-id="romanesque_end"
-                    class="summary-model-layer"
-                  />
-                </div>
-              </figure>
-            </div>
-          </template>
-
-          <template v-else>
-            <h3>{{ currentNode?.title || "Missing node" }}</h3>
-            <p class="bp-copy">
-              {{ currentNode?.body || "This node is not present in the current flow graph." }}
-            </p>
-
-            <div v-if="!isTerminal" class="bp-options">
-              <article
-                v-for="(option, idx) in currentNode.options"
-                :key="`${currentNode.id}-${idx}`"
-                class="bp-option-card surface-card"
-              >
-                <button
-                  type="button"
-                  class="primary-btn bp-option-button"
-                  :class="{ 'is-disabled': option.disabled }"
-                  :aria-disabled="option.disabled ? 'true' : 'false'"
-                  @click="choose(option)"
-                >
-                  {{ option.label }}<span v-if="option.disabled" class="soon"> — coming soon</span>
-                </button>
-                <img
-                  v-if="optionImage(option, idx)"
-                  :src="drawingSrc(optionImage(option, idx))"
-                  :alt="`Drawing ${optionImage(option, idx)}: ${option.label}`"
-                  class="bp-option-image"
-                />
-                <p v-else-if="option.imageNote" class="bp-option-note">{{ option.imageNote }}</p>
-              </article>
-            </div>
-
-            <div v-else class="bp-terminal-note">
-              Your binding is complete. Click Finish to review it.
-            </div>
-
-            <section v-if="supplementalImages.length" class="bp-supplemental" aria-label="Supporting illustrations">
-              <figure v-for="image in supplementalImages" :key="image.key">
-                <img :src="drawingSrc(image.key)" :alt="`Drawing ${image.key}: ${image.label}`" />
-                <figcaption>{{ image.label }}</figcaption>
-              </figure>
-            </section>
-
-            <!-- The evolving book, built up from every choice so far -->
-            <section class="bp-model-wrap" aria-live="polite">
-              <div class="model-caption">
-                <span>{{ modelCaption }}</span>
-                <span class="save-wrap">
-                  <button v-if="showModel" type="button" class="ghost-btn save-btn" aria-haspopup="menu" :aria-expanded="saveMenuKey === 'model'" @click="toggleSaveMenu('model')">Save ▾</button>
-                  <div v-if="saveMenuKey === 'model'" class="save-menu" role="menu">
-                    <button type="button" role="menuitem" @click="saveModel('png')">PNG (transparent)</button>
-                    <button type="button" role="menuitem" @click="saveModel('jpg')">JPG (on white)</button>
+        <div class="bp-bench">
+          <div class="bp-sheet-col">
+            <button
+              type="button"
+              class="model-stage"
+              :title="`Zoom: ${sheet.caption || 'drawing'}`"
+              :disabled="!sheet.layers.length"
+              @click="openLightbox"
+            >
+              <RomanesqueSheet :sheet="sheet" :base="ASSET_BASE" />
+              <span v-if="sheet.layers.length" class="zoom-hint" aria-hidden="true">⤢</span>
+            </button>
+            <div class="figline">
+              <span>{{ sheet.caption }}</span>
+              <span class="figline-end">
+                <span class="nums">{{ sheet.numbers }}</span>
+                <span v-if="sheet.layers.length" class="save-wrap">
+                  <button type="button" class="ghost-btn save-btn" aria-haspopup="menu" :aria-expanded="saveMenuKey === 'sheet'" @click="toggleSaveMenu('sheet')">Save ▾</button>
+                  <div v-if="saveMenuKey === 'sheet'" class="save-menu" role="menu">
+                    <button type="button" role="menuitem" @click="saveSheet('png')">PNG (transparent)</button>
+                    <button type="button" role="menuitem" @click="saveSheet('jpg')">JPG (on white)</button>
                   </div>
                 </span>
-              </div>
-              <button
-                v-if="showModel"
-                type="button"
-                class="model-stage"
-                :title="`Zoom: ${modelCaption}`"
-                @click="openLightbox"
-              >
-                <RomanesqueBookModel
-                  :derived="state.derived || {}"
-                  :node-id="state.currentNodeId"
-                  class="model-layer"
-                />
-                <span class="zoom-hint" aria-hidden="true">⤢</span>
-              </button>
-              <p v-if="showModel" class="model-hint">One connected reconstruction, updated from your choices.</p>
-              <p v-else class="model-paused">The sewn book is set aside while you prepare the boards.</p>
-            </section>
-          </template>
+              </span>
+            </div>
+          </div>
 
-          <footer class="bp-footer">
-            <button class="secondary-btn" :disabled="state.steps.length === 0 || !!summary" @click="goBack">Back</button>
-            <button class="ghost-btn" @click="restartWizard">Restart</button>
-            <button v-if="!summary && isTerminal" class="primary-btn" @click="finishWizard">Finish</button>
-          </footer>
-        </main>
+          <main class="bp-notes" aria-live="polite">
+            <div>
+              <p class="eyebrow">Step {{ stepIndex + 1 }} of {{ steps.length }}</p>
+              <h3 ref="stepTitle" tabindex="-1" class="step-title">{{ step.title }}</h3>
+            </div>
+
+            <div v-if="step.text && step.text.length" class="prose">
+              <p v-for="(p, i) in step.text" :key="`t${i}`">{{ p }}</p>
+            </div>
+
+            <figure v-for="f in figuresAfterText" :key="`fa-${f.draw}`" class="fig">
+              <DrawingCrop :drawing="drawings[f.draw]" :box="f.box" :base="ASSET_BASE" :alt="drawings[f.draw].name || ''" class="fig-frame" />
+              <figcaption>{{ f.caption || drawings[f.draw].name }}</figcaption>
+            </figure>
+
+            <template v-if="options.length">
+              <p v-if="step.question" class="question">{{ step.question }}</p>
+              <p v-if="because" class="cond">{{ because }}</p>
+              <ul class="options" :class="{ thumbs: hasThumbs }">
+                <li v-for="o in options" :key="o.value">
+                  <button
+                    :id="`opt-${step.id}-${o.value}`"
+                    type="button"
+                    class="opt"
+                    :class="{ withthumb: !!o.thumb }"
+                    :aria-pressed="choices[step.key] === o.value ? 'true' : 'false'"
+                    :disabled="!!o.disabled"
+                    @click="pick(o.value)"
+                  >
+                    <span class="opt-row">
+                      <span class="mark" aria-hidden="true"></span>
+                      <span>{{ o.label }}</span>
+                      <span v-if="o.disabled" class="later">{{ o.disabled }}</span>
+                    </span>
+                    <DrawingCrop v-if="o.thumb" :drawing="drawings[o.thumb.draw]" :box="o.thumb.box" :base="ASSET_BASE" class="thumb" />
+                  </button>
+                </li>
+              </ul>
+            </template>
+
+            <div v-if="step.after && step.after.length" class="prose">
+              <p v-for="(p, i) in step.after" :key="`a${i}`" class="aside">{{ p }}</p>
+            </div>
+
+            <figure v-for="f in figuresOther" :key="`fo-${f.draw}`" class="fig">
+              <DrawingCrop :drawing="drawings[f.draw]" :box="f.box" :base="ASSET_BASE" :alt="drawings[f.draw].name || ''" class="fig-frame" />
+              <figcaption>{{ f.caption || drawings[f.draw].name }}</figcaption>
+            </figure>
+
+            <template v-if="step.summary">
+              <dl class="summary">
+                <template v-for="row in summary" :key="row.key">
+                  <dt>{{ row.short }}</dt>
+                  <dd>{{ row.label }}</dd>
+                </template>
+              </dl>
+              <div v-if="sheet.layers.length" class="save-wrap summary-save">
+                <button type="button" class="secondary-btn" aria-haspopup="menu" :aria-expanded="saveMenuKey === 'summary'" @click="toggleSaveMenu('summary')">Save your binding ▾</button>
+                <div v-if="saveMenuKey === 'summary'" class="save-menu" role="menu">
+                  <button type="button" role="menuitem" @click="saveSheet('png')">PNG (transparent)</button>
+                  <button type="button" role="menuitem" @click="saveSheet('jpg')">JPG (on white)</button>
+                </div>
+              </div>
+            </template>
+
+            <div class="nav">
+              <button v-if="stepIndex > 0" type="button" class="secondary-btn" @click="go(stepIndex - 1)">Back</button>
+              <button
+                v-if="!isLast"
+                type="button"
+                class="primary-btn"
+                :disabled="!answered"
+                @click="go(stepIndex + 1)"
+              >{{ step.next || "Continue" }}</button>
+              <button v-if="stepIndex > 0" type="button" class="ghost-btn restart" @click="restart">Start again</button>
+            </div>
+            <p v-if="!isLast && !answered" class="hint">Choose an option to see it on the drawing. You can change your mind before you continue.</p>
+          </main>
+        </div>
       </div>
 
       <div v-if="lightbox" class="bp-lightbox" @click.self="closeLightbox">
         <div class="bp-lightbox-card surface-card" role="dialog" aria-modal="true" aria-label="Zoomed drawing">
           <div class="lightbox-head">
-            <strong>{{ modelCaption }}</strong>
+            <strong>{{ sheet.caption }}</strong>
             <div class="lightbox-tools">
               <button type="button" class="ghost-btn" title="Zoom out" @click="zoomOut">−</button>
               <span class="zoom-label">{{ Math.round(lbZoom * 100) }}%</span>
@@ -176,11 +170,7 @@
             @dblclick="toggleDoubleZoom"
           >
             <div class="lightbox-canvas" :style="lbImgStyle">
-              <RomanesqueBookModel
-                :derived="state.derived || {}"
-                :node-id="state.currentNodeId"
-                class="lightbox-layer"
-              />
+              <RomanesqueSheet :sheet="sheet" :base="ASSET_BASE" />
             </div>
           </div>
           <p class="lightbox-hint">Scroll to zoom · drag to pan · double-click to toggle · Esc to close</p>
@@ -191,189 +181,181 @@
 </template>
 
 <script setup>
-/* eslint-disable */
+/* global defineProps, defineEmits */
 import { computed, ref, watch, onMounted, onBeforeUnmount, nextTick } from "vue";
-import { resolveBookPathAsset } from "@/bookPaths/assets.generated";
-import { BOOK_PATHS_FLOW } from "@/bookPaths/flow";
-import { applyOption, buildSummary, createInitialWizardState, replayState } from "@/bookPaths/state";
-import RomanesqueBookModel from "@/components/bookPaths/RomanesqueBookModel.vue";
+import ACTIVITY from "@/bookPaths/romanesque/activity.json";
+import {
+  canContinue,
+  choose,
+  composeSheet,
+  furthest,
+  previewFiles,
+  soFar,
+  summaryRows,
+  test,
+  visibleOptions,
+} from "@/bookPaths/romanesque/compositor";
+import RomanesqueSheet from "@/components/bookPaths/RomanesqueSheet.vue";
+import DrawingCrop from "@/components/bookPaths/DrawingCrop.vue";
 
-const props = defineProps({
+defineProps({
   initialContext: { type: Object, default: () => ({}) },
   fullscreen: { type: Boolean, default: false },
 });
 
 const emit = defineEmits(["close", "finish"]);
 
-const STORAGE_KEY = "fenius-bookpaths-progress";
+const STORAGE_KEY = "fenius-bookpaths-romanesque-v2";
+const LEGACY_STORAGE_KEYS = ["fenius-bookpaths-progress"];
+const ASSET_BASE = `${process.env.BASE_URL}book-paths/romanesque/`;
 
-const state = ref(createInitialWizardState(props.initialContext));
-const summary = ref(null);
-const lightbox = ref(null);
+const steps = ACTIVITY.steps;
+const drawings = ACTIVITY.drawings;
+const lastIndex = steps.length - 1;
+
+const choices = ref({});
+const stepIndex = ref(0);
+const finishEmitted = ref(false);
+const lightbox = ref(false);
 const saveMenuKey = ref(null);
 const lightboxCloseBtn = ref(null);
+const stepTitle = ref(null);
+const scrollArea = ref(null);
 
-// lightbox zoom / pan
-const lbZoom = ref(1);
-const lbPanX = ref(0);
-const lbPanY = ref(0);
-const lbDragging = ref(false);
-let dragStart = null;
-const lbImgStyle = computed(() => ({
-  transform: `translate(${lbPanX.value}px, ${lbPanY.value}px) scale(${lbZoom.value})`,
-}));
+const step = computed(() => steps[stepIndex.value]);
+const isLast = computed(() => stepIndex.value === lastIndex);
+const answered = computed(() => canContinue(step.value, choices.value));
+const reach = computed(() => Math.max(furthest(ACTIVITY, choices.value), stepIndex.value));
+const now = computed(() => soFar(ACTIVITY, choices.value, stepIndex.value));
+const sheet = computed(() => composeSheet(ACTIVITY, choices.value, stepIndex.value));
 
-const displaySrc = (key) => `/book-paths/display/${key}.webp`;
-const drawingSrc = (key) => resolveBookPathAsset(key) || displaySrc(key);
-
-const BOARD_PREP = new Set(["romanesque_board", "romanesque_channels", "romanesque_backcorner"]);
-
-const currentNode = computed(() => BOOK_PATHS_FLOW[state.value.currentNodeId] || null);
-
-const showModel = computed(() =>
-  !(state.value.style === "Romanesque" && state.value.currentNodeId === "romanesque_board")
+const options = computed(() => visibleOptions(step.value, choices.value));
+const because = computed(() => (options.value.find((o) => o.because) || {}).because || "");
+const hasThumbs = computed(() => options.value.some((o) => o.thumb));
+const figuresAfterText = computed(() =>
+  (step.value.figures || []).filter((f) => f.place === "afterText" && test(f.when, now.value))
 );
-
-function optionImage(option, index) {
-  if (option?.image) return option.image;
-  const source = currentNode.value?.imagesFromDerived;
-  if (!source) return null;
-  const selected = source.map?.[state.value.derived?.[source.key]] || source.fallback || [];
-  return selected[index] || selected[0] || null;
-}
-
-const supplementalImages = computed(() =>
-  [
-    ...(() => {
-      const source = currentNode.value?.supplementalImagesFromDerived;
-      if (!source) return [];
-      return source.map?.[state.value.derived?.[source.key]] || [];
-    })(),
-    ...(currentNode.value?.supplementalImages || []),
-  ].map((image) =>
-    typeof image === "string" ? { key: image, label: `Drawing ${image}` } : image
-  )
+const figuresOther = computed(() =>
+  (step.value.figures || []).filter((f) => f.place !== "afterText" && test(f.when, now.value))
 );
+const summary = computed(() => summaryRows(ACTIVITY, choices.value));
 
-const modelCaption = computed(() =>
-  BOARD_PREP.has(state.value.currentNodeId) ? "Preparing the boards (the book is set aside)" : "Your book so far"
-);
-
-const isTerminal = computed(() => {
-  if (!currentNode.value) return true;
-  return currentNode.value.kind === "end" || !Array.isArray(currentNode.value.options) || currentNode.value.options.length === 0;
+const styleLabel = computed(() => {
+  const value = choices.value.style;
+  if (!value) return "";
+  const option = (steps[0].options || []).find((o) => o.value === value);
+  return option ? option.label : "";
 });
 
-const styleLabel = computed(() => state.value.style || "");
-
-// pure forced-advance transitions are not shown as revisable path steps
-const HIDDEN_CRUMBS = new Set(["romanesque_intro", "romanesque_lacing"]);
-const answeredEntries = computed(() =>
-  state.value.steps
-    .map((step, index) => ({
-      key: `${step.nodeId}-${index}`,
-      index,
-      nodeId: step.nodeId,
-      title: step.title || resolveNodeTitle(step.nodeId),
-      choiceLabel: step.choiceLabel,
-    }))
-    .filter((e) => !HIDDEN_CRUMBS.has(e.nodeId))
-);
-
-// ---- human-readable summary ----
-const LABELS = {
-  holes: { cut: "Cut holes (knife/chisel)", pierced: "Pierced holes (awl/needle)" },
-  endleaves: { none: "No endleaves", "first-last-pages": "First & last pages of the block", "added-quire": "Added thin quire", "wrapped-bifolium": "Wrapped in a large bifolium" },
-  support: { "slit-leather": "Slit leather strap", "twisted-leather": "Twisted strap" },
-  sewing: { herringbone: "Herringbone", straight: "Straight", "packed-straight": "Packed straight" },
-  board: { square: "Squared edge", bevelled: "Slightly bevelled edge", rounded: "Rounded edge" },
-  channels: { "type-1": "Type I (short channel)", "type-2": "Type II (long channel)" },
-  lining: { none: "No lining", patch: "Patch lining", slotted: "Full-length slotted lining" },
-  endband: { "double-straight-packed": "Double support, straight packed", "double-herringbone": "Double support, herringbone", "single-straight-packed": "Single support, straight packed" },
-  endbandTab: { square: "Square tab", round: "Round tab" },
-  coverStitch: { link: "Link stitch", saddle: "Saddle stitch" },
-  fastening: { "short-strap": "Short strap", "long-strap": "Long strap" },
-};
-const FIELD_ORDER = ["holes", "endleaves", "support", "sewing", "board", "channels", "lining", "endband", "endbandTab", "coverStitch", "fastening"];
-const FIELD_TITLES = {
-  holes: "Sewing holes", endleaves: "Endleaves", support: "Sewing support", sewing: "Sewing stitch",
-  board: "Board edge", channels: "Lacing channels", lining: "Spine lining", endband: "Endbands",
-  endbandTab: "Endband tab", coverStitch: "Cover stitch", fastening: "Fastening",
-};
-const recapRows = computed(() => {
-  const d = summary.value?.derived || {};
-  return FIELD_ORDER.filter((f) => d[f] != null).map((f) => ({
-    field: f,
-    title: FIELD_TITLES[f],
-    value: (LABELS[f] && LABELS[f][d[f]]) || String(d[f]),
-  }));
-});
-function choose(option) {
-  if (!currentNode.value || option.disabled) return;
-  summary.value = null;
+// ---- navigation ----
+function pick(value) {
+  const option = options.value.find((o) => o.value === value);
+  if (!option || option.disabled) return;
   saveMenuKey.value = null;
-  state.value = applyOption(state.value, currentNode.value, option);
+  choices.value = choose(ACTIVITY, choices.value, stepIndex.value, value);
 }
 
-function jumpToDecision(stepIndex) {
-  const capped = Math.max(0, Math.min(stepIndex, state.value.steps.length));
-  const partial = state.value.steps.slice(0, capped);
-  state.value = replayState(partial, BOOK_PATHS_FLOW, props.initialContext);
-  summary.value = null;
+function go(index) {
+  const target = Math.max(0, Math.min(lastIndex, index));
+  if (target > reach.value) return;
   saveMenuKey.value = null;
+  stepIndex.value = target;
+  nextTick(() => {
+    if (scrollArea.value) scrollArea.value.scrollTop = 0;
+    if (stepTitle.value) stepTitle.value.focus({ preventScroll: true });
+  });
 }
 
-function goBack() {
-  if (!state.value.steps.length || summary.value) return;
-  jumpToDecision(state.value.steps.length - 1);
-}
-
-function restartWizard() {
-  state.value = createInitialWizardState(props.initialContext);
-  summary.value = null;
-  saveMenuKey.value = null;
+function restart() {
+  choices.value = {};
+  finishEmitted.value = false;
   closeLightbox();
-  try { sessionStorage.removeItem(STORAGE_KEY); } catch (e) {}
+  try { sessionStorage.removeItem(STORAGE_KEY); } catch (e) { /* storage unavailable */ }
+  go(0);
 }
 
-function finishWizard() {
-  summary.value = buildSummary(state.value);
-  emit("finish", summary.value);
-}
+watch(stepIndex, (index) => {
+  if (index !== lastIndex || finishEmitted.value) return;
+  finishEmitted.value = true;
+  emit("finish", {
+    style: styleLabel.value || "Romanesque",
+    choices: { ...choices.value },
+    steps: summaryRows(ACTIVITY, choices.value).map(({ key, title, label }) => ({ key, title, label })),
+  });
+});
 
-function resolveNodeTitle(nodeId) {
-  return BOOK_PATHS_FLOW[nodeId]?.title || nodeId;
-}
+// ---- preload what the next click could need ----
+const preloaded = new Set();
+watch(
+  [choices, stepIndex],
+  () => {
+    for (const file of previewFiles(ACTIVITY, choices.value, stepIndex.value)) {
+      if (preloaded.has(file)) continue;
+      preloaded.add(file);
+      const img = new Image();
+      img.decoding = "async";
+      img.src = ASSET_BASE + file;
+    }
+  },
+  { immediate: true }
+);
 
 // ---- persistence (survive refresh / accidental reload) ----
+function sanitize(saved) {
+  if (!saved || typeof saved !== "object" || !saved.choices || typeof saved.choices !== "object") return null;
+  let clean = {};
+  for (const s of steps) {
+    if (!s.key || saved.choices[s.key] == null) continue;
+    const value = saved.choices[s.key];
+    const ok = visibleOptions(s, clean).some((o) => o.value === value && !o.disabled);
+    if (ok) clean = { ...clean, [s.key]: value };
+  }
+  const index = Number.isInteger(saved.stepIndex) ? saved.stepIndex : 0;
+  return { choices: clean, stepIndex: Math.max(0, Math.min(index, furthest(ACTIVITY, clean))) };
+}
+
 watch(
-  () => state.value.steps,
-  (steps) => {
+  [choices, stepIndex],
+  () => {
     try {
-      if (steps && steps.length) sessionStorage.setItem(STORAGE_KEY, JSON.stringify(steps));
-      else sessionStorage.removeItem(STORAGE_KEY);
-    } catch (e) {}
+      if (Object.keys(choices.value).length || stepIndex.value > 0) {
+        sessionStorage.setItem(STORAGE_KEY, JSON.stringify({ choices: choices.value, stepIndex: stepIndex.value }));
+      } else {
+        sessionStorage.removeItem(STORAGE_KEY);
+      }
+    } catch (e) { /* storage unavailable */ }
   },
   { deep: true }
 );
 
+function restore() {
+  try {
+    for (const key of LEGACY_STORAGE_KEYS) sessionStorage.removeItem(key);
+    const raw = sessionStorage.getItem(STORAGE_KEY);
+    if (!raw) return;
+    const restored = sanitize(JSON.parse(raw));
+    if (!restored) {
+      sessionStorage.removeItem(STORAGE_KEY);
+      return;
+    }
+    choices.value = restored.choices;
+    finishEmitted.value = restored.stepIndex === lastIndex;
+    stepIndex.value = restored.stepIndex;
+  } catch (e) {
+    try { sessionStorage.removeItem(STORAGE_KEY); } catch (err) { /* storage unavailable */ }
+  }
+}
+
 function beforeUnloadGuard(e) {
-  if (state.value.steps.length && !summary.value) {
+  if (Object.keys(choices.value).length && !isLast.value) {
     e.preventDefault();
     e.returnValue = "";
   }
 }
 
+restore();
+
 onMounted(() => {
-  try {
-    const saved = sessionStorage.getItem(STORAGE_KEY);
-    if (saved) {
-      const steps = JSON.parse(saved);
-      if (Array.isArray(steps) && steps.length) {
-        state.value = replayState(steps, BOOK_PATHS_FLOW, props.initialContext);
-      }
-    }
-  } catch (e) {}
   window.addEventListener("keydown", onKeydown);
   window.addEventListener("beforeunload", beforeUnloadGuard);
   window.addEventListener("click", onDocClick, true);
@@ -393,16 +375,27 @@ function onDocClick(e) {
   if (saveMenuKey.value && !e.target.closest(".save-wrap")) saveMenuKey.value = null;
 }
 
-// ---- lightbox ----
+// ---- lightbox zoom / pan ----
+const lbZoom = ref(1);
+const lbPanX = ref(0);
+const lbPanY = ref(0);
+const lbDragging = ref(false);
+let dragStart = null;
+const lbImgStyle = computed(() => ({
+  transform: `translate(${lbPanX.value}px, ${lbPanY.value}px) scale(${lbZoom.value})`,
+}));
+
 let lightboxOpener = null;
 function openLightbox(e) {
+  if (!sheet.value.layers.length) return;
   lightboxOpener = e && e.currentTarget ? e.currentTarget : null;
   lightbox.value = true;
   resetZoom();
   nextTick(() => { if (lightboxCloseBtn.value) lightboxCloseBtn.value.focus(); });
 }
 function closeLightbox() {
-  lightbox.value = null;
+  if (!lightbox.value) return;
+  lightbox.value = false;
   resetZoom();
   if (lightboxOpener && lightboxOpener.focus) lightboxOpener.focus();
 }
@@ -416,7 +409,8 @@ function onPointerDown(e) { if (lbZoom.value <= 1) return; lbDragging.value = tr
 function onPointerMove(e) { if (!lbDragging.value || !dragStart) return; lbPanX.value = e.clientX - dragStart.x; lbPanY.value = e.clientY - dragStart.y; }
 function onPointerUp() { lbDragging.value = false; dragStart = null; }
 
-// ---- save the model ----
+// ---- save the sheet as PNG / JPG ----
+// Drawn from the same composeSheet() layers and matrices as the on-screen sheet.
 function toggleSaveMenu(key) { saveMenuKey.value = saveMenuKey.value === key ? null : key; }
 function triggerDownload(href, filename) {
   const a = document.createElement("a");
@@ -424,39 +418,67 @@ function triggerDownload(href, filename) {
   document.body.appendChild(a); a.click(); a.remove();
 }
 function loadImage(src) {
-  return new Promise((resolve, reject) => { const i = new Image(); i.onload = () => resolve(i); i.onerror = reject; i.src = src; });
+  return new Promise((resolve, reject) => {
+    const img = new Image();
+    img.onload = () => resolve(img);
+    img.onerror = () => reject(new Error(`could not load ${src}`));
+    img.src = src;
+  });
 }
-async function saveModel(fmt) {
+// SVGs without width/height have no intrinsic size, which some browsers refuse to draw
+// on a canvas; give each one explicit pixel dimensions at the scale it will be drawn.
+async function loadLayerForCanvas(layer, pixelScale) {
+  const url = ASSET_BASE + layer.file;
+  if (!/\.svg$/i.test(layer.file)) return { img: await loadImage(url), revoke: null };
+  const text = await (await fetch(url)).text();
+  const w = Math.min(8192, Math.ceil(layer.size[0] * pixelScale));
+  const h = Math.min(8192, Math.ceil(layer.size[1] * pixelScale));
+  const sized = text.replace(/<svg\b/, `<svg width="${w}" height="${h}"`);
+  const blobUrl = URL.createObjectURL(new Blob([sized], { type: "image/svg+xml" }));
+  return { img: await loadImage(blobUrl), revoke: blobUrl };
+}
+async function saveSheet(fmt) {
   saveMenuKey.value = null;
-  const selector = summary.value
-    ? ".summary-model-stage svg.roman-model"
-    : ".model-stage svg.roman-model";
-  const renderedSvg = document.querySelector(selector);
-  if (!renderedSvg) return;
+  const current = sheet.value;
+  if (!current.layers.length) return;
+  const [canvasW, canvasH] = ACTIVITY.canvas;
+  const W = Math.round(canvasW * 2);
+  const H = Math.round(canvasH * 2);
+  const [vx, vy, vw] = current.view;
+  const s = W / vw;
+  const loaded = [];
   try {
-    const svg = renderedSvg.cloneNode(true);
-    svg.setAttribute("xmlns", "http://www.w3.org/2000/svg");
-    svg.setAttribute("width", "1200");
-    svg.setAttribute("height", "850");
-    if (fmt === "png") svg.querySelector("[data-model-background]")?.remove();
-    const source = new XMLSerializer().serializeToString(svg);
-    const sourceUrl = URL.createObjectURL(new Blob([source], { type: "image/svg+xml;charset=utf-8" }));
-    const img = await loadImage(sourceUrl);
-    const w = 1600;
-    const h = 1133;
+    for (const layer of current.layers) {
+      const [a, b, c, d] = layer.matrix;
+      const stretch = Math.max(Math.hypot(a, b), Math.hypot(c, d));
+      loaded.push(await loadLayerForCanvas(layer, s * stretch));
+    }
     const canvas = document.createElement("canvas");
-    canvas.width = w; canvas.height = h;
+    canvas.width = W; canvas.height = H;
     const ctx = canvas.getContext("2d");
-    if (fmt === "jpg") { ctx.fillStyle = "#fff"; ctx.fillRect(0, 0, w, h); }
-    ctx.drawImage(img, 0, 0, w, h);
-    URL.revokeObjectURL(sourceUrl);
-    canvas.toBlob((blob) => {
-      if (!blob) return;
-      const url = URL.createObjectURL(blob);
-      triggerDownload(url, `bookbinding.${fmt === "jpg" ? "jpg" : "png"}`);
-      setTimeout(() => URL.revokeObjectURL(url), 5000);
-    }, fmt === "jpg" ? "image/jpeg" : "image/png", 0.92);
-  } catch (e) { /* ignore */ }
+    if (fmt === "jpg") { ctx.fillStyle = "#fff"; ctx.fillRect(0, 0, W, H); }
+    current.layers.forEach((layer, i) => {
+      const [a, b, c, d, e, f] = layer.matrix;
+      ctx.setTransform(s * a, s * b, s * c, s * d, s * (e - vx), s * (f - vy));
+      ctx.drawImage(loaded[i].img, 0, 0, layer.size[0], layer.size[1]);
+    });
+    ctx.setTransform(1, 0, 0, 1, 0, 0);
+    const stepName = (step.value.id || "sheet").replace(/[^a-z0-9-]/gi, "");
+    await new Promise((resolve) => {
+      canvas.toBlob((blob) => {
+        if (blob) {
+          const url = URL.createObjectURL(blob);
+          triggerDownload(url, `romanesque-binding-${stepName}.${fmt === "jpg" ? "jpg" : "png"}`);
+          setTimeout(() => URL.revokeObjectURL(url), 5000);
+        }
+        resolve();
+      }, fmt === "jpg" ? "image/jpeg" : "image/png", 0.92);
+    });
+  } catch (e) {
+    /* a failed export leaves the page as it was */
+  } finally {
+    for (const item of loaded) if (item.revoke) URL.revokeObjectURL(item.revoke);
+  }
 }
 
 function handleClose() { emit("close"); }
@@ -492,6 +514,7 @@ function handleClose() { emit("close"); }
 .book-paths-overlay.fullscreen .book-paths-modal {
   width: 100%;
   height: 100vh;
+  height: 100dvh;
   border-radius: 0;
 }
 
@@ -510,196 +533,108 @@ function handleClose() { emit("close"); }
   margin: 4px 0 0;
   color: hsl(var(--muted-foreground));
   font-size: 14px;
+  line-height: 1.4;
 }
 
-.bp-layout {
+.bp-activity-title { font-weight: 600; color: hsl(var(--foreground)); }
+
+.bp-body {
   flex: 1;
   min-height: 0;
-  display: grid;
-  grid-template-columns: 250px 1fr;
-}
-
-.bp-crumbs,
-.bp-main { padding: 14px; overflow: auto; }
-
-.bp-crumbs {
-  border-right: 1px solid hsl(var(--border));
-  background: hsl(var(--card) / 0.78);
-}
-
-.bp-main { display: flex; flex-direction: column; }
-
-.bp-crumbs h3,
-.bp-main h3 { margin: 0 0 10px; font-size: 16px; }
-
-.bp-crumbs ul {
-  list-style: none;
-  margin: 0; padding: 0;
-  display: flex; flex-direction: column; gap: 8px;
-}
-
-.bp-crumbs button { width: 100%; text-align: left; font-weight: 600; }
-
-.crumb-choice {
-  display: block;
-  margin-top: 4px;
-  font-size: 12px;
-  color: hsl(var(--muted-foreground));
-}
-
-.current-step {
-  padding: 8px 10px;
-  border-radius: 10px;
-  border: 1px dashed hsl(var(--border));
-  font-size: 13px;
-  color: hsl(var(--muted-foreground));
-}
-
-.bp-copy {
-  margin-top: 0;
-  color: hsl(var(--muted-foreground));
-  line-height: 1.55;
-  max-width: 70ch;
-}
-
-.bp-options {
-  display: grid;
-  grid-template-columns: repeat(auto-fit, minmax(190px, 1fr));
-  gap: 10px;
-  margin: 12px 0 6px;
-}
-
-.bp-option-card {
-  min-width: 0;
-  padding: 10px;
+  overflow: auto;
+  padding: 14px 16px 28px;
   display: flex;
   flex-direction: column;
-  gap: 10px;
+  gap: 16px;
 }
 
-.bp-option-button { width: 100%; }
-
-.bp-option-image {
-  width: 100%;
-  height: 150px;
-  object-fit: contain;
-  display: block;
-  border-radius: 8px;
-  background: #fff;
-}
-
-.bp-option-note {
-  min-height: 72px;
-  margin: 0;
-  display: grid;
-  place-items: center;
-  border: 1px dashed hsl(var(--border));
-  border-radius: 8px;
-  color: hsl(var(--muted-foreground));
-  font-size: 13px;
-}
-
-.primary-btn.is-disabled {
-  opacity: 0.5;
-  cursor: not-allowed;
-  filter: grayscale(0.4);
-}
-
-.soon { font-size: 12px; opacity: 0.85; }
-
-.bp-terminal-note {
-  margin: 14px 0 6px;
-  color: hsl(var(--muted-foreground));
-  font-size: 14px;
-}
-
-.bp-supplemental {
+/* ---- stage rail ---- */
+.bp-rail {
   display: flex;
   flex-wrap: wrap;
-  gap: 12px;
-  margin: 12px 0 4px;
-}
-
-.bp-supplemental figure {
-  width: min(260px, 100%);
+  gap: 4px 6px;
+  list-style: none;
   margin: 0;
-  overflow: hidden;
-  border: 1px solid hsl(var(--border));
-  border-radius: 10px;
-  background: hsl(var(--card));
+  padding: 0;
 }
 
-.bp-supplemental img {
-  width: 100%;
-  height: 150px;
-  object-fit: contain;
-  display: block;
-  background: #fff;
-}
-
-.bp-supplemental figcaption {
-  padding: 7px 9px;
+.bp-rail button {
+  font: inherit;
+  font-size: 0.8rem;
+  line-height: 1.2;
   color: hsl(var(--muted-foreground));
-  font-size: 12px;
-}
-
-/* ---- evolving model ---- */
-.bp-model-wrap { margin: 16px auto 4px; width: min(820px, 100%); }
-
-.model-caption {
-  display: flex;
+  background: none;
+  border: 1px solid transparent;
+  border-radius: 999px;
+  padding: 4px 10px 4px 6px;
+  cursor: pointer;
+  display: inline-flex;
   align-items: center;
-  justify-content: space-between;
-  margin-bottom: 8px;
+  gap: 6px;
 }
 
-.model-caption > span:first-child {
-  font-size: 14px;
-  font-weight: 700;
-  color: hsl(var(--card-foreground));
+.rail-num {
+  font-size: 0.7rem;
+  font-weight: 600;
+  width: 1.6em;
+  height: 1.6em;
+  border-radius: 50%;
+  display: inline-grid;
+  place-items: center;
+  border: 1px solid hsl(var(--border));
+  font-variant-numeric: tabular-nums;
+}
+
+.bp-rail button:disabled { cursor: default; opacity: 0.55; }
+.bp-rail li.done button { color: hsl(var(--foreground)); }
+.bp-rail li.done .rail-num { background: hsl(var(--primary) / 0.14); border-color: transparent; }
+.bp-rail li.current button {
+  color: hsl(var(--foreground));
+  border-color: hsl(var(--border));
+  background: hsl(var(--card));
+  font-weight: 600;
+}
+.bp-rail li.current .rail-num {
+  background: hsl(var(--primary));
+  border-color: hsl(var(--primary));
+  color: hsl(var(--primary-foreground));
+}
+
+/* ---- bench: sheet left, notes right ---- */
+.bp-bench {
+  display: grid;
+  grid-template-columns: minmax(0, 1.25fr) minmax(0, 1fr);
+  gap: 28px;
+  align-items: start;
+}
+
+.bp-sheet-col {
+  position: sticky;
+  top: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  min-width: 0;
 }
 
 .model-stage {
   position: relative;
   display: block;
   width: 100%;
-  aspect-ratio: 1190.6 / 841.9;
+  padding: 0;
   border: 1px solid hsl(var(--border));
-  border-radius: 12px;
+  border-radius: 6px;
   overflow: hidden;
   background: #fff;
-  padding: 0;
   cursor: zoom-in;
   box-shadow: var(--shadow-sm);
 }
 
-.model-layer {
-  position: absolute;
-  inset: 0;
-  width: 100%;
-  height: 100%;
-  object-fit: contain;
-}
-
-.model-hint {
-  margin: 8px 0 0;
-  text-align: center;
-  font-size: 12px;
-  color: hsl(var(--muted-foreground));
-}
-
-.model-paused {
-  margin: 0;
-  padding: 24px;
-  border: 1px dashed hsl(var(--border));
-  border-radius: 12px;
-  text-align: center;
-  color: hsl(var(--muted-foreground));
-}
+.model-stage:disabled { cursor: default; }
 
 .zoom-hint {
   position: absolute;
-  right: 8px; bottom: 8px;
+  right: 8px; top: 8px;
   width: 26px; height: 26px;
   display: grid; place-items: center;
   border-radius: 8px;
@@ -707,18 +642,154 @@ function handleClose() { emit("close"); }
   color: #fff; font-size: 14px;
   opacity: 0;
   transition: opacity 0.15s ease;
+  z-index: 100;
 }
 
-.model-stage:hover .zoom-hint { opacity: 1; }
+.model-stage:hover .zoom-hint,
+.model-stage:focus-visible .zoom-hint { opacity: 1; }
 
+.figline {
+  display: flex;
+  flex-wrap: wrap;
+  justify-content: space-between;
+  align-items: center;
+  gap: 2px 16px;
+  color: hsl(var(--muted-foreground));
+  font-size: 0.78rem;
+}
+
+.figline-end { display: inline-flex; align-items: center; gap: 10px; }
+.nums { font-variant-numeric: tabular-nums; }
+
+/* ---- notes ---- */
+.bp-notes {
+  min-width: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 16px;
+}
+
+.eyebrow {
+  margin: 0;
+  font-size: 0.72rem;
+  font-weight: 600;
+  letter-spacing: 0.09em;
+  text-transform: uppercase;
+  color: hsl(var(--muted-foreground));
+}
+
+.step-title {
+  margin: 4px 0 0;
+  font-size: 1.45rem;
+  line-height: 1.2;
+}
+
+.step-title:focus { outline: none; }
+.step-title:focus-visible { outline: 2px solid hsl(var(--ring)); outline-offset: 2px; }
+
+.prose { display: flex; flex-direction: column; gap: 10px; max-width: 62ch; line-height: 1.55; }
+.prose p { margin: 0; }
+.prose p.aside { color: hsl(var(--muted-foreground)); font-size: 0.93rem; }
+.question { margin: 0; font-weight: 600; }
+.cond { margin: 0; color: hsl(var(--muted-foreground)); font-size: 0.9rem; }
+
+.options {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  margin: 0;
+  padding: 0;
+  list-style: none;
+  max-width: 62ch;
+}
+
+.options.thumbs { flex-direction: row; flex-wrap: wrap; }
+.options.thumbs li { flex: 1 1 180px; }
+
+.opt {
+  width: 100%;
+  text-align: left;
+  font: inherit;
+  color: hsl(var(--card-foreground));
+  background: hsl(var(--card));
+  border: 1px solid hsl(var(--border));
+  border-radius: 8px;
+  padding: 10px 14px;
+  cursor: pointer;
+  display: flex;
+  flex-direction: column;
+  align-items: stretch;
+  gap: 8px;
+}
+
+.opt-row { display: flex; align-items: center; gap: 12px; }
+
+.mark {
+  flex: none;
+  width: 16px;
+  height: 16px;
+  border-radius: 50%;
+  border: 1.5px solid hsl(var(--muted-foreground));
+  display: inline-grid;
+  place-items: center;
+}
+
+.opt[aria-pressed="true"] { border-color: hsl(var(--primary)); background: hsl(var(--primary) / 0.1); }
+.opt[aria-pressed="true"] .mark { border-color: hsl(var(--primary)); }
+.opt[aria-pressed="true"] .mark::after {
+  content: "";
+  width: 8px;
+  height: 8px;
+  border-radius: 50%;
+  background: hsl(var(--primary));
+}
+.opt:hover:not(:disabled) { border-color: hsl(var(--primary)); }
+.opt:disabled {
+  cursor: not-allowed;
+  color: hsl(var(--muted-foreground));
+  border-style: dashed;
+  background: none;
+}
+.opt:focus-visible { outline: 2px solid hsl(var(--ring)); outline-offset: 2px; }
+.later { margin-left: auto; font-size: 0.78rem; color: hsl(var(--muted-foreground)); white-space: nowrap; }
+
+.thumb {
+  border: 1px solid hsl(var(--border));
+  border-radius: 4px;
+}
+
+.fig { margin: 0; max-width: 340px; display: flex; flex-direction: column; gap: 6px; }
+.fig-frame { border: 1px solid hsl(var(--border)); border-radius: 4px; }
+.fig figcaption { color: hsl(var(--muted-foreground)); font-size: 0.82rem; }
+
+.summary {
+  margin: 0;
+  display: grid;
+  grid-template-columns: auto minmax(0, 1fr);
+  gap: 4px 16px;
+  max-width: 62ch;
+  font-size: 0.93rem;
+}
+
+.summary dt { color: hsl(var(--muted-foreground)); }
+.summary dd { margin: 0; font-weight: 600; }
+
+.summary-save { align-self: flex-start; }
+
+.nav { display: flex; flex-wrap: wrap; gap: 10px; align-items: center; margin-top: 4px; }
+.nav .restart { margin-left: auto; }
+.nav button:disabled { opacity: 0.45; cursor: not-allowed; }
+.hint { margin: 0; color: hsl(var(--muted-foreground)); font-size: 0.85rem; }
+
+/* ---- save menu ---- */
 .save-wrap { position: relative; }
 .save-btn { font-size: 12px; padding: 4px 10px; }
 
 .save-menu {
   position: absolute;
   right: 0;
-  bottom: calc(100% + 6px);
-  z-index: 5;
+  top: calc(100% + 6px);
+  z-index: 200;
   display: flex;
   flex-direction: column;
   min-width: 170px;
@@ -729,6 +800,8 @@ function handleClose() { emit("close"); }
   box-shadow: var(--shadow-md, 0 10px 24px rgb(6 14 25 / 0.3));
 }
 
+.summary-save .save-menu { left: 0; right: auto; }
+
 .save-menu button {
   border: 0; background: transparent;
   color: hsl(var(--card-foreground));
@@ -736,71 +809,8 @@ function handleClose() { emit("close"); }
   font-size: 13px; cursor: pointer;
 }
 
-.save-menu button:hover { background: hsl(var(--muted)); }
-
-.bp-footer {
-  margin-top: auto;
-  padding-top: 14px;
-  border-top: 1px solid hsl(var(--border));
-  display: flex;
-  justify-content: center;
-  gap: 10px;
-}
-
-/* ---- summary ---- */
-.summary-grid {
-  display: grid;
-  grid-template-columns: minmax(240px, 1fr) minmax(280px, 1.2fr);
-  gap: 18px;
-  align-items: start;
-}
-
-.summary-recap { padding: 14px 16px; }
-.recap-style { margin: 0 0 10px; font-size: 16px; }
-
-.summary-recap dl {
-  margin: 0;
-  display: grid;
-  grid-template-columns: auto 1fr;
-  gap: 6px 14px;
-}
-
-.summary-recap dt { color: hsl(var(--muted-foreground)); font-size: 13px; }
-.summary-recap dd { margin: 0; font-size: 13px; font-weight: 600; color: hsl(var(--card-foreground)); }
-
-.summary-figure {
-  margin: 0;
-  border: 1px solid hsl(var(--border));
-  border-radius: 12px;
-  overflow: hidden;
-  background: hsl(var(--card));
-}
-
-.figure-head {
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
-  gap: 8px;
-  padding: 8px 10px;
-  border-bottom: 1px solid hsl(var(--border));
-}
-
-.figure-head .fig-title { font-size: 12px; color: hsl(var(--muted-foreground)); }
-
-.summary-model-stage {
-  position: relative;
-  width: 100%;
-  aspect-ratio: 1190.6 / 841.9;
-  background: #fff;
-}
-
-.summary-model-layer {
-  position: absolute;
-  inset: 0;
-  width: 100%;
-  height: 100%;
-  object-fit: contain;
-}
+.save-menu button:hover,
+.save-menu button:focus-visible { background: hsl(var(--muted)); }
 
 /* ---- lightbox ---- */
 .bp-lightbox {
@@ -827,6 +837,7 @@ function handleClose() { emit("close"); }
   align-items: center;
   gap: 10px;
   margin-bottom: 10px;
+  flex-wrap: wrap;
 }
 
 .lightbox-tools { display: flex; align-items: center; gap: 6px; flex-wrap: wrap; }
@@ -853,18 +864,8 @@ function handleClose() { emit("close"); }
 
 .lightbox-canvas {
   position: relative;
-  width: min(100%, 92vh * 1190.6 / 841.9);
-  aspect-ratio: 1190.6 / 841.9;
+  width: min(100%, calc((92vh - 110px) * 1190.6 / 841.9));
   transform-origin: center center;
-  will-change: transform;
-}
-
-.lightbox-layer {
-  position: absolute;
-  inset: 0;
-  width: 100%; height: 100%;
-  object-fit: contain;
-  user-select: none;
 }
 
 .lightbox-hint {
@@ -874,9 +875,20 @@ function handleClose() { emit("close"); }
   color: hsl(var(--muted-foreground));
 }
 
-@media (max-width: 1120px) {
-  .bp-layout { grid-template-columns: 1fr; grid-template-rows: auto 1fr; }
-  .bp-crumbs { border-right: 0; border-bottom: 1px solid hsl(var(--border)); }
-  .summary-grid { grid-template-columns: 1fr; }
+@media (max-width: 860px) {
+  .bp-bench { grid-template-columns: minmax(0, 1fr); gap: 18px; }
+  .bp-sheet-col { position: static; }
+}
+
+@media (max-width: 480px) {
+  .bp-body { padding: 12px 12px 24px; }
+  .bp-header { padding: 12px; }
+  .bp-header h2 { font-size: 20px; }
+  /* one piece per line instead of a run-on sentence on phones */
+  .bp-subtitle .bp-activity-title,
+  .bp-subtitle .bp-activity-sub,
+  .bp-subtitle .bp-context { display: block; }
+  .bp-subtitle .bp-sep { display: none; }
+  .bp-subtitle { font-size: 13px; }
 }
 </style>

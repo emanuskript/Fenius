@@ -1,0 +1,13 @@
+<svg xmlns="http://www.w3.org/2000/svg" id="Square_endband_tab" version="1.1" viewBox="0 0 1190.55 841.89"><defs><style>.st0 {
+        fill: none;
+      }
+
+      .st0, .st1 {
+        stroke: #231f20;
+        stroke-miterlimit: 10;
+        stroke-width: .7px;
+      }
+
+      .st1 {
+        fill: #fff;
+      }</style></defs><path d="M453.24 466.03" class="st0"/><path d="M616.11 467.77H451.5c-2.45-35.92-2.85-69.61 0-99.76h164.61c-3.97 15.99-1.69 59.15 0 99.76Z" class="st1"/><line x1="616.11" x2="617.85" y1="368.01" y2="366.27" class="st0"/><path d="m451.5 368.01 1.73-1.73h164.61c-3.41 16.21-1.37 59.65 0 99.76l-1.73 1.73" class="st0"/></svg>
