@@ -9,7 +9,8 @@ locked build and a static HTTPS host with SPA fallback.
 - Build with Node.js 18-22 and npm 9+; Node.js 20 LTS is recommended.
 - Serve with Nginx on Linux or Vercel.
 - Allow at least 1 GiB free for staging. The uncompressed book-path asset set is
-  about 327 MiB and includes individual SVG/PNG files over 60 MiB, so bandwidth,
+  about 353 MiB (of which the Romanesque drawing stack in
+  `public/book-paths/romanesque/` is about 26 MiB) and includes individual SVG/PNG files over 60 MiB, so bandwidth,
   CDN/cache behavior, and low-memory/mobile testing matter.
 - Public DNS and TCP 80/443. There are no application ports to expose.
 
@@ -23,7 +24,8 @@ npm run verify
 ```
 
 `verify` audits every public SVG for scripts, event handlers, JavaScript URLs,
-external references, and doctypes; validates the generated book-path model;
+external references, and doctypes; validates the Romanesque activity (every
+decision path, scene, drawing file and viewBox);
 runs ESLint; and creates a production bundle. Do not deploy if the audit fails.
 
 The bundle currently emits performance warnings because the scholarly drawing
@@ -93,8 +95,10 @@ verification workflow before production promotion.
 
 ## Asset regeneration
 
-Asset sync replaces `public/book-paths`. It has no default source and requires
-an explicit confirmation phrase:
+Asset sync replaces the top-level drawing files in `public/book-paths`; it does
+not touch the Romanesque drawing stack in `public/book-paths/romanesque/`, which
+is copied as delivered alongside `src/bookPaths/romanesque/activity.json`. It
+has no default source and requires an explicit confirmation phrase:
 
 ```bash
 BOOK_PATHS_DRAWINGS_DIR=/absolute/path/to/reviewed-assets \

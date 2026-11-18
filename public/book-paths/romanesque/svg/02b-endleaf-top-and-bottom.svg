@@ -1,0 +1,12 @@
+<svg xmlns="http://www.w3.org/2000/svg" id="Layer_1" version="1.1" viewBox="0 0 1190.6 841.9"><defs><style>.st0 {
+        fill: none;
+      }
+
+      .st0, .st1 {
+        stroke: #231f20;
+        stroke-miterlimit: 10;
+      }
+
+      .st1 {
+        fill: #fff;
+      }</style></defs><g id="Bottom_leaf"><polyline points="218 536.5 214.5 539 685.2 810.7 1035.5 608.2 1030.3 605.5" class="st0"/></g><g id="Top_leaf"><polygon points="210.9 362.6 681.6 634.3 1031.9 431.8 561 161.3 210.9 362.6" class="st1"/></g></svg>
